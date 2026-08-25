@@ -13,9 +13,13 @@ const main = (): void => {
     const persistence = createPersistence({ dataDirectory: configuration.dataDirectory })
 
     const server = Bun.serve({
-      fetch: createApp().fetch,
+      fetch: createApp({
+        dataDirectory: configuration.dataDirectory,
+        security: configuration.security
+      }).fetch,
       hostname: "127.0.0.1",
-      port: configuration.port
+      port: configuration.port,
+      maxRequestBodySize: configuration.security.requestBytes
     })
 
     console.info(`Server listening at ${server.url}`)
@@ -33,7 +37,8 @@ const main = (): void => {
       return
     }
 
-    throw error
+    console.error("STARTUP_ERROR")
+    process.exitCode = 1
   }
 }
 
