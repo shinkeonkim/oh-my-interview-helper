@@ -1,6 +1,7 @@
 import eslint from "@eslint/js"
 import eslintConfigPrettier from "eslint-config-prettier"
 import vuePlugin from "eslint-plugin-vue"
+import globals from "globals"
 import tseslint from "typescript-eslint"
 import vueParser from "vue-eslint-parser"
 
@@ -46,11 +47,19 @@ export default [
     files: ["**/*.vue"],
     languageOptions: {
       parser: vueParser,
+      globals: globals.browser,
       parserOptions: {
         extraFileExtensions: [".vue"],
         parser: tseslint.parser,
         sourceType: "module"
       }
+    }
+  },
+  {
+    files: ["client/src/components/ui/**/*.vue"],
+    rules: {
+      "vue/multi-word-component-names": "off",
+      "vue/require-default-prop": "off"
     }
   },
   eslintConfigPrettier
