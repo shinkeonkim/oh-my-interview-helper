@@ -3,6 +3,12 @@ import { resolve } from "node:path"
 
 import { z } from "zod"
 
+import {
+  LocalSecurityConfigurationError,
+  parseLocalSecuritySettings,
+  type LocalSecuritySettings
+} from "./security/config"
+
 export type RawEnvironment = Readonly<Record<string, string | undefined>>
 
 const PortSchema = z
@@ -21,10 +27,11 @@ const ServerEnvironmentSchema = z.object({
 export type ServerConfig = {
   readonly port: z.output<typeof PortSchema>
   readonly dataDirectory: string
+  readonly security: LocalSecuritySettings
 }
 
 export type StartupConfigurationIssue = {
-  readonly field: "PORT" | "DATA_DIR"
+  readonly field: "PORT" | "DATA_DIR" | "SECURITY"
   readonly code: "missing" | "invalid" | "unavailable"
 }
 
@@ -63,9 +70,20 @@ export const parseServerConfig = (environment: RawEnvironment): ServerConfig => 
     )
   }
 
+  const security = (() => {
+    try {
+      return parseLocalSecuritySettings(environment, parsed.data.PORT)
+    } catch (error) {
+      if (error instanceof LocalSecurityConfigurationError)
+        throw new StartupConfigurationError([{ field: "SECURITY", code: "invalid" }])
+      throw error
+    }
+  })()
+
   return {
     port: parsed.data.PORT,
-    dataDirectory: resolve(parsed.data.DATA_DIR)
+    dataDirectory: resolve(parsed.data.DATA_DIR),
+    security
   }
 }
 
