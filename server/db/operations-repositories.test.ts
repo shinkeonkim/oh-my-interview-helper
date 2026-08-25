@@ -39,8 +39,9 @@ describe("operations repositories", () => {
       state: "queued",
       idempotencyKey: crypto.randomUUID(),
       payload: { applicationId: crypto.randomUUID() },
-      leaseOwner: null,
-      leaseExpiresAt: null
+      retryClass: "local",
+      executionTarget: "app",
+      maxAttempts: 1
     }
 
     // When
@@ -51,7 +52,7 @@ describe("operations repositories", () => {
     expect(operations.getJobByIdempotencyKey(created.idempotencyKey)).toEqual(created)
     expect(operations.listJobs()).toEqual([created])
     expect(created.leaseExpiresAt).toBeNull()
-    expect(() => operations.createJob({ ...input, id: crypto.randomUUID() })).toThrow()
+    expect(operations.createJob({ ...input, id: crypto.randomUUID() })).toEqual(created)
     expect(() => operations.createJob({ ...input, idempotencyKey: crypto.randomUUID() })).toThrow()
     close()
   })
@@ -64,7 +65,10 @@ describe("operations repositories", () => {
       kind: "research",
       state: "queued",
       idempotencyKey: crypto.randomUUID(),
-      payload: {}
+      payload: {},
+      retryClass: "local",
+      executionTarget: "app",
+      maxAttempts: 1
     })
 
     // When
@@ -82,8 +86,8 @@ describe("operations repositories", () => {
     })
 
     // Then
-    expect([queued.sequence, leased.sequence]).toEqual([1, 2])
-    expect(operations.listJobEvents(job.id)).toEqual([queued, leased])
+    expect([queued.sequence, leased.sequence]).toEqual([2, 3])
+    expect(operations.listJobEvents(job.id)).toHaveLength(3)
     expect(() =>
       operations.appendJobEvent({
         id: crypto.randomUUID(),

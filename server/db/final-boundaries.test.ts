@@ -51,62 +51,20 @@ test("rejects secret capabilities from persisted settings and runner rows", () =
   persistence.close()
 })
 
-test("enforces exhaustive durable state invariants in Zod and SQLite", () => {
+test("restricts durable creation to queued, secret-free jobs", () => {
   const persistence = createPersistenceForTest()
-  const valid = [
-    {
+  expect(() =>
+    DurableJobCreateSchema.parse({
+      id: crypto.randomUUID(),
+      kind: "work",
       state: "queued",
-      leaseOwner: null,
-      leaseExpiresAt: null,
-      errorCode: null,
-      errorMessage: null
-    },
-    {
-      state: "leased",
-      leaseOwner: "runner-a",
-      leaseExpiresAt: timestamp,
-      errorCode: null,
-      errorMessage: null
-    },
-    {
-      state: "running",
-      leaseOwner: "runner-a",
-      leaseExpiresAt: timestamp,
-      errorCode: null,
-      errorMessage: null
-    },
-    {
-      state: "succeeded",
-      leaseOwner: null,
-      leaseExpiresAt: null,
-      errorCode: null,
-      errorMessage: null
-    },
-    {
-      state: "failed",
-      leaseOwner: null,
-      leaseExpiresAt: null,
-      errorCode: "provider_error",
-      errorMessage: "unavailable"
-    },
-    {
-      state: "cancelled",
-      leaseOwner: null,
-      leaseExpiresAt: null,
-      errorCode: null,
-      errorMessage: null
-    }
-  ] as const
-  for (const fields of valid)
-    expect(() =>
-      DurableJobCreateSchema.parse({
-        id: crypto.randomUUID(),
-        kind: "work",
-        idempotencyKey: crypto.randomUUID(),
-        payload: {},
-        ...fields
-      })
-    ).not.toThrow()
+      idempotencyKey: crypto.randomUUID(),
+      payload: {},
+      retryClass: "local",
+      executionTarget: "app",
+      maxAttempts: 1
+    })
+  ).not.toThrow()
   expect(() =>
     DurableJobCreateSchema.parse({
       id: crypto.randomUUID(),
@@ -114,10 +72,9 @@ test("enforces exhaustive durable state invariants in Zod and SQLite", () => {
       state: "succeeded",
       idempotencyKey: crypto.randomUUID(),
       payload: {},
-      leaseOwner: "runner-a",
-      leaseExpiresAt: timestamp,
-      errorCode: null,
-      errorMessage: null
+      retryClass: "local",
+      executionTarget: "app",
+      maxAttempts: 1
     })
   ).toThrow()
   expect(() =>
