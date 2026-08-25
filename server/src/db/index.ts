@@ -12,6 +12,8 @@ export * from "./domain-repositories"
 export * from "./operations-repositories"
 export * from "./provider-artifact-repositories"
 export * from "./research-conversation-repositories"
+export * from "../jobs/types"
+export { JobsRepository } from "../jobs/repository"
 export { BlobRepository, DocumentRepository, Repositories } from "./repositories"
 export type PersistenceOptions = {
   readonly dataDirectory: string
