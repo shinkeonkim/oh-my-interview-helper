@@ -1,0 +1,44 @@
+{
+  "name": "oh-my-interview-helper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.10",
+  "engines": {
+    "bun": "1.3.10",
+    "node": "22.14.0"
+  },
+  "workspaces": [
+    "server",
+    "client",
+    "shared"
+  ],
+  "scripts": {
+    "build": "bun run build:client && bun run build:server",
+    "build:client": "bun run --cwd client build",
+    "build:server": "bun build server/src/index.ts --target bun --outdir server/dist --sourcemap=linked",
+    "dev": "bun --hot server/src/index.ts",
+    "dev:client": "bun run --cwd client dev",
+    "format": "prettier --write .",
+    "lint": "eslint . && prettier --check .",
+    "start": "bun server/dist/index.js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p server/tsconfig.json && vue-tsc --noEmit -p client/tsconfig.app.json && tsc --noEmit -p client/tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.2.0",
+    "@vitejs/plugin-vue": "6.0.8",
+    "bun-types": "1.4.0",
+    "eslint": "10.9.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-vue": "10.10.0",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vite": "8.2.2",
+    "vue-eslint-parser": "10.4.1",
+    "vue-tsc": "3.3.11"
+  }
+}

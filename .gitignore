@@ -1,0 +1,24 @@
+# Local configuration and task input
+.env
+.env.*
+!.env.example
+REQUEST.md
+.omo/evidence/
+
+# Runtime state and credentials
+/data/
+/.secrets/
+/secrets/
+*.db
+*.db-shm
+*.db-wal
+*.pem
+*.sqlite
+*.sqlite3
+
+# Generated artifacts
+client/dist/
+node_modules/
+server/dist/
+server/public/
+coverage/

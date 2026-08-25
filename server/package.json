@@ -1,0 +1,12 @@
+{
+  "name": "@interview-helper/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@interview-helper/shared": "workspace:*",
+    "@strands-agents/sdk": "1.14.0",
+    "hono": "4.13.4",
+    "zod": "4.4.3"
+  }
+}

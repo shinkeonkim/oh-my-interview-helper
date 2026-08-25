@@ -1,0 +1,5 @@
+.omo/evidence/
+client/dist/
+node_modules/
+server/dist/
+server/public/

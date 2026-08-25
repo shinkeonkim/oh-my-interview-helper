@@ -1,0 +1,83 @@
+import { accessSync, constants, mkdirSync } from "node:fs"
+import { resolve } from "node:path"
+
+import { z } from "zod"
+
+export type RawEnvironment = Readonly<Record<string, string | undefined>>
+
+const PortSchema = z
+  .string()
+  .trim()
+  .regex(/^[1-9][0-9]{0,4}$/)
+  .transform(Number)
+  .pipe(z.number().int().min(1).max(65535))
+  .brand<"Port">()
+
+const ServerEnvironmentSchema = z.object({
+  PORT: PortSchema,
+  DATA_DIR: z.string().trim().min(1)
+})
+
+export type ServerConfig = {
+  readonly port: z.output<typeof PortSchema>
+  readonly dataDirectory: string
+}
+
+export type StartupConfigurationIssue = {
+  readonly field: "PORT" | "DATA_DIR"
+  readonly code: "missing" | "invalid" | "unavailable"
+}
+
+const formatIssue = (issue: StartupConfigurationIssue): string => `${issue.field}: ${issue.code}`
+
+export class StartupConfigurationError extends Error {
+  override readonly name = "StartupConfigurationError"
+
+  constructor(readonly issues: readonly StartupConfigurationIssue[]) {
+    super(`CONFIGURATION_ERROR: ${issues.map(formatIssue).join(", ")}`)
+  }
+}
+
+type SchemaIssue = {
+  readonly path: readonly PropertyKey[]
+}
+
+const toStartupConfigurationIssue = (
+  issue: SchemaIssue,
+  environment: RawEnvironment
+): StartupConfigurationIssue => {
+  const field = issue.path[0] === "PORT" ? "PORT" : "DATA_DIR"
+
+  return {
+    field,
+    code: environment[field] === undefined ? "missing" : "invalid"
+  }
+}
+
+export const parseServerConfig = (environment: RawEnvironment): ServerConfig => {
+  const parsed = ServerEnvironmentSchema.safeParse(environment)
+
+  if (!parsed.success) {
+    throw new StartupConfigurationError(
+      parsed.error.issues.map((issue) => toStartupConfigurationIssue(issue, environment))
+    )
+  }
+
+  return {
+    port: parsed.data.PORT,
+    dataDirectory: resolve(parsed.data.DATA_DIR)
+  }
+}
+
+export const ensureDataDirectoryIsWritable = ({ dataDirectory }: ServerConfig): void => {
+  try {
+    mkdirSync(dataDirectory, { recursive: true })
+    accessSync(dataDirectory, constants.W_OK)
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new StartupConfigurationError([{ field: "DATA_DIR", code: "unavailable" }])
+    }
+
+    throw error
+  }
+}
