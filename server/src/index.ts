@@ -4,11 +4,13 @@ import {
   parseServerConfig,
   StartupConfigurationError
 } from "./config"
+import { createPersistence } from "./db"
 
 const main = (): void => {
   try {
     const configuration = parseServerConfig(process.env)
     ensureDataDirectoryIsWritable(configuration)
+    const persistence = createPersistence({ dataDirectory: configuration.dataDirectory })
 
     const server = Bun.serve({
       fetch: createApp().fetch,
@@ -17,6 +19,13 @@ const main = (): void => {
     })
 
     console.info(`Server listening at ${server.url}`)
+    const shutdown = (): void => {
+      server.stop(true)
+      persistence.close()
+      process.exit(0)
+    }
+    process.once("SIGINT", shutdown)
+    process.once("SIGTERM", shutdown)
   } catch (error) {
     if (error instanceof StartupConfigurationError) {
       console.error(error.message)
