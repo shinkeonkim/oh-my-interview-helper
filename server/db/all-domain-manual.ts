@@ -127,13 +127,12 @@ const main = async (): Promise<void> => {
   const durableJob = operations.createJob({
     id: crypto.randomUUID(),
     kind: "research",
-    state: "leased",
+    state: "queued",
     idempotencyKey: crypto.randomUUID(),
     payload: { applicationId: application.id },
-    leaseOwner: "runner-a",
-    leaseExpiresAt: "2026-08-26T12:05:00.000Z",
-    errorCode: null,
-    errorMessage: null
+    retryClass: "local",
+    executionTarget: "app",
+    maxAttempts: 1
   })
   const jobEvents = [
     operations.appendJobEvent({
