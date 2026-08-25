@@ -49,10 +49,46 @@ CREATE TRIGGER outbound_disclosures_input_hashes_nonempty_update BEFORE UPDATE O
 CREATE TRIGGER runner_registrations_revoked_immutable BEFORE UPDATE ON runner_registrations WHEN OLD.status='revoked' BEGIN SELECT RAISE(ABORT,'revoked runner registration is immutable'); END;
 `
 
+const jobSchedulingSql = `
+ALTER TABLE durable_jobs ADD COLUMN retry_class TEXT NOT NULL DEFAULT 'local' CHECK(retry_class IN ('local','external'));
+ALTER TABLE durable_jobs ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count>=0);
+ALTER TABLE durable_jobs ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 1 CHECK(max_attempts>0);
+ALTER TABLE durable_jobs ADD COLUMN next_attempt_at TEXT;
+ALTER TABLE durable_jobs ADD COLUMN cancellation_requested_at TEXT;
+ALTER TABLE durable_jobs ADD COLUMN last_error_code TEXT CHECK(last_error_code IS NULL OR (length(last_error_code)>0 AND last_error_code GLOB '[a-z0-9_]*' AND last_error_code NOT GLOB '*[^a-z0-9_]*'));
+ALTER TABLE durable_jobs ADD COLUMN last_error_message TEXT CHECK(last_error_message IS NULL OR (length(last_error_message)>0 AND length(last_error_message)<=1024));
+CREATE INDEX durable_jobs_claim_idx ON durable_jobs(state,next_attempt_at,created_at);
+CREATE TRIGGER durable_jobs_terminal_immutable BEFORE UPDATE ON durable_jobs WHEN OLD.state IN ('succeeded','failed','cancelled') BEGIN SELECT RAISE(ABORT,'terminal durable job is immutable'); END;
+CREATE TRIGGER durable_job_events_immutable_update BEFORE UPDATE ON durable_job_events BEGIN SELECT RAISE(ABORT,'durable job events are immutable'); END;
+CREATE TRIGGER durable_job_events_immutable_delete BEFORE DELETE ON durable_job_events BEGIN SELECT RAISE(ABORT,'durable job events are immutable'); END;
+`
+
+const jobRetentionSql = `
+DROP TRIGGER durable_job_events_immutable_delete;
+CREATE TRIGGER durable_job_events_audit_immutable_delete BEFORE DELETE ON durable_job_events WHEN OLD.event_kind!='progress' BEGIN SELECT RAISE(ABORT,'durable job audit event is immutable'); END;
+`
+
+const jobEventCursorSql = `
+CREATE TABLE durable_job_event_cursors (job_id TEXT PRIMARY KEY REFERENCES durable_jobs(id) ON DELETE RESTRICT, next_sequence INTEGER NOT NULL CHECK(next_sequence>0));
+CREATE TABLE durable_job_event_replay_watermarks (job_id TEXT PRIMARY KEY REFERENCES durable_jobs(id) ON DELETE RESTRICT, minimum_resume_sequence INTEGER NOT NULL CHECK(minimum_resume_sequence>0));
+INSERT INTO durable_job_event_cursors (job_id,next_sequence) SELECT j.id,COALESCE(MAX(e.sequence),0)+1 FROM durable_jobs j LEFT JOIN durable_job_events e ON e.job_id=j.id GROUP BY j.id;
+CREATE TRIGGER durable_job_events_cursor_insert AFTER INSERT ON durable_job_events BEGIN INSERT INTO durable_job_event_cursors (job_id,next_sequence) VALUES (NEW.job_id,NEW.sequence+1) ON CONFLICT(job_id) DO UPDATE SET next_sequence=MAX(next_sequence,NEW.sequence+1); END;
+CREATE TRIGGER durable_job_events_terminal_consistency BEFORE INSERT ON durable_job_events WHEN EXISTS (SELECT 1 FROM durable_jobs WHERE id=NEW.job_id AND state IN ('succeeded','failed','cancelled')) BEGIN SELECT CASE WHEN NEW.event_kind!=(SELECT state FROM durable_jobs WHERE id=NEW.job_id) THEN RAISE(ABORT,'terminal event does not match job state') END; SELECT CASE WHEN EXISTS (SELECT 1 FROM durable_job_events WHERE job_id=NEW.job_id AND event_kind IN ('succeeded','failed','cancelled')) THEN RAISE(ABORT,'terminal event already exists') END; END;
+`
+
+const jobExecutionTargetSql = `
+ALTER TABLE durable_jobs ADD COLUMN execution_target TEXT NOT NULL DEFAULT 'app' CHECK(execution_target IN ('app','runner'));
+CREATE INDEX durable_jobs_target_claim_idx ON durable_jobs(execution_target,state,next_attempt_at,created_at);
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
-  { id: "0003_execution", sql: executionSql }
+  { id: "0003_execution", sql: executionSql },
+  { id: "0004_job_scheduling", sql: jobSchedulingSql },
+  { id: "0005_job_retention", sql: jobRetentionSql },
+  { id: "0006_job_event_cursors", sql: jobEventCursorSql },
+  { id: "0007_job_execution_target", sql: jobExecutionTargetSql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>
