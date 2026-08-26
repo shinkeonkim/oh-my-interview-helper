@@ -11,7 +11,8 @@ import {
   interruptJob,
   recoverExpiredJobs,
   startJob,
-  succeedJob
+  succeedJob,
+  type JobTerminalAction
 } from "./repository-transitions"
 import {
   assertSecretFreeJobInput,
@@ -24,7 +25,8 @@ import {
   type Job,
   type JobEventPayload,
   type JobEventReplay,
-  type JobEvent
+  type JobEvent,
+  type TerminalJobState
 } from "./types"
 
 type JobIdInput = { readonly id: string }
@@ -154,6 +156,18 @@ export class JobsRepository {
   interrupt(input: OwnerInput): { readonly job: Job } {
     return this.transition(() => interruptJob(this.database, input))
   }
+  terminal(
+    input: OwnerInput & {
+      readonly action: JobTerminalAction
+      readonly onTerminal: (job: Job, state: TerminalJobState) => void
+    }
+  ): { readonly job: Job } {
+    return this.transition(() => {
+      const job = this.applyTerminalAction(input)
+      if (isTerminalJobState(job.state)) input.onTerminal(job, job.state)
+      return job
+    })
+  }
   recoverExpired(input: { readonly now: string }): readonly Job[] {
     const jobs = recoverExpiredJobs(this.database, input.now)
     for (const job of jobs) this.notify(job.id)
@@ -227,6 +241,18 @@ export class JobsRepository {
     const result = this.database.transaction(() => ({ job: action() })).immediate()
     this.notify(result.job.id)
     return result
+  }
+  private applyTerminalAction(input: OwnerInput & { readonly action: JobTerminalAction }): Job {
+    switch (input.action.kind) {
+      case "succeed":
+        return succeedJob(this.database, input)
+      case "fail":
+        return failJob(this.database, { ...input, ...input.action })
+      case "cancel":
+        return finishCancellation(this.database, input)
+      case "interrupt":
+        return interruptJob(this.database, input)
+    }
   }
 
   private notify(jobId: string): void {

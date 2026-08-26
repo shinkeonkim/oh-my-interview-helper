@@ -2,16 +2,23 @@ import type { JobsRepository } from "./repository"
 import {
   CanonicalJobInputSchema,
   assertSecretFreeJobInput,
+  isTerminalJobState,
   UnknownJobKindError,
   type ExecutionTarget,
   type Job,
   type JobEvent,
-  type JobEventPayload
+  type JobEventPayload,
+  type TerminalJobState
 } from "./types"
 
 export type JobHandlerContext = {
   readonly job: Job
   readonly signal: AbortSignal
+}
+export type JobTerminalContext = {
+  readonly job: Job
+  readonly state: TerminalJobState
+  readonly reason: "succeeded" | "failed" | "timeout" | "cancelled" | "interrupted"
 }
 
 export type JobDefinition = {
@@ -20,6 +27,8 @@ export type JobDefinition = {
   readonly executionTarget?: ExecutionTarget
   readonly maxAttempts: number
   readonly run: (context: JobHandlerContext) => Promise<void>
+  readonly terminal?: (context: JobTerminalContext) => void
+  readonly reconcile?: (job: Job) => void
 }
 
 export const createJobRegistry = (
@@ -97,5 +106,12 @@ export class JobRuntime {
 
   unregisterAbortController(id: string, controller: AbortController): void {
     if (this.aborters.get(id) === controller) this.aborters.delete(id)
+  }
+  reconcile(job: Job): void {
+    if (!isTerminalJobState(job.state)) return
+    this.registry.get(job.kind)?.reconcile?.(job)
+  }
+  reconcileTerminals(): void {
+    for (const job of this.repository.list()) this.reconcile(job)
   }
 }

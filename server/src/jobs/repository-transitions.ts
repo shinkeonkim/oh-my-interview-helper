@@ -7,6 +7,11 @@ import { isTerminalJobState, JobTransitionError, type Job } from "./types"
 
 type OwnerInput = { readonly id: string; readonly owner: string; readonly now: string }
 type Failure = OwnerInput & { readonly code: string; readonly message: string }
+export type JobTerminalAction =
+  | { readonly kind: "succeed" }
+  | { readonly kind: "fail"; readonly code: string; readonly message: string }
+  | { readonly kind: "cancel" }
+  | { readonly kind: "interrupt" }
 
 const shouldRetry = (job: Job): boolean =>
   job.retryClass === "local" && job.attemptCount < job.maxAttempts
