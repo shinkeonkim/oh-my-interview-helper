@@ -14,7 +14,7 @@ const SourceHashSchema = z
   .string()
   .regex(/^[a-f0-9]{64}$/)
   .brand<"SourceHash">()
-const RequestHashSchema = z
+export const ProviderRequestHashSchema = z
   .string()
   .regex(/^[a-f0-9]{64}$/)
   .brand<"ProviderRequestHash">()
@@ -30,9 +30,15 @@ export const ProviderRunStatusSchema = z.enum([
 const ProviderUsageSchema = z
   .object({
     inputTokens: z.number().int().nonnegative(),
-    outputTokens: z.number().int().nonnegative()
+    outputTokens: z.number().int().nonnegative(),
+    cacheTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative()
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.totalTokens !== value.inputTokens + value.outputTokens + value.cacheTokens)
+      context.addIssue({ code: "custom", message: "Provider usage total must match components" })
+  })
   .nullable()
 const ProviderCostSchema = z
   .object({ currency: z.literal("USD"), microunits: z.number().int().nonnegative() })
@@ -40,7 +46,15 @@ const ProviderCostSchema = z
   .nullable()
 const ProviderErrorSchema = z
   .object({
-    category: z.enum(["provider_unavailable", "rate_limited", "invalid_response"]),
+    category: z.enum([
+      "provider_unavailable",
+      "rate_limited",
+      "invalid_response",
+      "invalid_output",
+      "timeout",
+      "cancelled",
+      "provider_failure"
+    ]),
     retryable: z.boolean()
   })
   .strict()
@@ -60,7 +74,7 @@ export const ProviderRunCreateSchema = z
     providerKind: z.string().trim().min(1).max(128),
     mode: ProviderRunModeSchema,
     model: z.string().trim().min(1).max(256),
-    requestHash: RequestHashSchema,
+    requestHash: ProviderRequestHashSchema,
     status: ProviderRunStatusSchema,
     usage: ProviderUsageSchema,
     cost: ProviderCostSchema,
@@ -68,6 +82,20 @@ export const ProviderRunCreateSchema = z
     completedAt: TimestampSchema.nullable()
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.status === "running" && (value.completedAt !== null || value.error !== null))
+      context.addIssue({ code: "custom", message: "Running provider run cannot be terminal" })
+    if (value.status === "succeeded" && (value.completedAt === null || value.error !== null))
+      context.addIssue({ code: "custom", message: "Succeeded provider run must be complete" })
+    if (
+      (value.status === "failed" || value.status === "cancelled") &&
+      (value.completedAt === null || value.error === null)
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Terminal provider failure requires sanitized error"
+      })
+  })
 export type ProviderRun = z.output<typeof ProviderRunCreateSchema>
 
 export const ArtifactKindSchema = z.enum([
@@ -132,7 +160,7 @@ const ProviderRunRowSchema = z.object({
   id: ProviderRunIdSchema,
   providerKind: z.string(),
   status: ProviderRunStatusSchema,
-  requestHash: RequestHashSchema,
+  requestHash: ProviderRequestHashSchema,
   metadata: StoredJsonSchema(ProviderRunMetadataSchema),
   completedAt: TimestampSchema.nullable()
 })
