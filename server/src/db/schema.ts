@@ -86,6 +86,29 @@ CREATE TRIGGER provider_runs_terminal_immutable BEFORE UPDATE ON provider_runs W
 CREATE TRIGGER provider_runs_running_transition BEFORE UPDATE ON provider_runs WHEN OLD.status='running' AND NEW.status NOT IN ('succeeded','failed','cancelled') BEGIN SELECT RAISE(ABORT,'provider run transition invalid'); END;
 `
 
+const consentArtifactsSql = `
+CREATE TABLE disclosure_confirmations (id TEXT PRIMARY KEY, nonce TEXT NOT NULL UNIQUE, provider_id TEXT NOT NULL, provider_mode TEXT NOT NULL CHECK(provider_mode IN ('api','runner','test')), model TEXT NOT NULL, action TEXT NOT NULL, capability TEXT NOT NULL CHECK(capability IN ('generation','structured_output','cited_research')), research_enabled INTEGER NOT NULL CHECK(research_enabled IN (0,1)), request_hash TEXT NOT NULL CHECK(length(request_hash)=64 AND request_hash GLOB '[0-9a-f]*' AND request_hash NOT GLOB '*[^0-9a-f]*'), provider_fingerprint TEXT NOT NULL CHECK(length(provider_fingerprint)=64 AND provider_fingerprint GLOB '[0-9a-f]*' AND provider_fingerprint NOT GLOB '*[^0-9a-f]*'), input_manifest_json TEXT NOT NULL CHECK(json_valid(input_manifest_json)), input_hashes_json TEXT NOT NULL CHECK(json_valid(input_hashes_json)), manifest_hash TEXT NOT NULL CHECK(length(manifest_hash)=64 AND manifest_hash GLOB '[0-9a-f]*' AND manifest_hash NOT GLOB '*[^0-9a-f]*'), confirmed_at TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT, bound_run_id TEXT UNIQUE);
+CREATE INDEX disclosure_confirmations_active_idx ON disclosure_confirmations(provider_id,expires_at,consumed_at);
+CREATE TABLE draft_artifact_series (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('cover_letter','resume','interview_brief','application_answer')), status TEXT NOT NULL CHECK(status IN ('draft','archived','deleted')), created_at TEXT NOT NULL, archived_at TEXT, deleted_at TEXT);
+ CREATE TABLE draft_artifact_revisions (id TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES draft_artifact_series(id) ON DELETE RESTRICT, revision_number INTEGER NOT NULL CHECK(revision_number>0), provider_run_id TEXT REFERENCES provider_runs(id) ON DELETE SET NULL, disclosure_id TEXT REFERENCES disclosure_confirmations(id) ON DELETE SET NULL, provider_id TEXT NOT NULL, provider_mode TEXT NOT NULL CHECK(provider_mode IN ('api','runner','test')), provider_model TEXT NOT NULL, provider_capability_revision TEXT NOT NULL CHECK(length(provider_capability_revision)=64 AND provider_capability_revision GLOB '[0-9a-f]*' AND provider_capability_revision NOT GLOB '*[^0-9a-f]*'), prompt_template_id TEXT NOT NULL, prompt_template_revision TEXT NOT NULL, content_hash TEXT NOT NULL CHECK(length(content_hash)=64 AND content_hash GLOB '[0-9a-f]*' AND content_hash NOT GLOB '*[^0-9a-f]*'), content_json TEXT NOT NULL CHECK(json_valid(content_json)), created_at TEXT NOT NULL, UNIQUE(series_id,revision_number));
+CREATE TABLE draft_artifact_inputs (revision_id TEXT NOT NULL REFERENCES draft_artifact_revisions(id) ON DELETE RESTRICT, input_kind TEXT NOT NULL, input_ref_json TEXT NOT NULL CHECK(json_valid(input_ref_json)), source_hash TEXT NOT NULL CHECK(length(source_hash)=64 AND source_hash GLOB '[0-9a-f]*' AND source_hash NOT GLOB '*[^0-9a-f]*'), source_label TEXT NOT NULL, source_version INTEGER, parent_current_id TEXT, PRIMARY KEY(revision_id,input_kind,input_ref_json));
+CREATE INDEX draft_artifact_revisions_series_idx ON draft_artifact_revisions(series_id,revision_number DESC);
+CREATE TRIGGER disclosure_confirmations_immutable BEFORE UPDATE ON disclosure_confirmations WHEN OLD.consumed_at IS NOT NULL OR NEW.provider_id!=OLD.provider_id OR NEW.provider_mode!=OLD.provider_mode OR NEW.model!=OLD.model OR NEW.action!=OLD.action OR NEW.capability!=OLD.capability OR NEW.request_hash!=OLD.request_hash OR NEW.input_manifest_json!=OLD.input_manifest_json OR NEW.input_hashes_json!=OLD.input_hashes_json OR NEW.manifest_hash!=OLD.manifest_hash BEGIN SELECT RAISE(ABORT,'disclosure confirmation is immutable'); END;
+CREATE TRIGGER draft_artifact_revisions_immutable BEFORE UPDATE ON draft_artifact_revisions BEGIN SELECT RAISE(ABORT,'draft artifact revision is immutable'); END;
+CREATE TRIGGER draft_artifact_revisions_no_delete BEFORE DELETE ON draft_artifact_revisions BEGIN SELECT RAISE(ABORT,'draft artifact revision is immutable'); END;
+CREATE TRIGGER draft_artifact_inputs_immutable_update BEFORE UPDATE ON draft_artifact_inputs BEGIN SELECT RAISE(ABORT,'draft artifact input is immutable'); END;
+CREATE TRIGGER draft_artifact_inputs_immutable_delete BEFORE DELETE ON draft_artifact_inputs BEGIN SELECT RAISE(ABORT,'draft artifact input is immutable'); END;
+`
+
+const consentArtifactIntegritySql = `
+DROP TRIGGER disclosure_confirmations_immutable;
+CREATE TRIGGER disclosure_confirmations_immutable BEFORE UPDATE ON disclosure_confirmations WHEN NOT (OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND OLD.bound_run_id IS NULL AND NEW.bound_run_id IS NOT NULL AND NEW.nonce=OLD.nonce AND NEW.provider_id=OLD.provider_id AND NEW.provider_mode=OLD.provider_mode AND NEW.model=OLD.model AND NEW.action=OLD.action AND NEW.capability=OLD.capability AND NEW.research_enabled=OLD.research_enabled AND NEW.request_hash=OLD.request_hash AND NEW.provider_fingerprint=OLD.provider_fingerprint AND NEW.input_manifest_json=OLD.input_manifest_json AND NEW.input_hashes_json=OLD.input_hashes_json AND NEW.manifest_hash=OLD.manifest_hash AND NEW.confirmed_at=OLD.confirmed_at AND NEW.expires_at=OLD.expires_at) BEGIN SELECT RAISE(ABORT,'disclosure confirmation is immutable'); END;
+CREATE TABLE draft_artifact_content_hashes (content_hash TEXT PRIMARY KEY CHECK(length(content_hash)=64 AND content_hash GLOB '[0-9a-f]*' AND content_hash NOT GLOB '*[^0-9a-f]*'), content_json TEXT NOT NULL CHECK(json_valid(content_json)), UNIQUE(content_hash,content_json));
+CREATE TRIGGER draft_artifact_series_lifecycle BEFORE UPDATE OF status ON draft_artifact_series WHEN OLD.status='deleted' OR (OLD.status='draft' AND NEW.status NOT IN ('archived','deleted')) OR (OLD.status='archived' AND NEW.status!='deleted') BEGIN SELECT RAISE(ABORT,'draft artifact series lifecycle is immutable'); END;
+CREATE TRIGGER draft_artifact_revisions_active_series BEFORE INSERT ON draft_artifact_revisions WHEN NOT EXISTS (SELECT 1 FROM draft_artifact_series WHERE id=NEW.series_id AND status='draft') BEGIN SELECT RAISE(ABORT,'draft artifact series unavailable'); END;
+CREATE TRIGGER draft_artifact_revisions_content_hash BEFORE INSERT ON draft_artifact_revisions WHEN NOT EXISTS (SELECT 1 FROM draft_artifact_content_hashes WHERE content_hash=NEW.content_hash AND content_json=NEW.content_json) BEGIN SELECT RAISE(ABORT,'draft artifact content hash invalid'); END;
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
@@ -94,7 +117,9 @@ export const migrations: readonly Migration[] = [
   { id: "0005_job_retention", sql: jobRetentionSql },
   { id: "0006_job_event_cursors", sql: jobEventCursorSql },
   { id: "0007_job_execution_target", sql: jobExecutionTargetSql },
-  { id: "0008_provider_run_transitions", sql: providerRunTransitionsSql }
+  { id: "0008_provider_run_transitions", sql: providerRunTransitionsSql },
+  { id: "0009_consent_artifacts", sql: consentArtifactsSql },
+  { id: "0010_consent_artifact_integrity", sql: consentArtifactIntegritySql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>

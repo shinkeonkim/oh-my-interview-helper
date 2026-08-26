@@ -12,6 +12,7 @@ import type { Job } from "../jobs/types"
 import type { ProviderKernel } from "./kernel"
 import { ProviderIdSchema, ProviderModeSchema, type ProviderInvocation } from "./contracts"
 import { ProviderInvokeCoordinator } from "./provider-invoke-coordinator"
+import { providerInvocationHash } from "./provider-invocation-hash"
 import { collectProviderStream } from "./provider-stream"
 
 const ProviderInvokePayloadSchema = z
@@ -20,10 +21,14 @@ const ProviderInvokePayloadSchema = z
     providerId: ProviderIdSchema,
     mode: ProviderModeSchema,
     model: z.string().trim().min(1).max(128),
-    requestHash: ProviderRequestHashSchema
+    requestHash: ProviderRequestHashSchema,
+    disclosureId: z.string().uuid().optional()
   })
   .strict()
 type ProviderInvokePayload = z.output<typeof ProviderInvokePayloadSchema>
+export type ProviderInvokeAuthorization = {
+  readonly consume: (payload: ProviderInvokePayload) => boolean
+}
 export type ProviderRequestSource = {
   readonly resolve: (payload: ProviderInvokePayload) => ProviderInvocation | null
 }
@@ -34,6 +39,7 @@ export const createProviderInvokeJobDefinition = (dependencies: {
   readonly providerRuns: ProviderArtifactRepository
   readonly jobs: JobsRepository
   readonly requests: ProviderRequestSource
+  readonly authorization?: ProviderInvokeAuthorization
 }): ProviderInvokeJobDefinition => {
   const outcomes = new ProviderInvokeCoordinator<ProviderTerminal>()
   const complete = (context: JobTerminalContext): void => {
@@ -81,6 +87,14 @@ export const createProviderInvokeJobDefinition = (dependencies: {
         throw new ProviderInvokeJobError()
       }
       if (request.providerId !== payload.providerId) {
+        outcomes.report(job.id, unavailableTerminal())
+        throw new ProviderInvokeJobError()
+      }
+      if (providerInvocationHash(request) !== payload.requestHash) {
+        outcomes.report(job.id, unavailableTerminal())
+        throw new ProviderInvokeJobError()
+      }
+      if (dependencies.authorization?.consume(payload) !== true) {
         outcomes.report(job.id, unavailableTerminal())
         throw new ProviderInvokeJobError()
       }

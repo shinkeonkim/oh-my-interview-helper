@@ -115,7 +115,8 @@ const definition = createProviderInvokeJobDefinition({
   kernel: jobKernel,
   providerRuns: persistence.repositories.providerArtifacts,
   jobs: persistence.repositories.jobs,
-  requests: { resolve: () => request }
+  requests: { resolve: () => request },
+  authorization: { consume: () => true }
 })
 const runtime = new JobRuntime(persistence.repositories.jobs, createJobRegistry([definition]))
 const job = runtime.enqueue({

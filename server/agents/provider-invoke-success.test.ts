@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createProviderInvokeJobDefinition } from "../src/agents"
+import { createProviderInvokeJobDefinition, providerInvocationHash } from "../src/agents"
 import { createPersistence, type Persistence } from "../src/db"
 import { JobRuntime, createJobRegistry } from "../src/jobs/runtime"
 import { JobScheduler } from "../src/jobs/scheduler"
@@ -11,7 +11,7 @@ import { kernelFor, registration, request } from "./contract-support"
 
 const directories: string[] = []
 const handles: Persistence[] = []
-const requestHash = "a".repeat(64)
+const requestHash = providerInvocationHash(request)
 const usage = { inputTokens: 3, outputTokens: 2, cacheTokens: 1, totalTokens: 6 }
 
 const setup = () => {
@@ -24,10 +24,11 @@ const setup = () => {
     kernel: kernelFor(provider.registration),
     providerRuns: persistence.repositories.providerArtifacts,
     jobs: persistence.repositories.jobs,
-    requests: { resolve: () => request }
+    requests: { resolve: () => request },
+    authorization: { consume: () => true }
   })
   const runtime = new JobRuntime(persistence.repositories.jobs, createJobRegistry([definition]))
-  return { definition, persistence, runtime }
+  return { definition, persistence, runtime, probe: provider.probe }
 }
 
 const enqueue = (runtime: JobRuntime) =>
@@ -97,4 +98,50 @@ test("drains a reported outcome when its provider run became terminal before the
 
   // Then
   expect(harness.definition.pendingCount()).toBe(0)
+})
+
+test("rejects a resolved invocation whose content differs from the approved request hash", async () => {
+  // Given
+  const directory = mkdtempSync(join(tmpdir(), "provider-invoke-unbound-request-"))
+  directories.push(directory)
+  const persistence = createPersistence({ dataDirectory: directory })
+  handles.push(persistence)
+  const provider = registration([{ kind: "text", chunks: ["unapproved"], usage }])
+  const definition = createProviderInvokeJobDefinition({
+    kernel: kernelFor(provider.registration),
+    providerRuns: persistence.repositories.providerArtifacts,
+    jobs: persistence.repositories.jobs,
+    requests: {
+      resolve: () => ({
+        ...request,
+        messages: [
+          {
+            role: "user",
+            content: [{ kind: "text", text: "UNAPPROVED_CALLER_SUPPLIED_PROMPT" }]
+          }
+        ]
+      })
+    },
+    authorization: { consume: () => true }
+  })
+  const runtime = new JobRuntime(persistence.repositories.jobs, createJobRegistry([definition]))
+  const job = enqueue(runtime)
+  const scheduler = new JobScheduler(runtime, { idleMilliseconds: 1 })
+  let resolveTerminal: () => void = () => undefined
+  const terminal = new Promise<void>((resolve) => {
+    resolveTerminal = resolve
+  })
+  const unsubscribe = runtime.subscribe(job.id, (event) => {
+    if (["succeeded", "failed", "cancelled"].includes(event.kind)) resolveTerminal()
+  })
+
+  // When
+  scheduler.start()
+  await terminal
+  unsubscribe()
+
+  // Then
+  expect(persistence.repositories.jobs.get({ id: job.id })).toMatchObject({ state: "failed" })
+  expect(provider.probe.calls).toHaveLength(0)
+  await scheduler.stop()
 })

@@ -31,6 +31,9 @@ export class ProviderRegistry {
   get(id: string): ProviderRegistration | null {
     return this.providers.get(ProviderIdSchema.parse(id)) ?? null
   }
+  list(): readonly ProviderRegistration[] {
+    return [...this.providers.values()]
+  }
   async health(id: string): Promise<ProviderHealth> {
     const provider = this.get(id)
     if (provider === null) return { kind: "unavailable", code: "unconfigured" }
