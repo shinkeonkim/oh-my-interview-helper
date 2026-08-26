@@ -8,6 +8,14 @@ import { createPreviewRoutes } from "./routes/preview"
 import { createJobsRoutes } from "./routes/jobs"
 import { createPersistence, type Persistence } from "./db"
 import { createJobRegistry, JobRuntime, type JobDefinition } from "./jobs/runtime"
+import {
+  ProviderKernel,
+  ProviderRegistry,
+  ToolRegistry,
+  createProviderInvokeJobDefinition,
+  unavailableProviderRequestSource,
+  type ProviderRequestSource
+} from "./agents"
 import { defaultLocalSecuritySettings, type LocalSecuritySettings } from "./security/config"
 import type { PinnedTransport, Resolver } from "./ingest/safe-fetcher"
 import { createCsrfProtection, localSecurityMiddleware } from "./security/local-security"
@@ -21,6 +29,8 @@ export type AppOptions = {
   readonly persistence?: Persistence
   readonly jobDefinitions?: readonly JobDefinition[]
   readonly jobRuntime?: JobRuntime
+  readonly providerRegistry?: ProviderRegistry
+  readonly providerRequests?: ProviderRequestSource
 }
 
 export const createApp = ({
@@ -31,13 +41,26 @@ export const createApp = ({
   csrfSecret,
   persistence: providedPersistence,
   jobDefinitions = [],
-  jobRuntime
+  jobRuntime,
+  providerRegistry = new ProviderRegistry([]),
+  providerRequests = unavailableProviderRequestSource
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
   const persistence = providedPersistence ?? createPersistence({ dataDirectory })
+  const providerDefinition = createProviderInvokeJobDefinition({
+    kernel: new ProviderKernel({ providers: providerRegistry, tools: new ToolRegistry([]) }),
+    providerRuns: persistence.repositories.providerArtifacts,
+    jobs: persistence.repositories.jobs,
+    requests: providerRequests
+  })
+  const definitions = jobDefinitions.some(
+    (definition) => definition.kind === providerDefinition.kind
+  )
+    ? jobDefinitions
+    : [...jobDefinitions, providerDefinition]
   const jobs =
-    jobRuntime ?? new JobRuntime(persistence.repositories.jobs, createJobRegistry(jobDefinitions))
+    jobRuntime ?? new JobRuntime(persistence.repositories.jobs, createJobRegistry(definitions))
 
   app.use("*", localSecurityMiddleware(security, csrf))
   app.use(

@@ -16,7 +16,7 @@
   "scripts": {
     "build": "bun run build:client && bun run build:server",
     "build:client": "bun run --cwd client build",
-    "build:server": "bun build server/src/index.ts --target bun --outdir server/dist --sourcemap=linked",
+    "build:server": "bun build server/src/index.ts --target bun --outdir server/dist --sourcemap=linked --external @strands-agents/sdk",
     "dev": "bun --hot server/src/index.ts",
     "dev:client": "bun run --cwd client dev",
     "check:i18n": "bun scripts/check-i18n.ts",

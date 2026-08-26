@@ -7,13 +7,33 @@ import {
 import { createPersistence } from "./db"
 import { JobScheduler } from "./jobs/scheduler"
 import { createJobRegistry, JobRuntime } from "./jobs/runtime"
+import {
+  ProviderKernel,
+  ProviderRegistry,
+  ToolRegistry,
+  createProviderInvokeJobDefinition,
+  unavailableProviderRequestSource
+} from "./agents"
 
 const main = (): void => {
   try {
     const configuration = parseServerConfig(process.env)
     ensureDataDirectoryIsWritable(configuration)
     const persistence = createPersistence({ dataDirectory: configuration.dataDirectory })
-    const jobs = new JobRuntime(persistence.repositories.jobs, createJobRegistry([]))
+    const jobs = new JobRuntime(
+      persistence.repositories.jobs,
+      createJobRegistry([
+        createProviderInvokeJobDefinition({
+          kernel: new ProviderKernel({
+            providers: new ProviderRegistry([]),
+            tools: new ToolRegistry([])
+          }),
+          providerRuns: persistence.repositories.providerArtifacts,
+          jobs: persistence.repositories.jobs,
+          requests: unavailableProviderRequestSource
+        })
+      ])
+    )
     const scheduler = new JobScheduler(jobs)
     scheduler.start()
 
