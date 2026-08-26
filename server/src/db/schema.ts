@@ -81,6 +81,11 @@ ALTER TABLE durable_jobs ADD COLUMN execution_target TEXT NOT NULL DEFAULT 'app'
 CREATE INDEX durable_jobs_target_claim_idx ON durable_jobs(execution_target,state,next_attempt_at,created_at);
 `
 
+const providerRunTransitionsSql = `
+CREATE TRIGGER provider_runs_terminal_immutable BEFORE UPDATE ON provider_runs WHEN OLD.status IN ('succeeded','failed','cancelled') BEGIN SELECT RAISE(ABORT,'terminal provider run is immutable'); END;
+CREATE TRIGGER provider_runs_running_transition BEFORE UPDATE ON provider_runs WHEN OLD.status='running' AND NEW.status NOT IN ('succeeded','failed','cancelled') BEGIN SELECT RAISE(ABORT,'provider run transition invalid'); END;
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
@@ -88,7 +93,8 @@ export const migrations: readonly Migration[] = [
   { id: "0004_job_scheduling", sql: jobSchedulingSql },
   { id: "0005_job_retention", sql: jobRetentionSql },
   { id: "0006_job_event_cursors", sql: jobEventCursorSql },
-  { id: "0007_job_execution_target", sql: jobExecutionTargetSql }
+  { id: "0007_job_execution_target", sql: jobExecutionTargetSql },
+  { id: "0008_provider_run_transitions", sql: providerRunTransitionsSql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>
