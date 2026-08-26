@@ -55,7 +55,7 @@ const createAllDomainRecords = (persistence: Persistence, blobHash: string) => {
     model: "gpt-5.6",
     requestHash: "a".repeat(64),
     status: "succeeded",
-    usage: { inputTokens: 120, outputTokens: 48 },
+    usage: { inputTokens: 120, outputTokens: 48, cacheTokens: 0, totalTokens: 168 },
     cost: { currency: "USD", microunits: 900 },
     error: null,
     completedAt: timestamp

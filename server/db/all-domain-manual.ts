@@ -62,7 +62,7 @@ const main = async (): Promise<void> => {
     model: "gpt-5.6",
     requestHash: "a".repeat(64),
     status: "succeeded",
-    usage: { inputTokens: 1, outputTokens: 1 },
+    usage: { inputTokens: 1, outputTokens: 1, cacheTokens: 0, totalTokens: 2 },
     cost: { currency: "USD", microunits: 1 },
     error: null,
     completedAt: timestamp
