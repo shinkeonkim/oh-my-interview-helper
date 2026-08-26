@@ -1,6 +1,7 @@
 import type { JobRuntime } from "./runtime"
 import { systemSchedulerClock, type SchedulerClock, type SchedulerTimer } from "./scheduler-clock"
 import { runHandler } from "./scheduler-handler"
+import { reconcile, terminalize } from "./scheduler-terminalizer"
 import { JobTransitionError, type Job } from "./types"
 
 export { type SchedulerClock } from "./scheduler-clock"
@@ -56,7 +57,8 @@ export class JobScheduler {
   start(): void {
     if (!this.stopped) return
     this.stopped = false
-    this.runtime.repository.recoverExpired({ now: this.now() })
+    reconcile(this.runtime, this.now())
+    this.runtime.reconcileTerminals()
     this.wake()
   }
 
@@ -78,7 +80,7 @@ export class JobScheduler {
   }
 
   private pump(): void {
-    this.runtime.repository.recoverExpired({ now: this.now() })
+    reconcile(this.runtime, this.now())
     while (!this.stopped && this.active.size < this.concurrency) {
       try {
         const job = this.runtime.repository.claim({
@@ -148,56 +150,50 @@ export class JobScheduler {
         case "succeeded":
           if (active.controller.signal.aborted) {
             if (active.controller.signal.reason === "timeout")
-              this.runtime.repository.fail({
-                id: job.id,
-                owner: this.owner,
-                now: this.now(),
+              terminalize(this.runtime, definition, job, this.owner, this.now(), "timeout", {
+                kind: "fail",
                 code: "handler_timeout",
                 message: "Job handler timed out"
               })
             else if (active.controller.signal.reason === "shutdown")
-              this.runtime.repository.interrupt({ id: job.id, owner: this.owner, now: this.now() })
+              terminalize(this.runtime, definition, job, this.owner, this.now(), "interrupted", {
+                kind: "interrupt"
+              })
             else if (active.controller.signal.reason !== "lost_lease")
-              this.runtime.repository.finishCancellation({
-                id: job.id,
-                owner: this.owner,
-                now: this.now()
+              terminalize(this.runtime, definition, job, this.owner, this.now(), "cancelled", {
+                kind: "cancel"
               })
             return
           }
-          this.runtime.repository.succeed({ id: job.id, owner: this.owner, now: this.now() })
+          terminalize(this.runtime, definition, job, this.owner, this.now(), "succeeded", {
+            kind: "succeed"
+          })
           return
         case "failed":
-          this.runtime.repository.fail({
-            id: job.id,
-            owner: this.owner,
-            now: this.now(),
+          terminalize(this.runtime, definition, job, this.owner, this.now(), "failed", {
+            kind: "fail",
             code: "handler_failed",
             message: "Job handler failed"
           })
           return
         case "aborted":
           if (result.reason === "timeout")
-            this.runtime.repository.fail({
-              id: job.id,
-              owner: this.owner,
-              now: this.now(),
+            terminalize(this.runtime, definition, job, this.owner, this.now(), "timeout", {
+              kind: "fail",
               code: "handler_timeout",
               message: "Job handler timed out"
             })
           else if (result.reason !== "shutdown" && result.reason !== "lost_lease")
-            this.runtime.repository.finishCancellation({
-              id: job.id,
-              owner: this.owner,
-              now: this.now()
+            terminalize(this.runtime, definition, job, this.owner, this.now(), "cancelled", {
+              kind: "cancel"
             })
       }
     } catch (error) {
       if (error instanceof JobTransitionError || started === null) return
-      this.runtime.repository.fail({
-        id: started.id,
-        owner: this.owner,
-        now: this.now(),
+      const definition = this.runtime.registry.get(started.kind)
+      if (definition === undefined) return
+      terminalize(this.runtime, definition, started, this.owner, this.now(), "failed", {
+        kind: "fail",
         code: "handler_failed",
         message: "Job handler failed"
       })
@@ -237,7 +233,12 @@ export class JobScheduler {
   private forceInterrupt(active: ActiveJob): void {
     active.controller.abort("shutdown")
     try {
-      this.runtime.repository.interrupt({ id: active.id, owner: this.owner, now: this.now() })
+      const job = this.runtime.repository.get({ id: active.id })
+      const definition = job === null ? undefined : this.runtime.registry.get(job.kind)
+      if (job === null || definition === undefined) throw new JobTransitionError("JOB_NOT_FOUND")
+      terminalize(this.runtime, definition, job, this.owner, this.now(), "interrupted", {
+        kind: "interrupt"
+      })
     } catch (error) {
       if (!(error instanceof JobTransitionError)) throw error
     }
