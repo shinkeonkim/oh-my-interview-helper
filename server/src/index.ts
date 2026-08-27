@@ -9,23 +9,24 @@ import { JobScheduler } from "./jobs/scheduler"
 import { createJobRegistry, JobRuntime } from "./jobs/runtime"
 import {
   ProviderKernel,
-  ProviderRegistry,
   ToolRegistry,
   createProviderInvokeJobDefinition,
   unavailableProviderRequestSource
 } from "./agents"
+import { createDirectApiProviderRegistry } from "./providers"
 
 const main = (): void => {
   try {
     const configuration = parseServerConfig(process.env)
     ensureDataDirectoryIsWritable(configuration)
     const persistence = createPersistence({ dataDirectory: configuration.dataDirectory })
+    const providers = createDirectApiProviderRegistry(process.env)
     const jobs = new JobRuntime(
       persistence.repositories.jobs,
       createJobRegistry([
         createProviderInvokeJobDefinition({
           kernel: new ProviderKernel({
-            providers: new ProviderRegistry([]),
+            providers,
             tools: new ToolRegistry([])
           }),
           providerRuns: persistence.repositories.providerArtifacts,
@@ -42,7 +43,8 @@ const main = (): void => {
         dataDirectory: configuration.dataDirectory,
         security: configuration.security,
         persistence,
-        jobRuntime: jobs
+        jobRuntime: jobs,
+        providerRegistry: providers
       }).fetch,
       hostname: "127.0.0.1",
       port: configuration.port,
