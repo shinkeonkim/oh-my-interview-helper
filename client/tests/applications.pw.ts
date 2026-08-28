@@ -11,27 +11,30 @@ test("creates a posting and moves an application through the local pipeline", as
     sourceKind: "manual",
     canonicalUrl: "https://careers.example.com/backend"
   }
-  const stages = [
+  let stages = [
     {
       id: "00000000-0000-4000-8000-000000000001",
       key: "saved",
       name: "Saved",
       position: 1,
-      outcome: null
+      outcome: null,
+      system: true
     },
     {
       id: "00000000-0000-4000-8000-000000000002",
       key: "applied",
       name: "Applied",
       position: 2,
-      outcome: null
+      outcome: null,
+      system: true
     },
     {
       id: "00000000-0000-4000-8000-000000000003",
       key: "interviewing",
       name: "Interviewing",
       position: 3,
-      outcome: null
+      outcome: null,
+      system: true
     }
   ]
   const savedStage = stages[0]
@@ -60,7 +63,47 @@ test("creates a posting and moves an application through the local pipeline", as
     route.fulfill({ json: { csrfToken: "token" } })
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings } }))
-  await page.route("**/api/pipeline/stages", (route) => route.fulfill({ json: { stages } }))
+  await page.route("**/api/pipeline/stages", async (route) => {
+    if (route.request().method() === "POST") {
+      const input = route.request().postDataJSON() as { key: string; name: string }
+      stages = [
+        ...stages,
+        {
+          id: "99999999-9999-4999-8999-999999999999",
+          key: input.key,
+          name: input.name,
+          position: stages.length + 1,
+          outcome: null,
+          system: false
+        }
+      ]
+    }
+    await route.fulfill({
+      status: route.request().method() === "POST" ? 201 : 200,
+      json: { stages }
+    })
+  })
+  await page.route("**/api/pipeline/stages/order", async (route) => {
+    const { stageIds } = route.request().postDataJSON() as { stageIds: string[] }
+    expect(route.request().method()).toBe("PUT")
+    stages = stageIds.map((id, index) => ({
+      ...stages.find((stage) => stage.id === id)!,
+      position: index + 1
+    }))
+    await route.fulfill({ status: 204 })
+  })
+  await page.route(/\/api\/pipeline\/stages\/[0-9a-f-]+$/, async (route) => {
+    const id = route.request().url().split("/").at(-1)
+    if (route.request().method() === "PATCH") {
+      const { name } = route.request().postDataJSON() as { name: string }
+      stages = stages.map((stage) => (stage.id === id ? { ...stage, name } : stage))
+    } else if (route.request().method() === "DELETE") {
+      stages = stages
+        .filter((stage) => stage.id !== id)
+        .map((stage, index) => ({ ...stage, position: index + 1 }))
+    }
+    await route.fulfill({ status: 204 })
+  })
   await page.route("**/api/postings/manual", async (route) => {
     postings = [post]
     await route.fulfill({ status: 201, json: post })
@@ -232,4 +275,20 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("보관됨")).toBeVisible()
   await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
   await expect(page.getByRole("button", { name: "지원 보관" })).toHaveCount(0)
+  await page.getByPlaceholder("새 단계 이름").fill("Phone screen")
+  await page.getByRole("button", { name: "단계 추가" }).click()
+  const customStage = page.getByRole("button", { name: "단계 삭제: Phone screen" }).locator("..")
+  await expect(customStage).toBeVisible()
+  await customStage.getByRole("textbox").fill("Recruiter screen")
+  await page.getByRole("button", { name: "단계 이름 저장: Phone screen" }).click()
+  const renamedStage = page
+    .getByRole("button", { name: "단계 삭제: Recruiter screen" })
+    .locator("..")
+  await expect(renamedStage.getByRole("textbox")).toHaveValue("Recruiter screen")
+  await page.getByRole("button", { name: "단계 위로 이동: Recruiter screen" }).click()
+  await expect(
+    page.getByRole("button", { name: "단계 삭제: Recruiter screen" }).locator("..").locator("span")
+  ).toHaveText("3")
+  await page.getByRole("button", { name: "단계 삭제: Recruiter screen" }).click()
+  await expect(page.getByRole("button", { name: "단계 삭제: Recruiter screen" })).toHaveCount(0)
 })
