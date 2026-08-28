@@ -154,7 +154,7 @@ describe("outbound runner connection", () => {
     })
 
     await Bun.sleep(1)
-    sockets[0]?.onclose?.()
+    sockets[0]?.onclose?.({ code: 1006, reason: "network_lost" })
     await Bun.sleep(5)
     expect(sockets).toHaveLength(2)
     expect(
@@ -164,5 +164,36 @@ describe("outbound runner connection", () => {
     controller.abort()
     await running
     expect(sockets[1]?.closed).toBeTrue()
+  })
+
+  test("stops reconnecting when the server rejects runner authentication", async () => {
+    let connections = 0
+    const connection = new RunnerConnection(
+      { runnerId: crypto.randomUUID(), token: "t".repeat(32) },
+      { execute: async () => ({ kind: "completed", stdout: "", stderr: "" }) }
+    )
+    const running = superviseOutboundRunner({
+      endpoint: "ws://127.0.0.1:3000/api/runner/ws",
+      connection,
+      signal: new AbortController().signal,
+      reconnectMilliseconds: 0,
+      createSocket: () => {
+        connections += 1
+        const socket: OutboundWebSocket = {
+          binaryType: "",
+          onopen: null,
+          onmessage: null,
+          onerror: null,
+          onclose: null,
+          send() {},
+          close() {}
+        }
+        queueMicrotask(() => socket.onclose?.({ code: 1008, reason: "authentication_failed" }))
+        return socket
+      }
+    })
+
+    await expect(running).rejects.toThrow("RUNNER_CONNECTION_AUTHENTICATION_REJECTED")
+    expect(connections).toBe(1)
   })
 })
