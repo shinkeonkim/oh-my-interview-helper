@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 test("creates a posting and moves an application through the local pipeline", async ({ page }) => {
+  test.setTimeout(20_000)
   const post = {
     id: "11111111-1111-4111-8111-111111111111",
     title: "Backend Engineer",
