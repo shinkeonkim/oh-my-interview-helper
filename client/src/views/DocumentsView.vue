@@ -96,7 +96,7 @@ const uploadFiles = async (event: Event) => {
 const uploadVersion = async (event: Event, document: DocumentItem) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file === undefined) return
+  if (file === undefined || document.state !== "active") return
   const form = new FormData()
   form.set("file", file)
   try {
@@ -111,6 +111,7 @@ const uploadVersion = async (event: Event, document: DocumentItem) => {
 }
 
 const toggleSelection = async (document: DocumentItem) => {
+  if (document.state !== "active") return
   try {
     await mutate(`/api/documents/${document.id}/selection`, document.selected ? "DELETE" : "PUT")
     await load()
@@ -209,7 +210,11 @@ onMounted(load)
             </div>
           </div>
           <Badge :variant="document.selected ? 'default' : 'outline'">{{
-            document.selected ? copy("selected") : document.extractionStatus
+            document.state === "archived"
+              ? copy("archived")
+              : document.selected
+                ? copy("selected")
+                : document.extractionStatus
           }}</Badge>
         </CardHeader>
         <CardContent class="grid gap-4">
@@ -217,19 +222,23 @@ onMounted(load)
             {{ copy("usage") }}: {{ document.usageCount }}
           </p>
           <div class="flex flex-wrap gap-2">
-            <Button variant="secondary" @click="toggleSelection(document)">{{
-              document.selected ? copy("unselect") : copy("select")
-            }}</Button>
+            <Button
+              variant="secondary"
+              :disabled="document.state !== 'active'"
+              @click="toggleSelection(document)"
+              >{{ document.selected ? copy("unselect") : copy("select") }}</Button
+            >
             <Button variant="outline" @click="showPreview(document)"
               ><Eye />{{ copy("preview") }}</Button
             >
             <Button variant="outline" @click="showHistory(document)">{{ copy("history") }}</Button>
-            <Button variant="outline" as-child
-              ><label class="cursor-pointer"
+            <Button variant="outline" as-child :disabled="document.state !== 'active'"
+              ><label :class="document.state === 'active' ? 'cursor-pointer' : 'cursor-not-allowed'"
                 ><input
                   class="sr-only"
                   type="file"
                   accept=".pdf,.docx,.md,.txt"
+                  :disabled="document.state !== 'active'"
                   @change="uploadVersion($event, document)"
                 />{{ copy("newVersion") }}</label
               ></Button
@@ -239,7 +248,10 @@ onMounted(load)
                 ><Download />{{ copy("download") }}</a
               ></Button
             >
-            <Button variant="ghost" @click="transition(document, 'archive')"
+            <Button
+              v-if="document.state === 'active'"
+              variant="ghost"
+              @click="transition(document, 'archive')"
               ><Archive />{{ copy("archive") }}</Button
             >
             <Button variant="destructive" @click="transition(document, 'delete')"

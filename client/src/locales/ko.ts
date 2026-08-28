@@ -79,7 +79,7 @@ export const ko = {
     preview: "미리보기",
     download: "원본 받기",
     archive: "보관",
-    postingArchived: "채용공고를 보관했습니다.",
+    archived: "보관됨",
     remove: "삭제",
     version: "버전",
     newVersion: "새 버전",
