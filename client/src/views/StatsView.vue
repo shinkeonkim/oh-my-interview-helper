@@ -59,12 +59,21 @@ const load = async () => {
     )
   )
     throw new Error("request")
-  postingCount.value = ((await postingsResponse.json()) as { postings: unknown[] }).postings.length
-  applications.value = (
-    (await applicationsResponse.json()) as { applications: Application[] }
-  ).applications
-  documents.value = ((await documentsResponse.json()) as { documents: Document[] }).documents
-  jobs.value = (await jobsResponse.json()) as Job[]
+  const postingsBody = (await postingsResponse.json()) as { postings?: unknown }
+  const applicationsBody = (await applicationsResponse.json()) as { applications?: unknown }
+  const documentsBody = (await documentsResponse.json()) as { documents?: unknown }
+  const jobsBody = await jobsResponse.json()
+  if (
+    !Array.isArray(postingsBody.postings) ||
+    !Array.isArray(applicationsBody.applications) ||
+    !Array.isArray(documentsBody.documents) ||
+    !Array.isArray(jobsBody)
+  )
+    throw new Error("response")
+  postingCount.value = postingsBody.postings.length
+  applications.value = applicationsBody.applications as Application[]
+  documents.value = documentsBody.documents as Document[]
+  jobs.value = jobsBody as Job[]
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
 onBeforeUnmount(() => controller.abort())
