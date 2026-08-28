@@ -112,6 +112,37 @@ const versionFile = ref<File | null>(null)
 const updatingPost = ref(false)
 const loadController = new AbortController()
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
+const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
+
+const payloadText = (event: HistoryEntry, key: string) => {
+  const value = event.payload[key]
+  return typeof value === "string" ? value : null
+}
+const eventTitle = (event: HistoryEntry) => {
+  const known: Record<string, string> = {
+    created: "eventCreated",
+    stage_changed: "eventStageChanged",
+    note_added: "eventNoteAdded",
+    interview_scheduled: "eventInterviewScheduled"
+  }
+  const key = known[event.kind]
+  return key === undefined ? copy("eventOther") : copy(key)
+}
+const eventDetail = (event: HistoryEntry) => {
+  if (event.kind === "created") {
+    const stageId = payloadText(event, "stageId")
+    return stageId === null ? "" : (stageById.value.get(stageId) ?? "")
+  }
+  if (event.kind === "stage_changed") {
+    const from = payloadText(event, "fromStageId")
+    const to = payloadText(event, "toStageId")
+    if (from === null || to === null) return ""
+    return `${stageById.value.get(from) ?? copy("unknownStage")} → ${stageById.value.get(to) ?? copy("unknownStage")}`
+  }
+  if (event.kind === "note_added") return payloadText(event, "text") ?? ""
+  if (event.kind === "interview_scheduled") return payloadText(event, "kind") ?? ""
+  return ""
+}
 
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
@@ -585,8 +616,13 @@ onBeforeUnmount(() => loadController.abort())
         </div>
         <ol class="grid gap-2 text-sm">
           <li v-for="event in history" :key="event.id" class="rounded border p-3">
-            #{{ event.sequence }} {{ event.kind }} ·
-            {{ new Date(event.createdAt).toLocaleString(settings.locale) }}
+            <p class="font-medium">
+              #{{ event.sequence }} {{ eventTitle(event) }} ·
+              {{ new Date(event.createdAt).toLocaleString(settings.locale) }}
+            </p>
+            <p v-if="eventDetail(event)" class="mt-1 whitespace-pre-wrap text-muted-foreground">
+              {{ eventDetail(event) }}
+            </p>
           </li>
           <li v-for="interview in interviews" :key="interview.id" class="rounded border p-3">
             <p class="font-medium">
