@@ -43,6 +43,9 @@ test("deep-links all seven job workspace areas while preserving job context", as
   )
   await page.route("**/api/documents", (route) => route.fulfill({ json: { documents: [] } }))
   await page.route("**/api/providers/status", (route) => route.fulfill({ json: { providers: [] } }))
+  await page.route(/\/api\/conversations\?applicationId=/, (route) =>
+    route.fulfill({ json: { conversations: [] } })
+  )
   await page.route("**/api/research**", (route) => route.fulfill({ json: { records: [] } }))
 
   await page.goto(`/jobs/${postId}`)
