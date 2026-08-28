@@ -121,6 +121,8 @@ const versionBody = ref("")
 const versionFile = ref<File | null>(null)
 const updatingPost = ref(false)
 const loadController = new AbortController()
+let historyRequestId = 0
+let versionsRequestId = 0
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
 const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
 const activeApplicationPostIds = computed(
@@ -153,6 +155,20 @@ const interviewReady = computed(() => {
   return !Number.isNaN(new Date(interviewAt.value).getTime())
 })
 const newStageReady = computed(() => newStage.value.trim().length > 0)
+const updateHasPublicUrl = computed(() => {
+  try {
+    const parsed = new URL(updateUrl.value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+})
+const versionReady = computed(
+  () =>
+    (versionSource.value === "url" && updateHasPublicUrl.value) ||
+    (versionSource.value === "manual" && versionBody.value.trim().length > 0) ||
+    (versionSource.value === "file" && versionFile.value !== null)
+)
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -306,7 +322,10 @@ const archiveApplication = async (application: Application) => {
   setApplicationPending(application.id, true)
   try {
     await request(`/api/applications/${application.id}/archive`, "POST")
-    if (activeApplication.value === application.id) activeApplication.value = null
+    if (activeApplication.value === application.id) {
+      historyRequestId += 1
+      activeApplication.value = null
+    }
     await load()
     toast.success(copy("applicationArchived"))
   } catch {
@@ -361,18 +380,21 @@ const schedule = async () => {
   }
 }
 const showHistory = async (id: string) => {
-  const response = await fetch(`/api/applications/${id}/history`)
-  if (!response.ok) {
-    toast.error(copy("failed"))
-    return
+  const requestId = ++historyRequestId
+  try {
+    const response = await fetch(`/api/applications/${id}/history`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as {
+      events: HistoryEntry[]
+      interviews: typeof interviews.value
+    }
+    if (requestId !== historyRequestId) return
+    activeApplication.value = id
+    history.value = value.events
+    interviews.value = value.interviews
+  } catch {
+    if (requestId === historyRequestId) toast.error(copy("failed"))
   }
-  const value = (await response.json()) as {
-    events: HistoryEntry[]
-    interviews: typeof interviews.value
-  }
-  activeApplication.value = id
-  history.value = value.events
-  interviews.value = value.interviews
 }
 const archivePosting = async (post: Posting) => {
   if (
@@ -394,11 +416,14 @@ const archivePosting = async (post: Posting) => {
   }
 }
 const showVersions = async (post: Posting) => {
+  if (updatingPost.value) return
+  const requestId = ++versionsRequestId
   try {
     const response = await fetch(`/api/postings/${post.id}/versions`)
     if (!response.ok) throw new Error("request")
     const body = (await response.json()) as { versions?: unknown }
     if (!Array.isArray(body.versions)) throw new Error("response")
+    if (requestId !== versionsRequestId) return
     activePost.value = post
     postingVersions.value = body.versions as PostingVersion[]
     versionSource.value = post.canonicalUrl === null ? "manual" : "url"
@@ -406,21 +431,22 @@ const showVersions = async (post: Posting) => {
     versionBody.value = ""
     versionFile.value = null
   } catch {
-    toast.error(copy("failed"))
+    if (requestId === versionsRequestId) toast.error(copy("failed"))
   }
 }
 const addPostingVersion = async () => {
-  if (activePost.value === null) return
+  if (activePost.value === null || !versionReady.value || updatingPost.value) return
+  const postId = activePost.value.id
   updatingPost.value = true
   try {
     if (versionSource.value === "file") {
       if (versionFile.value === null) throw new Error("file")
       const form = new FormData()
       form.set("file", versionFile.value)
-      await request(`/api/postings/${activePost.value.id}/versions/file`, "POST", form)
+      await request(`/api/postings/${postId}/versions/file`, "POST", form)
     } else {
       await request(
-        `/api/postings/${activePost.value.id}/versions/${versionSource.value}`,
+        `/api/postings/${postId}/versions/${versionSource.value}`,
         "POST",
         JSON.stringify(
           versionSource.value === "url" ? { url: updateUrl.value } : { text: versionBody.value }
@@ -428,8 +454,9 @@ const addPostingVersion = async () => {
       )
     }
     await load()
-    const refreshed = postings.value.find((post) => post.id === activePost.value?.id)
-    if (refreshed !== undefined) await showVersions(refreshed)
+    const refreshed = postings.value.find((post) => post.id === postId)
+    updatingPost.value = false
+    if (refreshed !== undefined && activePost.value?.id === postId) await showVersions(refreshed)
     toast.success(copy("versionSaved"))
   } catch {
     toast.error(copy("failed"))
@@ -641,7 +668,7 @@ onBeforeUnmount(() => loadController.abort())
                   ? copy("applicationInProgress")
                   : copy("startApplication")
               }}</Button
-            ><Button variant="outline" @click="showVersions(post)"
+            ><Button variant="outline" :disabled="updatingPost" @click="showVersions(post)"
               ><History />{{ copy("versionHistory") }}</Button
             ><Button
               v-if="post.state === 'active'"
@@ -666,7 +693,7 @@ onBeforeUnmount(() => loadController.abort())
       <CardContent class="grid gap-5 lg:grid-cols-2">
         <div class="grid gap-3">
           <Label>{{ copy("versionSource") }}</Label>
-          <Select v-model="versionSource" :disabled="activePost.state !== 'active'">
+          <Select v-model="versionSource" :disabled="activePost.state !== 'active' || updatingPost">
             <SelectTrigger class="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="manual">{{ copy("manual") }}</SelectItem>
@@ -678,33 +705,27 @@ onBeforeUnmount(() => loadController.abort())
             v-if="versionSource === 'url'"
             v-model="updateUrl"
             type="url"
-            :disabled="activePost.state !== 'active'"
+            :disabled="activePost.state !== 'active' || updatingPost"
             :aria-label="copy('updateUrl')"
           />
           <textarea
             v-else-if="versionSource === 'manual'"
             v-model="versionBody"
             class="min-h-28 rounded-lg border bg-background p-3"
-            :disabled="activePost.state !== 'active'"
+            :disabled="activePost.state !== 'active' || updatingPost"
             :placeholder="copy('body')"
           />
           <Input
             v-else
             type="file"
             accept=".pdf,.docx,.md,.txt"
-            :disabled="activePost.state !== 'active'"
+            :disabled="activePost.state !== 'active' || updatingPost"
             :aria-label="copy('versionFile')"
             @change="versionFile = ($event.target as HTMLInputElement).files?.[0] ?? null"
           />
           <Button
             class="w-fit"
-            :disabled="
-              updatingPost ||
-              activePost.state !== 'active' ||
-              (versionSource === 'url' && !updateUrl.trim()) ||
-              (versionSource === 'manual' && !versionBody.trim()) ||
-              (versionSource === 'file' && versionFile === null)
-            "
+            :disabled="updatingPost || activePost.state !== 'active' || !versionReady"
             @click="addPostingVersion"
           >
             <RefreshCw />{{ copy("addVersion") }}
