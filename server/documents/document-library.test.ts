@@ -81,6 +81,21 @@ describe("uploaded career document library", () => {
     expect(
       (await (await app.request(url("/api/documents/context"))).json()) as { documents: unknown[] }
     ).toEqual({ documents: [] })
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/selection`), {
+          method: "PUT",
+          headers
+        })
+      ).status
+    ).toBe(409)
+    expect(
+      persistence.database
+        .query<{ count: number }, [string]>(
+          "SELECT count(*) count FROM profile_document_selections WHERE document_id=?"
+        )
+        .get(first)?.count
+    ).toBe(0)
 
     const blobCount = () =>
       persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
