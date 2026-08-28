@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { Archive, BriefcaseBusiness, CalendarPlus, History, Plus } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
@@ -66,6 +66,7 @@ const activeApplication = ref<string | null>(null)
 const history = ref<HistoryEntry[]>([])
 const interviews = ref<Array<{ id: string; scheduledAt: string; kind: string; notes: string }>>([])
 const newStage = ref("")
+const loadController = new AbortController()
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
 
 const csrf = async () =>
@@ -79,9 +80,9 @@ const request = async (path: string, method: string, value?: FormData | string) 
 }
 const load = async () => {
   const [postResponse, applicationResponse, stageResponse] = await Promise.all([
-    fetch("/api/postings"),
-    fetch("/api/applications"),
-    fetch("/api/pipeline/stages")
+    fetch("/api/postings", { signal: loadController.signal }),
+    fetch("/api/applications", { signal: loadController.signal }),
+    fetch("/api/pipeline/stages", { signal: loadController.signal })
   ])
   postings.value = ((await postResponse.json()) as { postings: Posting[] }).postings
   applications.value = (
@@ -214,6 +215,7 @@ const addStage = async () => {
   }
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
+onBeforeUnmount(() => loadController.abort())
 </script>
 
 <template>
