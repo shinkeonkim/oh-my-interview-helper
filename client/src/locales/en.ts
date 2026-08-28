@@ -117,6 +117,8 @@ export const en = {
     addNote: "Add note",
     interviewAt: "Interview time",
     interviewKind: "Interview type",
+    interviewLocation: "Interview location or link",
+    interviewNotes: "Interview preparation notes",
     scheduleInterview: "Record interview",
     history: "Full history",
     archive: "Archive",

@@ -114,6 +114,8 @@ export const ko = {
     addNote: "메모 추가",
     interviewAt: "면접 일시",
     interviewKind: "면접 종류",
+    interviewLocation: "면접 장소 또는 링크",
+    interviewNotes: "면접 준비 메모",
     scheduleInterview: "면접 기록",
     history: "전체 이력",
     archive: "보관",

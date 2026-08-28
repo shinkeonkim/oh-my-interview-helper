@@ -77,9 +77,19 @@ const selectedStages = ref<Record<string, string>>({})
 const note = ref("")
 const interviewAt = ref("")
 const interviewKind = ref("")
+const interviewLocation = ref("")
+const interviewNotes = ref("")
 const activeApplication = ref<string | null>(null)
 const history = ref<HistoryEntry[]>([])
-const interviews = ref<Array<{ id: string; scheduledAt: string; kind: string; notes: string }>>([])
+const interviews = ref<
+  Array<{
+    id: string
+    scheduledAt: string
+    kind: string
+    location: string | null
+    notes: string
+  }>
+>([])
 const newStage = ref("")
 const activePost = ref<Posting | null>(null)
 const postingVersions = ref<PostingVersion[]>([])
@@ -194,11 +204,11 @@ const schedule = async () => {
       JSON.stringify({
         scheduledAt: new Date(interviewAt.value).toISOString(),
         kind: interviewKind.value,
-        location: null,
-        notes: ""
+        location: interviewLocation.value.trim() || null,
+        notes: interviewNotes.value.trim()
       })
     )
-    interviewAt.value = interviewKind.value = ""
+    interviewAt.value = interviewKind.value = interviewLocation.value = interviewNotes.value = ""
     await showHistory(activeApplication.value)
   } catch {
     toast.error(copy("failed"))
@@ -480,11 +490,19 @@ onBeforeUnmount(() => loadController.abort())
               copy("addNote")
             }}</Button>
           </div>
-          <div class="grid gap-2 sm:grid-cols-3">
+          <div class="grid gap-2 sm:grid-cols-2">
             <Input v-model="interviewAt" type="datetime-local" /><Input
               v-model="interviewKind"
               :placeholder="copy('interviewKind')"
-            /><Button @click="schedule"><CalendarPlus />{{ copy("scheduleInterview") }}</Button>
+            />
+            <Input v-model="interviewLocation" :placeholder="copy('interviewLocation')" />
+            <Input v-model="interviewNotes" :placeholder="copy('interviewNotes')" />
+            <Button
+              class="w-fit"
+              :disabled="!interviewAt || !interviewKind.trim()"
+              @click="schedule"
+              ><CalendarPlus />{{ copy("scheduleInterview") }}</Button
+            >
           </div>
         </div>
         <ol class="grid gap-2 text-sm">
@@ -493,8 +511,16 @@ onBeforeUnmount(() => loadController.abort())
             {{ new Date(event.createdAt).toLocaleString(settings.locale) }}
           </li>
           <li v-for="interview in interviews" :key="interview.id" class="rounded border p-3">
-            {{ interview.kind }} ·
-            {{ new Date(interview.scheduledAt).toLocaleString(settings.locale) }}
+            <p class="font-medium">
+              {{ interview.kind }} ·
+              {{ new Date(interview.scheduledAt).toLocaleString(settings.locale) }}
+            </p>
+            <p v-if="interview.location" class="mt-1 text-muted-foreground">
+              {{ copy("interviewLocation") }} · {{ interview.location }}
+            </p>
+            <p v-if="interview.notes" class="mt-1 whitespace-pre-wrap text-muted-foreground">
+              {{ interview.notes }}
+            </p>
           </li>
         </ol></CardContent
       ></Card
