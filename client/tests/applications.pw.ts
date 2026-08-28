@@ -9,7 +9,8 @@ test("creates a posting and moves an application through the local pipeline", as
     state: "active",
     versionNumber: 1,
     sourceKind: "manual",
-    canonicalUrl: "https://careers.example.com/backend"
+    canonicalUrl: "https://careers.example.com/backend",
+    metadata: { location: "Seoul · Hybrid", employmentType: "Full-time" }
   }
   let stages = [
     {
@@ -121,6 +122,14 @@ test("creates a posting and moves an application through the local pipeline", as
     await route.fulfill({ status: 204 })
   })
   await page.route("**/api/postings/manual", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      title: post.title,
+      companyName: post.companyName,
+      teamName: post.teamName,
+      location: post.metadata.location,
+      employmentType: post.metadata.employmentType,
+      text: "Role body"
+    })
     postings = [post]
     await route.fulfill({ status: 201, json: post })
   })
@@ -263,9 +272,20 @@ test("creates a posting and moves an application through the local pipeline", as
     .getByRole("textbox")
     .fill(post.companyName)
   await page.getByText("팀", { exact: true }).locator("..").getByRole("textbox").fill(post.teamName)
+  await page
+    .getByText("근무 위치", { exact: true })
+    .locator("..")
+    .getByRole("textbox")
+    .fill(post.metadata.location)
+  await page
+    .getByText("고용 형태", { exact: true })
+    .locator("..")
+    .getByRole("textbox")
+    .fill(post.metadata.employmentType)
   await page.getByPlaceholder("공고 내용").fill("Role body")
   await page.getByRole("button", { name: "공고 저장" }).click()
   await expect(page.getByText(post.title)).toBeVisible()
+  await expect(page.getByText("Seoul · Hybrid · Full-time")).toBeVisible()
   await page.getByRole("button", { name: "버전 기록" }).click()
   await expect(page.getByText("버전 1 · 직접 입력")).toBeVisible()
   await expect(page.getByLabel("갱신할 공개 공고 URL")).toHaveValue(post.canonicalUrl)
