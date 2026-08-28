@@ -214,6 +214,31 @@ describe("job posting and hiring pipeline API", () => {
     ).json()) as { events: unknown[]; interviews: unknown[] }
     expect(archivedHistory.events).toHaveLength(5)
     expect(archivedHistory.interviews).toHaveLength(1)
+
+    expect(
+      (
+        await app.request(`${base}/postings/${post.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    const retried = await create()
+    expect(retried.status).toBe(201)
+    expect(((await retried.json()) as { id: string }).id).toBe(application.id)
+    expect(
+      (
+        await app.request(`${base}/applications`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ jobPostId: post.id, idempotencyKey: crypto.randomUUID() })
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      ((await (await app.request(`${base}/applications`)).json()) as { applications: unknown[] })
+        .applications
+    ).toHaveLength(1)
   })
 
   test("allows bounded custom stage CRUD and rejects deleted-stage transitions atomically", async () => {
