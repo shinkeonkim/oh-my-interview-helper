@@ -112,6 +112,7 @@ const interviews = ref<
   }>
 >([])
 const newStage = ref("")
+const stagesBusy = ref(false)
 const activePost = ref<Posting | null>(null)
 const postingVersions = ref<PostingVersion[]>([])
 const versionSource = ref<Source>("url")
@@ -151,6 +152,7 @@ const interviewReady = computed(() => {
   if (interviewAt.value.length === 0 || interviewKind.value.trim().length === 0) return false
   return !Number.isNaN(new Date(interviewAt.value).getTime())
 })
+const newStageReady = computed(() => newStage.value.trim().length > 0)
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -436,34 +438,45 @@ const addPostingVersion = async () => {
   }
 }
 const addStage = async () => {
+  if (!newStageReady.value || stagesBusy.value) return
+  stagesBusy.value = true
   try {
     const key = `custom_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`
-    await request("/api/pipeline/stages", "POST", JSON.stringify({ key, name: newStage.value }))
+    await request(
+      "/api/pipeline/stages",
+      "POST",
+      JSON.stringify({ key, name: newStage.value.trim() })
+    )
     newStage.value = ""
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
   }
 }
 const renameStage = async (stage: Stage) => {
+  const name = stageNames.value[stage.id]?.trim()
+  if (stagesBusy.value || !name || name === stage.name) return
+  stagesBusy.value = true
   try {
-    await request(
-      `/api/pipeline/stages/${stage.id}`,
-      "PATCH",
-      JSON.stringify({ name: stageNames.value[stage.id] })
-    )
+    await request(`/api/pipeline/stages/${stage.id}`, "PATCH", JSON.stringify({ name }))
     await load()
     toast.success(copy("stageSaved"))
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
   }
 }
 const moveStage = async (stage: Stage, offset: -1 | 1) => {
+  if (stagesBusy.value) return
   const ordered = [...stages.value].sort((left, right) => left.position - right.position)
   const index = ordered.findIndex((item) => item.id === stage.id)
   const target = index + offset
   if (index < 0 || target < 0 || target >= ordered.length) return
   ;[ordered[index], ordered[target]] = [ordered[target]!, ordered[index]!]
+  stagesBusy.value = true
   try {
     await request(
       "/api/pipeline/stages/order",
@@ -473,15 +486,21 @@ const moveStage = async (stage: Stage, offset: -1 | 1) => {
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
   }
 }
 const deleteStage = async (stage: Stage) => {
+  if (stagesBusy.value) return
+  stagesBusy.value = true
   try {
     await request(`/api/pipeline/stages/${stage.id}`, "DELETE")
     await load()
     toast.success(copy("stageDeleted"))
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
   }
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
@@ -830,7 +849,7 @@ onBeforeUnmount(() => loadController.abort())
       ></Card
     >
 
-    <Card
+    <Card :aria-busy="stagesBusy"
       ><CardHeader
         ><CardTitle>{{ copy("stages") }}</CardTitle></CardHeader
       ><CardContent
@@ -841,12 +860,12 @@ onBeforeUnmount(() => loadController.abort())
             class="flex flex-wrap items-center gap-2 rounded-lg border p-2"
           >
             <span class="w-6 text-center text-sm text-muted-foreground">{{ stage.position }}</span>
-            <Input v-model="stageNames[stage.id]" class="min-w-48 flex-1" />
+            <Input v-model="stageNames[stage.id]" class="min-w-48 flex-1" :disabled="stagesBusy" />
             <Button
               size="icon"
               variant="ghost"
               :aria-label="`${copy('moveStageUp')}: ${stage.name}`"
-              :disabled="index === 0"
+              :disabled="stagesBusy || index === 0"
               @click="moveStage(stage, -1)"
               ><ArrowUp
             /></Button>
@@ -854,7 +873,7 @@ onBeforeUnmount(() => loadController.abort())
               size="icon"
               variant="ghost"
               :aria-label="`${copy('moveStageDown')}: ${stage.name}`"
-              :disabled="index === stages.length - 1"
+              :disabled="stagesBusy || index === stages.length - 1"
               @click="moveStage(stage, 1)"
               ><ArrowDown
             /></Button>
@@ -862,7 +881,9 @@ onBeforeUnmount(() => loadController.abort())
               size="icon"
               variant="ghost"
               :aria-label="`${copy('saveStage')}: ${stage.name}`"
-              :disabled="!stageNames[stage.id]?.trim() || stageNames[stage.id] === stage.name"
+              :disabled="
+                stagesBusy || !stageNames[stage.id]?.trim() || stageNames[stage.id] === stage.name
+              "
               @click="renameStage(stage)"
               ><Save
             /></Button>
@@ -871,15 +892,18 @@ onBeforeUnmount(() => loadController.abort())
               size="icon"
               variant="ghost"
               :aria-label="`${copy('deleteStage')}: ${stage.name}`"
+              :disabled="stagesBusy"
               @click="deleteStage(stage)"
               ><Trash2
             /></Button>
           </div>
         </div>
         <div class="mt-4 flex max-w-md gap-2">
-          <Input v-model="newStage" :placeholder="copy('newStage')" /><Button @click="addStage">{{
-            copy("addStage")
-          }}</Button>
+          <Input v-model="newStage" :disabled="stagesBusy" :placeholder="copy('newStage')" /><Button
+            :disabled="stagesBusy || !newStageReady"
+            @click="addStage"
+            >{{ copy("addStage") }}</Button
+          >
         </div></CardContent
       ></Card
     >
