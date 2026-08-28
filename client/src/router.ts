@@ -5,6 +5,8 @@ import HomeView from "./views/HomeView.vue"
 import PlaceholderView from "./views/PlaceholderView.vue"
 import SettingsView from "./views/SettingsView.vue"
 import NotFoundView from "./views/NotFoundView.vue"
+import DocumentsView from "./views/DocumentsView.vue"
+import ApplicationsView from "./views/ApplicationsView.vue"
 
 const placeholderRoute = (name: string, path: string, key: string) => ({
   name,
@@ -18,8 +20,8 @@ export const router = createRouter({
   routes: [
     { name: "home", path: "/", component: HomeView },
     placeholderRoute("search", "/search", "search"),
-    placeholderRoute("jobs", "/jobs", "jobs"),
-    placeholderRoute("documents", "/documents", "documents"),
+    { name: "jobs", path: "/jobs", component: ApplicationsView },
+    { name: "documents", path: "/documents", component: DocumentsView },
     placeholderRoute("jobSearch", "/job-search", "jobSearch"),
     placeholderRoute("stats", "/stats", "stats"),
     { name: "settings", path: "/settings", component: SettingsView },

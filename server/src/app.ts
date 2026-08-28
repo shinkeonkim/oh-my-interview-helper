@@ -34,6 +34,10 @@ import type { PinnedTransport, Resolver } from "./ingest/safe-fetcher"
 import { createCsrfProtection, localSecurityMiddleware } from "./security/local-security"
 import { createRunnerRoutes } from "./routes/runner"
 import type { RunnerPairingService } from "./runner/pairing"
+import { DocumentLibraryService } from "./documents/service"
+import { createDocumentRoutes } from "./routes/documents"
+import { ApplicationService } from "./applications/service"
+import { createApplicationRoutes } from "./routes/applications"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -103,6 +107,12 @@ export const createApp = ({
     "/api/preview",
     createPreviewRoutes({ dataDirectory, limits: security, resolver, transport })
   )
+  app.route(
+    "/api",
+    createApplicationRoutes(
+      new ApplicationService(persistence, dataDirectory, security, resolver, transport)
+    )
+  )
   app.route("/api/jobs", createJobsRoutes(jobs))
   app.route(
     "/api/settings",
@@ -119,6 +129,10 @@ export const createApp = ({
     })
   )
   app.route("/api/disclosures", createDisclosureRoutes(disclosures))
+  app.route(
+    "/api/documents",
+    createDocumentRoutes(new DocumentLibraryService(persistence, dataDirectory, security))
+  )
   if (runnerPairing !== undefined) app.route("/api/runners", createRunnerRoutes(runnerPairing))
   const artifacts = new DraftArtifactService(
     new DraftArtifactRepository(persistence.database),
