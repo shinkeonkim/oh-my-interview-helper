@@ -47,6 +47,7 @@ const history = ref<{
 } | null>(null)
 const historyDocumentId = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+let loadRequestId = 0
 let previewRequestId = 0
 let historyRequestId = 0
 const kindLabels = computed<Record<Kind, string>>(() => ({
@@ -57,15 +58,18 @@ const kindLabels = computed<Record<Kind, string>>(() => ({
 }))
 
 const load = async () => {
+  const requestId = ++loadRequestId
   loading.value = true
   try {
     const response = await fetch("/api/documents")
     if (!response.ok) throw new Error("load")
-    documents.value = ((await response.json()) as { documents: DocumentItem[] }).documents
+    const value = (await response.json()) as { documents: DocumentItem[] }
+    if (requestId !== loadRequestId) return
+    documents.value = value.documents
   } catch {
-    toast.error(copy("failed"))
+    if (requestId === loadRequestId) toast.error(copy("failed"))
   } finally {
-    loading.value = false
+    if (requestId === loadRequestId) loading.value = false
   }
 }
 
@@ -212,6 +216,7 @@ const closeHistory = () => {
 
 onMounted(load)
 onBeforeUnmount(() => {
+  loadRequestId += 1
   previewRequestId += 1
   historyRequestId += 1
 })

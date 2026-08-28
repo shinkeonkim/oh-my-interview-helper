@@ -121,6 +121,7 @@ const versionBody = ref("")
 const versionFile = ref<File | null>(null)
 const updatingPost = ref(false)
 const loadController = new AbortController()
+let loadRequestId = 0
 let historyRequestId = 0
 let versionsRequestId = 0
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
@@ -222,20 +223,30 @@ const setPostPending = (id: string, pending: boolean) => {
   pendingPostIds.value = next
 }
 const load = async () => {
-  const [postResponse, applicationResponse, stageResponse] = await Promise.all([
-    fetch("/api/postings", { signal: loadController.signal }),
-    fetch("/api/applications", { signal: loadController.signal }),
-    fetch("/api/pipeline/stages", { signal: loadController.signal })
-  ])
-  postings.value = ((await postResponse.json()) as { postings: Posting[] }).postings
-  applications.value = (
-    (await applicationResponse.json()) as { applications: Application[] }
-  ).applications
-  stages.value = ((await stageResponse.json()) as { stages: Stage[] }).stages
-  stageNames.value = Object.fromEntries(stages.value.map((stage) => [stage.id, stage.name]))
-  selectedStages.value = Object.fromEntries(
-    applications.value.map((item) => [item.id, item.stageId])
-  )
+  const requestId = ++loadRequestId
+  try {
+    const [postResponse, applicationResponse, stageResponse] = await Promise.all([
+      fetch("/api/postings", { signal: loadController.signal }),
+      fetch("/api/applications", { signal: loadController.signal }),
+      fetch("/api/pipeline/stages", { signal: loadController.signal })
+    ])
+    if (!postResponse.ok || !applicationResponse.ok || !stageResponse.ok) throw new Error("request")
+    const [postValue, applicationValue, stageValue] = await Promise.all([
+      postResponse.json() as Promise<{ postings: Posting[] }>,
+      applicationResponse.json() as Promise<{ applications: Application[] }>,
+      stageResponse.json() as Promise<{ stages: Stage[] }>
+    ])
+    if (requestId !== loadRequestId) return
+    postings.value = postValue.postings
+    applications.value = applicationValue.applications
+    stages.value = stageValue.stages
+    stageNames.value = Object.fromEntries(stages.value.map((stage) => [stage.id, stage.name]))
+    selectedStages.value = Object.fromEntries(
+      applications.value.map((item) => [item.id, item.stageId])
+    )
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
+  }
 }
 
 const savePosting = async () => {
@@ -531,7 +542,12 @@ const deleteStage = async (stage: Stage) => {
   }
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => loadController.abort())
+onBeforeUnmount(() => {
+  loadRequestId += 1
+  historyRequestId += 1
+  versionsRequestId += 1
+  loadController.abort()
+})
 </script>
 
 <template>
