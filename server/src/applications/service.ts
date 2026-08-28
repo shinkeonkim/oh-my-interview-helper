@@ -2,7 +2,7 @@ import type { Persistence } from "../db"
 import { previewFile } from "../ingest/file-preview"
 import { fetchPublicText, type PinnedTransport, type Resolver } from "../ingest/safe-fetcher"
 import type { LocalSecuritySettings } from "../security/config"
-import { ApplicationRepository } from "./repository"
+import { ApplicationDomainError, ApplicationRepository } from "./repository"
 
 type PostMetadata = {
   readonly title: string
@@ -46,9 +46,11 @@ export class ApplicationService {
     return this.persistPost(input, "url", fetched.text, fetched.url)
   }
   async addManualVersion(postId: string, text: string) {
+    this.assertActivePost(postId)
     return this.persistVersion(postId, "manual", text)
   }
   async addFileVersion(postId: string, file: File) {
+    this.assertActivePost(postId)
     const extracted = await previewFile({
       dataDirectory: this.dataDirectory,
       file,
@@ -57,6 +59,7 @@ export class ApplicationService {
     return this.persistVersion(postId, "file", extracted.text)
   }
   async addUrlVersion(postId: string, url: string) {
+    this.assertActivePost(postId)
     const fetched = await fetchPublicText({
       limits: this.limits,
       resolver: this.resolver,
@@ -94,6 +97,7 @@ export class ApplicationService {
     text: string,
     sourceUrl: string | null = null
   ) {
+    this.assertActivePost(postId)
     const normalized = text.trim()
     if (normalized.length === 0) throw new ApplicationServiceError("content_required")
     const blob = await this.persistence.blobs.put(
@@ -110,6 +114,10 @@ export class ApplicationService {
       createdAt: this.now()
     })
     return this.repository.post(postId)
+  }
+  private assertActivePost(postId: string): void {
+    if (this.repository.post(postId)?.state !== "active")
+      throw new ApplicationDomainError("post_unavailable")
   }
 }
 
