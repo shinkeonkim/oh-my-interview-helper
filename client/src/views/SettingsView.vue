@@ -56,7 +56,9 @@ const loadProviders = async () => {
   try {
     const response = await fetch("/api/providers/status")
     if (!response.ok) throw new Error("request")
-    providers.value = ((await response.json()) as { providers: Provider[] }).providers
+    const body = (await response.json()) as { providers?: unknown }
+    if (!Array.isArray(body.providers)) throw new Error("response")
+    providers.value = body.providers as Provider[]
   } catch {
     toast.error(copy("settings.providersFailed"))
   } finally {
