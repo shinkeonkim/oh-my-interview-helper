@@ -108,7 +108,7 @@ Claude Code와 Codex CLI는 서버가 임의의 로컬 프로세스를 실행하
 bun packages/runner/src/bin.ts pair --code ABCD1234 --name my-local-runner
 ```
 
-페어링 후 runner를 실행해 둡니다. 서버와 runner의 WebSocket 연결은 loopback 주소만 허용합니다.
+페어링 후 runner를 실행해 둡니다. 서버와 runner의 WebSocket 연결은 loopback 주소만 허용하며, 일시적으로 연결이 끊기면 자동 재연결합니다. 종료할 때는 `Ctrl+C`를 누릅니다.
 
 ```bash
 bun packages/runner/src/bin.ts run
