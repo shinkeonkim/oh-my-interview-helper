@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { MessageCircle, Send, ShieldCheck } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
@@ -58,7 +58,10 @@ const documentVersionId = ref("none")
 const message = ref("")
 const turnKey = ref(crypto.randomUUID())
 const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
+const reviewing = ref(false)
 const running = ref(false)
+let contextId = 0
+let loadRequestId = 0
 const inputs = computed(() => {
   const selected: Array<Record<string, string>> = [
     { kind: "job_post_version", jobPostVersionId: props.postingVersionId }
@@ -87,62 +90,85 @@ const requestBody = () => ({
   turnKey: turnKey.value,
   inputs: inputs.value
 })
-const loadMessages = async (id: string) => {
-  const response = await fetch(`/api/conversations/${id}/messages`, {
-    signal: controller.signal
-  })
-  if (response.ok) messages.value = ((await response.json()) as { messages: Message[] }).messages
-}
 const load = async () => {
-  const [documentsResponse, providersResponse, conversationsResponse] = await Promise.all([
-    fetch("/api/documents", { signal: controller.signal }),
-    fetch("/api/providers/status", { signal: controller.signal }),
-    fetch(`/api/conversations?applicationId=${encodeURIComponent(props.applicationId)}`, {
-      signal: controller.signal
-    })
-  ])
-  documents.value = (
-    (await documentsResponse.json()) as { documents: Document[] }
-  ).documents.filter((item) => item.state === "active" && item.currentVersionId)
-  providers.value = (
-    (await providersResponse.json()) as { providers: Provider[] }
-  ).providers.filter((item) => item.configured)
-  conversations.value = (
-    (await conversationsResponse.json()) as { conversations: Conversation[] }
-  ).conversations
-  providerId.value = providers.value[0]?.id ?? ""
-  const latest = conversations.value.at(-1)
-  if (latest) {
-    conversationId.value = latest.id
-    await loadMessages(latest.id)
+  const requestId = ++loadRequestId
+  const requestedApplicationId = props.applicationId
+  try {
+    const [documentsResponse, providersResponse, conversationsResponse] = await Promise.all([
+      fetch("/api/documents", { signal: controller.signal }),
+      fetch("/api/providers/status", { signal: controller.signal }),
+      fetch(`/api/conversations?applicationId=${encodeURIComponent(requestedApplicationId)}`, {
+        signal: controller.signal
+      })
+    ])
+    if (!documentsResponse.ok || !providersResponse.ok || !conversationsResponse.ok)
+      throw new Error("request")
+    const [documentValue, providerValue, conversationValue] = await Promise.all([
+      documentsResponse.json() as Promise<{ documents: Document[] }>,
+      providersResponse.json() as Promise<{ providers: Provider[] }>,
+      conversationsResponse.json() as Promise<{ conversations: Conversation[] }>
+    ])
+    const configuredProviders = providerValue.providers.filter((item) => item.configured)
+    const activeDocuments = documentValue.documents.filter(
+      (item) => item.state === "active" && item.currentVersionId
+    )
+    const latest = conversationValue.conversations.at(-1)
+    let latestMessages: Message[] = []
+    if (latest !== undefined) {
+      const response = await fetch(`/api/conversations/${latest.id}/messages`, {
+        signal: controller.signal
+      })
+      if (!response.ok) throw new Error("request")
+      latestMessages = ((await response.json()) as { messages: Message[] }).messages
+    }
+    if (requestId !== loadRequestId || requestedApplicationId !== props.applicationId) return
+    documents.value = activeDocuments
+    providers.value = configuredProviders
+    conversations.value = conversationValue.conversations
+    providerId.value = configuredProviders[0]?.id ?? ""
+    conversationId.value = latest?.id ?? null
+    messages.value = latestMessages
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
   }
 }
 const review = async () => {
-  if (!message.value.trim()) return
+  if (!message.value.trim() || reviewing.value || running.value) return
+  const operationContext = contextId
+  const body = requestBody()
+  reviewing.value = true
   try {
-    preview.value = (await (await post("/api/conversations/preview", requestBody())).json()) as {
+    const value = (await (await post("/api/conversations/preview", body)).json()) as {
       manifest: Manifest
       authorizationToken: string
     }
+    if (operationContext === contextId) preview.value = value
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
+  } finally {
+    if (operationContext === contextId) reviewing.value = false
   }
 }
 const send = async () => {
-  if (!preview.value) return
+  if (!preview.value || running.value) return
+  const operationContext = contextId
+  const reviewed = preview.value
+  const body = requestBody()
   running.value = true
   try {
     const confirmation = (await (
       await post("/api/disclosures/confirm", {
-        authorizationToken: preview.value.authorizationToken
+        authorizationToken: reviewed.authorizationToken
       })
     ).json()) as { id: string }
+    if (operationContext !== contextId) return
     const result = (await (
       await post("/api/conversations/send", {
-        ...requestBody(),
+        ...body,
         disclosureId: confirmation.id
       })
     ).json()) as { conversation: Conversation; messages: Message[] }
+    if (operationContext !== contextId) return
     conversationId.value = result.conversation.id
     messages.value.push(...result.messages)
     if (!conversations.value.some((item) => item.id === result.conversation.id))
@@ -151,13 +177,37 @@ const send = async () => {
     preview.value = null
     turnKey.value = crypto.randomUUID()
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    running.value = false
+    if (operationContext === contextId) running.value = false
   }
 }
-onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => controller.abort())
+watch(
+  () => props.applicationId,
+  () => {
+    contextId += 1
+    loadRequestId += 1
+    documents.value = []
+    providers.value = []
+    conversations.value = []
+    messages.value = []
+    conversationId.value = null
+    providerId.value = ""
+    documentVersionId.value = "none"
+    message.value = ""
+    preview.value = null
+    reviewing.value = false
+    running.value = false
+    turnKey.value = crypto.randomUUID()
+    void load().catch(() => toast.error(copy("failed")))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  contextId += 1
+  loadRequestId += 1
+  controller.abort()
+})
 </script>
 
 <template>
@@ -227,7 +277,10 @@ onBeforeUnmount(() => controller.abort())
         <Label for="chat-message">{{ copy("message") }}</Label
         ><Textarea id="chat-message" v-model="message" :placeholder="copy('placeholder')" />
       </div>
-      <Button class="w-fit" :disabled="!providerId || !message.trim()" @click="review"
+      <Button
+        class="w-fit"
+        :disabled="!providerId || !message.trim() || reviewing || running"
+        @click="review"
         ><ShieldCheck />{{ copy("review") }}</Button
       >
     </CardContent>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { ExternalLink, RefreshCw, Search } from "lucide-vue-next"
 import { toast } from "vue-sonner"
@@ -72,6 +72,9 @@ const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
 const running = ref(false)
 const loadController = new AbortController()
+let contextId = 0
+let loadRequestId = 0
+let recordRequestId = 0
 const jobPostId = computed(() => {
   const value = route.params["postId"]
   return typeof value === "string" ? value : null
@@ -85,10 +88,18 @@ const sourceUrls = () =>
     .filter(Boolean)
     .slice(0, 8)
 const load = async () => {
-  const query = jobPostId.value === null ? "" : `?jobPostId=${encodeURIComponent(jobPostId.value)}`
-  const response = await fetch(`/api/research${query}`, { signal: loadController.signal })
-  if (!response.ok) return
-  records.value = ((await response.json()) as { records: RecordSummary[] }).records
+  const requestId = ++loadRequestId
+  const requestedPostId = jobPostId.value
+  const query = requestedPostId === null ? "" : `?jobPostId=${encodeURIComponent(requestedPostId)}`
+  try {
+    const response = await fetch(`/api/research${query}`, { signal: loadController.signal })
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as { records: RecordSummary[] }
+    if (requestId !== loadRequestId || requestedPostId !== jobPostId.value) return
+    records.value = value.records
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
+  }
 }
 watch(
   () => [props.subjectNamePreset, props.organizationPreset] as const,
@@ -98,6 +109,8 @@ watch(
   }
 )
 const submit = async (parentRecordId: string | null = null) => {
+  if (running.value) return
+  const operationContext = contextId
   running.value = true
   try {
     const path =
@@ -120,22 +133,56 @@ const submit = async (parentRecordId: string | null = null) => {
       body: JSON.stringify(body)
     })
     if (!response.ok) throw new Error("research")
-    current.value = (await response.json()) as ResearchRecord
+    const value = (await response.json()) as ResearchRecord
+    if (operationContext !== contextId) return
+    current.value = value
     await load()
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    running.value = false
+    if (operationContext === contextId) running.value = false
   }
 }
 const openRecord = async (id: string) => {
-  const response = await fetch(`/api/research/${id}`)
-  if (response.ok) current.value = (await response.json()) as ResearchRecord
+  const requestId = ++recordRequestId
+  const operationContext = contextId
+  try {
+    const response = await fetch(`/api/research/${id}`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as ResearchRecord
+    if (requestId === recordRequestId && operationContext === contextId) current.value = value
+  } catch {
+    if (requestId === recordRequestId && operationContext === contextId) toast.error(copy("failed"))
+  }
 }
 const identityLabel = (status: ResearchRecord["identityStatus"]) =>
   copy(status === "not_found" ? "notFound" : status)
-onMounted(load)
-onBeforeUnmount(() => loadController.abort())
+watch(
+  () => [jobPostId.value, props.subjectTypePreset] as const,
+  () => {
+    contextId += 1
+    loadRequestId += 1
+    recordRequestId += 1
+    records.value = []
+    current.value = null
+    running.value = false
+    subjectType.value = props.subjectTypePreset
+    if (props.embedded) {
+      subjectName.value = props.subjectNamePreset
+      organization.value = props.organizationPreset
+      roleHint.value = ""
+      urls.value = ""
+    }
+    void load().catch(() => toast.error(copy("failed")))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  contextId += 1
+  loadRequestId += 1
+  recordRequestId += 1
+  loadController.abort()
+})
 </script>
 
 <template>

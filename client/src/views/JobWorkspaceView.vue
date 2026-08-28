@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
 import { ArrowLeft, Building2, CalendarClock, Users } from "lucide-vue-next"
 import { toast } from "vue-sonner"
@@ -33,6 +33,7 @@ const controller = new AbortController()
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
 const interviews = ref<Interview[]>([])
+let loadRequestId = 0
 const postId = computed(() => String(route.params["postId"] ?? ""))
 const posting = computed(() => postings.value.find((item) => item.id === postId.value) ?? null)
 const application = computed(
@@ -60,24 +61,49 @@ const workflow = computed(
 )
 
 const load = async () => {
-  const [postResponse, applicationResponse] = await Promise.all([
-    fetch("/api/postings", { signal: controller.signal }),
-    fetch("/api/applications", { signal: controller.signal })
-  ])
-  postings.value = ((await postResponse.json()) as { postings: Posting[] }).postings
-  applications.value = (
-    (await applicationResponse.json()) as { applications: Application[] }
-  ).applications
-  if (application.value) {
-    const response = await fetch(`/api/applications/${application.value.id}/history`, {
-      signal: controller.signal
-    })
-    if (response.ok)
-      interviews.value = ((await response.json()) as { interviews: Interview[] }).interviews
+  const requestId = ++loadRequestId
+  const requestedPostId = postId.value
+  try {
+    const [postResponse, applicationResponse] = await Promise.all([
+      fetch("/api/postings", { signal: controller.signal }),
+      fetch("/api/applications", { signal: controller.signal })
+    ])
+    if (!postResponse.ok || !applicationResponse.ok) throw new Error("request")
+    const [postValue, applicationValue] = await Promise.all([
+      postResponse.json() as Promise<{ postings: Posting[] }>,
+      applicationResponse.json() as Promise<{ applications: Application[] }>
+    ])
+    const requestedApplication = applicationValue.applications.find(
+      (item) => item.jobPostId === requestedPostId
+    )
+    let requestedInterviews: Interview[] = []
+    if (requestedApplication !== undefined) {
+      const response = await fetch(`/api/applications/${requestedApplication.id}/history`, {
+        signal: controller.signal
+      })
+      if (!response.ok) throw new Error("request")
+      requestedInterviews = ((await response.json()) as { interviews: Interview[] }).interviews
+    }
+    if (requestId !== loadRequestId || requestedPostId !== postId.value) return
+    postings.value = postValue.postings
+    applications.value = applicationValue.applications
+    interviews.value = requestedInterviews
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
   }
 }
-onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => controller.abort())
+watch(
+  postId,
+  () => {
+    interviews.value = []
+    void load().catch(() => toast.error(copy("failed")))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  loadRequestId += 1
+  controller.abort()
+})
 </script>
 
 <template>
