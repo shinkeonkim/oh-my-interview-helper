@@ -21,7 +21,10 @@ test("rolls back grouped operations writes", () => {
         kind: "rollback",
         state: "queued",
         idempotencyKey: crypto.randomUUID(),
-        payload: {}
+        payload: {},
+        retryClass: "local",
+        executionTarget: "app",
+        maxAttempts: 1
       })
       throw new Error("rollback")
     })

@@ -1,12 +1,13 @@
 import type { Database } from "bun:sqlite"
 import { z } from "zod"
 
+import { JobsRepository } from "../jobs/repository"
+import { nextJobEventSequence } from "../jobs/repository-events"
 import { DurableJobIdSchema, type DurableJobId } from "./ids"
 import {
   DurableJobCreateSchema,
   DurableJobEventCreateSchema,
   DurableJobEventRowSchema,
-  DurableJobRowSchema,
   OutboundDisclosureCreateSchema,
   OutboundDisclosureRowSchema,
   ProviderSettingsRowSchema,
@@ -50,62 +51,42 @@ export type {
 const now = (): string => new Date().toISOString()
 
 export class OperationsRepositories {
-  constructor(readonly database: Database) {}
+  private readonly jobs: JobsRepository
+
+  constructor(readonly database: Database) {
+    this.jobs = new JobsRepository(database)
+  }
   parseJobId(input: z.input<typeof DurableJobIdSchema>): DurableJobId {
     return DurableJobIdSchema.parse(input)
   }
   createJob(input: z.input<typeof DurableJobCreateSchema>): DurableJob {
     const value = DurableJobCreateSchema.parse(input)
-    const createdAt = now()
-    this.database.run(
-      "INSERT INTO durable_jobs (id,kind,state,idempotency_key,payload_json,lease_owner,lease_expires_at,error_code,error_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-      [
-        value.id,
-        value.kind,
-        value.state,
-        value.idempotencyKey,
-        JSON.stringify(value.payload),
-        value.leaseOwner,
-        value.leaseExpiresAt,
-        value.errorCode,
-        value.errorMessage,
-        createdAt,
-        createdAt
-      ]
-    )
-    return { ...value, createdAt, updatedAt: createdAt }
+    return this.jobs.enqueue({
+      id: value.id,
+      kind: value.kind,
+      input: value.payload,
+      idempotencyKey: value.idempotencyKey,
+      retryClass: value.retryClass,
+      executionTarget: value.executionTarget,
+      maxAttempts: value.maxAttempts,
+      now: now()
+    }).job
   }
   getJob(id: DurableJobId): DurableJob | null {
-    return this.getOne(
-      "SELECT id,kind,state,idempotency_key idempotencyKey,payload_json payload,lease_owner leaseOwner,lease_expires_at leaseExpiresAt,error_code errorCode,error_message errorMessage,created_at createdAt,updated_at updatedAt FROM durable_jobs WHERE id=?",
-      id,
-      DurableJobRowSchema
-    )
+    return this.jobs.get({ id })
   }
   getJobByIdempotencyKey(idempotencyKey: DurableJobIdempotencyKey): DurableJob | null {
-    return this.getOne(
-      "SELECT id,kind,state,idempotency_key idempotencyKey,payload_json payload,lease_owner leaseOwner,lease_expires_at leaseExpiresAt,error_code errorCode,error_message errorMessage,created_at createdAt,updated_at updatedAt FROM durable_jobs WHERE idempotency_key=?",
-      idempotencyKey,
-      DurableJobRowSchema
-    )
+    return this.jobs.list().find((job) => job.idempotencyKey === idempotencyKey) ?? null
   }
   listJobs(): readonly DurableJob[] {
-    return this.list(
-      "SELECT id,kind,state,idempotency_key idempotencyKey,payload_json payload,lease_owner leaseOwner,lease_expires_at leaseExpiresAt,error_code errorCode,error_message errorMessage,created_at createdAt,updated_at updatedAt FROM durable_jobs ORDER BY created_at,id",
-      DurableJobRowSchema
-    )
+    return this.jobs.list()
   }
   appendJobEvent(input: z.input<typeof DurableJobEventCreateSchema>): DurableJobEvent {
     const value = DurableJobEventCreateSchema.parse(input)
     const createdAt = now()
     return this.database
       .transaction(() => {
-        const sequence =
-          this.database
-            .query<{ readonly sequence: number }, [DurableJobId]>(
-              "SELECT COALESCE(MAX(sequence),0)+1 sequence FROM durable_job_events WHERE job_id=?"
-            )
-            .get(value.jobId)?.sequence ?? 1
+        const sequence = nextJobEventSequence(this.database, value.jobId)
         this.database.run(
           "INSERT INTO durable_job_events (id,job_id,sequence,event_kind,payload_json,created_at) VALUES (?,?,?,?,?,?)",
           [value.id, value.jobId, sequence, value.kind, JSON.stringify(value.payload), createdAt]

@@ -7,6 +7,7 @@ import { DomainRepository } from "./domain-repositories"
 import { OperationsRepositories } from "./operations-repositories"
 import { ProviderArtifactRepository } from "./provider-artifact-repositories"
 import { ResearchConversationRepository } from "./research-conversation-repositories"
+import { JobsRepository } from "../jobs/repository"
 
 const TimestampSchema = z.string().datetime()
 const BlobHashSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -163,6 +164,7 @@ export class Repositories {
   readonly operations: OperationsRepositories
   readonly providerArtifacts: ProviderArtifactRepository
   readonly researchConversations: ResearchConversationRepository
+  readonly jobs: JobsRepository
   constructor(readonly database: Database) {
     this.documents = new DocumentRepository(database)
     this.blobs = new BlobRepository(database)
@@ -170,6 +172,7 @@ export class Repositories {
     this.operations = new OperationsRepositories(database)
     this.providerArtifacts = new ProviderArtifactRepository(database)
     this.researchConversations = new ResearchConversationRepository(database)
+    this.jobs = new JobsRepository(database)
   }
   transaction<T>(action: () => T): T {
     return this.database.transaction(action).immediate()

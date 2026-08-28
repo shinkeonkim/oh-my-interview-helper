@@ -55,7 +55,7 @@ const createAllDomainRecords = (persistence: Persistence, blobHash: string) => {
     model: "gpt-5.6",
     requestHash: "a".repeat(64),
     status: "succeeded",
-    usage: { inputTokens: 120, outputTokens: 48 },
+    usage: { inputTokens: 120, outputTokens: 48, cacheTokens: 0, totalTokens: 168 },
     cost: { currency: "USD", microunits: 900 },
     error: null,
     completedAt: timestamp
@@ -114,13 +114,12 @@ const createAllDomainRecords = (persistence: Persistence, blobHash: string) => {
   const job = operations.createJob({
     id: crypto.randomUUID(),
     kind: "interview_brief",
-    state: "leased",
+    state: "queued",
     idempotencyKey: crypto.randomUUID(),
     payload: { applicationId: application.id },
-    leaseOwner: "runner-a",
-    leaseExpiresAt: "2026-08-26T12:05:00.000Z",
-    errorCode: null,
-    errorMessage: null
+    retryClass: "local",
+    executionTarget: "app",
+    maxAttempts: 1
   })
   const jobEvent = operations.appendJobEvent({
     id: crypto.randomUUID(),
@@ -232,9 +231,12 @@ test("composes every repository family atomically and reopens typed records", as
   expect(
     reopened.repositories.researchConversations.listMessages(persisted.conversation.id)
   ).toEqual([persisted.message])
-  expect(reopened.repositories.operations.listJobEvents(persisted.job.id)).toEqual([
-    persisted.jobEvent
+  const jobEvents = reopened.repositories.operations.listJobEvents(persisted.job.id)
+  expect(jobEvents.map((event) => [event.kind, event.sequence])).toEqual([
+    ["queued", 1],
+    ["leased", 2]
   ])
+  expect(jobEvents[1]).toEqual(persisted.jobEvent)
   expect(
     reopened.repositories.operations.getProviderSettings(persisted.settings.providerKind)
   ).toEqual(persisted.settings)
