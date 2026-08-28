@@ -307,22 +307,20 @@ export class ApplicationRepository {
       .immediate()
   }
   transition(input: { applicationId: string; stageId: string; at: string }): HiringApplication {
-    const application = this.application(input.applicationId)
-    const target = this.stages().find((stage) => stage.id === Id.parse(input.stageId))
-    if (application === null || target === undefined || application.archivedAt !== null)
-      throw new ApplicationDomainError("transition_denied")
-    const current = this.stages().find((stage) => stage.id === application.stageId)
-    if (current?.outcome !== null || target.id === application.stageId)
-      throw new ApplicationDomainError("transition_denied")
-    const status =
-      target.outcome ??
-      (target.key === "saved" || target.key === "applied" || target.key === "interviewing"
-        ? target.key
-        : "interviewing")
-    this.database
+    return this.database
       .transaction(() => {
-        if (this.requireApplication(application.id).archivedAt !== null)
+        const application = this.application(Id.parse(input.applicationId))
+        const target = this.stages().find((stage) => stage.id === Id.parse(input.stageId))
+        if (application === null || target === undefined || application.archivedAt !== null)
           throw new ApplicationDomainError("transition_denied")
+        const current = this.stages().find((stage) => stage.id === application.stageId)
+        if (current?.outcome !== null || target.id === application.stageId)
+          throw new ApplicationDomainError("transition_denied")
+        const status =
+          target.outcome ??
+          (target.key === "saved" || target.key === "applied" || target.key === "interviewing"
+            ? target.key
+            : "interviewing")
         this.database.run(
           "UPDATE applications SET current_stage_id=?,status=?,applied_at=CASE WHEN ?='applied' AND applied_at IS NULL THEN ? ELSE applied_at END,outcome_at=CASE WHEN ? IS NOT NULL THEN ? ELSE outcome_at END WHERE id=?",
           [target.id, status, target.key, input.at, target.outcome, input.at, application.id]
@@ -333,9 +331,9 @@ export class ApplicationRepository {
           { fromStageId: application.stageId, toStageId: target.id, outcome: target.outcome },
           input.at
         )
+        return this.requireApplication(application.id)
       })
       .immediate()
-    return this.requireApplication(application.id)
   }
   addNote(applicationId: string, text: string, at: string): void {
     this.database
