@@ -2,12 +2,16 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   BriefcaseBusiness,
   CalendarPlus,
   History,
   Plus,
   RefreshCw,
-  Sparkles
+  Save,
+  Sparkles,
+  Trash2
 } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
@@ -43,7 +47,14 @@ type PostingVersion = {
   sourceKind: Source
   createdAt: string
 }
-type Stage = { id: string; key: string; name: string; position: number; outcome: string | null }
+type Stage = {
+  id: string
+  key: string
+  name: string
+  position: number
+  outcome: string | null
+  system: boolean
+}
 type Application = {
   id: string
   jobPostId: string
@@ -66,6 +77,7 @@ const copy = (key: string) => translate(settings.locale, `applications.${key}`)
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
 const stages = ref<Stage[]>([])
+const stageNames = ref<Record<string, string>>({})
 const source = ref<Source>("manual")
 const title = ref("")
 const company = ref("")
@@ -121,6 +133,7 @@ const load = async () => {
     (await applicationResponse.json()) as { applications: Application[] }
   ).applications
   stages.value = ((await stageResponse.json()) as { stages: Stage[] }).stages
+  stageNames.value = Object.fromEntries(stages.value.map((stage) => [stage.id, stage.name]))
   selectedStages.value = Object.fromEntries(
     applications.value.map((item) => [item.id, item.stageId])
   )
@@ -296,6 +309,45 @@ const addStage = async () => {
     await request("/api/pipeline/stages", "POST", JSON.stringify({ key, name: newStage.value }))
     newStage.value = ""
     await load()
+  } catch {
+    toast.error(copy("failed"))
+  }
+}
+const renameStage = async (stage: Stage) => {
+  try {
+    await request(
+      `/api/pipeline/stages/${stage.id}`,
+      "PATCH",
+      JSON.stringify({ name: stageNames.value[stage.id] })
+    )
+    await load()
+    toast.success(copy("stageSaved"))
+  } catch {
+    toast.error(copy("failed"))
+  }
+}
+const moveStage = async (stage: Stage, offset: -1 | 1) => {
+  const ordered = [...stages.value].sort((left, right) => left.position - right.position)
+  const index = ordered.findIndex((item) => item.id === stage.id)
+  const target = index + offset
+  if (index < 0 || target < 0 || target >= ordered.length) return
+  ;[ordered[index], ordered[target]] = [ordered[target]!, ordered[index]!]
+  try {
+    await request(
+      "/api/pipeline/stages/order",
+      "PUT",
+      JSON.stringify({ stageIds: ordered.map((item) => item.id) })
+    )
+    await load()
+  } catch {
+    toast.error(copy("failed"))
+  }
+}
+const deleteStage = async (stage: Stage) => {
+  try {
+    await request(`/api/pipeline/stages/${stage.id}`, "DELETE")
+    await load()
+    toast.success(copy("stageDeleted"))
   } catch {
     toast.error(copy("failed"))
   }
@@ -556,10 +608,47 @@ onBeforeUnmount(() => loadController.abort())
       ><CardHeader
         ><CardTitle>{{ copy("stages") }}</CardTitle></CardHeader
       ><CardContent
-        ><div class="flex flex-wrap gap-2">
-          <Badge v-for="stage in stages" :key="stage.id" variant="outline"
-            >{{ stage.position }}. {{ stage.name }}</Badge
+        ><div class="grid gap-2">
+          <div
+            v-for="(stage, index) in stages"
+            :key="stage.id"
+            class="flex flex-wrap items-center gap-2 rounded-lg border p-2"
           >
+            <span class="w-6 text-center text-sm text-muted-foreground">{{ stage.position }}</span>
+            <Input v-model="stageNames[stage.id]" class="min-w-48 flex-1" />
+            <Button
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('moveStageUp')}: ${stage.name}`"
+              :disabled="index === 0"
+              @click="moveStage(stage, -1)"
+              ><ArrowUp
+            /></Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('moveStageDown')}: ${stage.name}`"
+              :disabled="index === stages.length - 1"
+              @click="moveStage(stage, 1)"
+              ><ArrowDown
+            /></Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('saveStage')}: ${stage.name}`"
+              :disabled="!stageNames[stage.id]?.trim() || stageNames[stage.id] === stage.name"
+              @click="renameStage(stage)"
+              ><Save
+            /></Button>
+            <Button
+              v-if="!stage.system"
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('deleteStage')}: ${stage.name}`"
+              @click="deleteStage(stage)"
+              ><Trash2
+            /></Button>
+          </div>
         </div>
         <div class="mt-4 flex max-w-md gap-2">
           <Input v-model="newStage" :placeholder="copy('newStage')" /><Button @click="addStage">{{
