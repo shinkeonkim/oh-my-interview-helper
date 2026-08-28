@@ -226,7 +226,9 @@ test("creates a posting and moves an application through the local pipeline", as
       json: route.request().method() === "POST" ? applications[0] : { applications }
     })
   })
+  let transitionRequests = 0
   await page.route("**/api/applications/*/transition", async (route) => {
+    transitionRequests += 1
     const current = applications[0]
     if (current === undefined) throw new Error("application missing")
     const { stageId } = route.request().postDataJSON() as { stageId: string }
@@ -252,13 +254,17 @@ test("creates a posting and moves an application through the local pipeline", as
       payload: { fromStageId: current.stageId, toStageId: target.id },
       createdAt: changedAt
     })
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ json: applications[0] })
   })
+  let archiveApplicationRequests = 0
   await page.route("**/api/applications/*/archive", async (route) => {
+    archiveApplicationRequests += 1
     const current = applications[0]
     if (current === undefined) throw new Error("application missing")
     expect(route.request().headers()["x-csrf-token"]).toBe("token")
     applications[0] = { ...current, archivedAt: "2026-08-28T04:00:00.000Z" }
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 204 })
   })
   await page.route("**/api/applications/*/history", (route) =>
@@ -351,7 +357,13 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByRole("button", { name: "지원 진행 중" })).toBeDisabled()
   await page.getByRole("combobox").last().click()
   await page.getByRole("option", { name: "Applied" }).click()
-  await page.getByRole("button", { name: "단계 이동" }).click()
+  const applicationStage = page.getByRole("combobox").last()
+  const moveButton = page.getByRole("button", { name: "단계 이동" })
+  const archiveApplicationButton = page.getByRole("button", { name: "지원 보관" })
+  await moveButton.click()
+  await expect(moveButton).toBeDisabled()
+  await expect(applicationStage).toBeDisabled()
+  await expect(archiveApplicationButton).toBeDisabled()
   await expect(page.getByText("Applied", { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/지원일 ·/)).toBeVisible()
   await page.getByRole("combobox").last().click()
@@ -394,10 +406,13 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("Offered", { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/결과 확정일 ·/)).toBeVisible()
   await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
-  await page.getByRole("button", { name: "지원 보관" }).click()
+  await archiveApplicationButton.click()
+  await expect(archiveApplicationButton).toBeDisabled()
   await expect(page.getByText("보관됨")).toBeVisible()
   await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
   await expect(page.getByRole("button", { name: "지원 보관" })).toHaveCount(0)
+  expect(transitionRequests).toBe(3)
+  expect(archiveApplicationRequests).toBe(1)
   await page.getByPlaceholder("새 단계 이름").fill("Phone screen")
   await page.getByRole("button", { name: "단계 추가" }).click()
   const customStage = page.getByRole("button", { name: "단계 삭제: Phone screen" }).locator("..")
