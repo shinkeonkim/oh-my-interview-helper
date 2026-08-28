@@ -321,6 +321,8 @@ export class ApplicationRepository {
         : "interviewing")
     this.database
       .transaction(() => {
+        if (this.requireApplication(application.id).archivedAt !== null)
+          throw new ApplicationDomainError("transition_denied")
         this.database.run(
           "UPDATE applications SET current_stage_id=?,status=?,applied_at=CASE WHEN ?='applied' AND applied_at IS NULL THEN ? ELSE applied_at END,outcome_at=CASE WHEN ? IS NOT NULL THEN ? ELSE outcome_at END WHERE id=?",
           [target.id, status, target.key, input.at, target.outcome, input.at, application.id]
@@ -336,13 +338,17 @@ export class ApplicationRepository {
     return this.requireApplication(application.id)
   }
   addNote(applicationId: string, text: string, at: string): void {
-    this.requireApplication(applicationId)
-    this.appendEventUnsafe(
-      applicationId,
-      "note_added",
-      { text: z.string().trim().min(1).max(10_000).parse(text) },
-      at
-    )
+    this.database
+      .transaction(() => {
+        this.requireActiveApplication(applicationId)
+        this.appendEventUnsafe(
+          applicationId,
+          "note_added",
+          { text: z.string().trim().min(1).max(10_000).parse(text) },
+          at
+        )
+      })
+      .immediate()
   }
   scheduleInterview(input: {
     id: string
@@ -354,9 +360,9 @@ export class ApplicationRepository {
     notes: string
     createdAt: string
   }): void {
-    this.requireApplication(input.applicationId)
     this.database
       .transaction(() => {
+        this.requireActiveApplication(input.applicationId)
         this.database.run(
           "INSERT INTO application_interviews (id,application_id,scheduled_at,ended_at,interview_kind,location,notes,created_at) VALUES (?,?,?,?,?,?,?,?)",
           [
@@ -409,6 +415,11 @@ export class ApplicationRepository {
   private requireApplication(id: string) {
     const application = this.application(id)
     if (application === null) throw new ApplicationDomainError("application_unavailable")
+    return application
+  }
+  private requireActiveApplication(id: string) {
+    const application = this.requireApplication(id)
+    if (application.archivedAt !== null) throw new ApplicationDomainError("application_unavailable")
     return application
   }
   private appendEventUnsafe(
