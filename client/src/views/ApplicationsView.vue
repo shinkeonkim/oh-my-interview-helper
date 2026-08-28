@@ -295,7 +295,7 @@ onBeforeUnmount(() => loadController.abort())
             ></CardHeader
           ><CardContent class="flex gap-2"
             ><Button as-child variant="secondary"
-              ><RouterLink :to="`/jobs/${post.id}/prepare`"
+              ><RouterLink :to="`/jobs/${post.id}/overview`"
                 ><Sparkles />{{ copy("prepare") }}</RouterLink
               ></Button
             ><Button @click="startApplication(post)"

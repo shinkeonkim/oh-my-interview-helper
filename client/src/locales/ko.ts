@@ -145,6 +145,23 @@ export const ko = {
     failed: "생성 요청을 처리하지 못했습니다.",
     unavailable: "사용 가능한 Provider 또는 공고 버전이 없습니다."
   },
+  workspace: {
+    overline: "채용공고 워크스페이스",
+    back: "채용공고 목록",
+    overview: "개요",
+    company: "기업 분석",
+    people: "인물 & 팀 분석",
+    resume: "이력서 피드백",
+    interview: "면접 준비",
+    technical: "기술 면접 준비",
+    topics: "토픽별 답안",
+    application: "지원 현황",
+    noApplication: "아직 이 공고에 시작한 지원이 없습니다.",
+    currentStage: "현재 단계",
+    upcoming: "예정된 면접",
+    noInterview: "예정된 면접이 없습니다.",
+    failed: "공고 워크스페이스를 불러오지 못했습니다."
+  },
   research: {
     overline: "공개 자료 리서치",
     title: "회사와 팀 리서치",

@@ -147,6 +147,23 @@ export const en = {
     failed: "The generation request could not be completed.",
     unavailable: "No configured provider or posting version is available."
   },
+  workspace: {
+    overline: "JOB WORKSPACE",
+    back: "Job postings",
+    overview: "Overview",
+    company: "Company analysis",
+    people: "People & team",
+    resume: "Resume feedback",
+    interview: "Interview prep",
+    technical: "Technical prep",
+    topics: "Topic answers",
+    application: "Application status",
+    noApplication: "No application has been started for this posting.",
+    currentStage: "Current stage",
+    upcoming: "Upcoming interviews",
+    noInterview: "No upcoming interviews.",
+    failed: "The job workspace could not be loaded."
+  },
   research: {
     overline: "PUBLIC EVIDENCE RESEARCH",
     title: "Company and team research",

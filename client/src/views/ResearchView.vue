@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 import { ExternalLink, RefreshCw, Search } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +19,20 @@ import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
 
 type SubjectType = "company" | "executive" | "team_lead" | "team_member"
+const props = withDefaults(
+  defineProps<{
+    subjectTypePreset?: SubjectType
+    subjectNamePreset?: string
+    organizationPreset?: string
+    embedded?: boolean
+  }>(),
+  {
+    subjectTypePreset: "company",
+    subjectNamePreset: "",
+    organizationPreset: "",
+    embedded: false
+  }
+)
 type RecordSummary = {
   id: string
   subjectType: SubjectType
@@ -45,17 +60,22 @@ type ResearchRecord = RecordSummary & {
   }>
   sources: Array<{ id: string; url: string; title: string; excerpt: string; status: string }>
 }
+const route = useRoute()
 const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `research.${key}`)
-const subjectType = ref<SubjectType>("company")
-const subjectName = ref("")
-const organization = ref("")
+const subjectType = ref<SubjectType>(props.subjectTypePreset)
+const subjectName = ref(props.subjectNamePreset)
+const organization = ref(props.organizationPreset)
 const roleHint = ref("")
 const urls = ref("")
 const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
 const running = ref(false)
 const loadController = new AbortController()
+const jobPostId = computed(() => {
+  const value = route.params["postId"]
+  return typeof value === "string" ? value : null
+})
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const sourceUrls = () =>
@@ -65,10 +85,18 @@ const sourceUrls = () =>
     .filter(Boolean)
     .slice(0, 8)
 const load = async () => {
-  const response = await fetch("/api/research", { signal: loadController.signal })
+  const query = jobPostId.value === null ? "" : `?jobPostId=${encodeURIComponent(jobPostId.value)}`
+  const response = await fetch(`/api/research${query}`, { signal: loadController.signal })
   if (!response.ok) return
   records.value = ((await response.json()) as { records: RecordSummary[] }).records
 }
+watch(
+  () => [props.subjectNamePreset, props.organizationPreset] as const,
+  ([name, company]) => {
+    if (subjectName.value === "") subjectName.value = name
+    if (organization.value === "") organization.value = company
+  }
+)
 const submit = async (parentRecordId: string | null = null) => {
   running.value = true
   try {
@@ -81,7 +109,7 @@ const submit = async (parentRecordId: string | null = null) => {
             subjectName: subjectName.value,
             organization: organization.value || null,
             roleHint: roleHint.value || null,
-            jobPostId: null,
+            jobPostId: jobPostId.value,
             sourceUrls: sourceUrls(),
             parentRecordId: null
           }
@@ -112,7 +140,7 @@ onBeforeUnmount(() => loadController.abort())
 
 <template>
   <div class="grid gap-8">
-    <section>
+    <section v-if="!props.embedded">
       <p class="eyebrow">{{ copy("overline") }}</p>
       <h1 class="page-title mt-4">{{ copy("title") }}</h1>
       <p class="route-copy mt-4">{{ copy("copy") }}</p>

@@ -63,6 +63,14 @@ type Revision = {
   providerModel: string
 }
 
+const props = withDefaults(
+  defineProps<{
+    workflowPreset?: Workflow
+    embedded?: boolean
+  }>(),
+  { workflowPreset: "cover_letter", embedded: false }
+)
+
 const route = useRoute()
 const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `preparation.${key}`)
@@ -70,7 +78,7 @@ const controller = new AbortController()
 const postings = ref<Posting[]>([])
 const documents = ref<Document[]>([])
 const providers = ref<Provider[]>([])
-const workflow = ref<Workflow>("cover_letter")
+const workflow = ref<Workflow>(props.workflowPreset)
 const providerId = ref("")
 const documentVersionId = ref("none")
 const practiceAnswer = ref("")
@@ -187,7 +195,7 @@ onBeforeUnmount(() => controller.abort())
 
 <template>
   <div class="grid gap-8">
-    <section>
+    <section v-if="!props.embedded">
       <p class="eyebrow">{{ copy("overline") }}</p>
       <h1 class="page-title mt-4">{{ copy("title") }}</h1>
       <p class="route-copy mt-4">{{ copy("copy") }}</p>
