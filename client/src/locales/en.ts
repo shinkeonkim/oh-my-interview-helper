@@ -114,6 +114,7 @@ export const en = {
     emptyPostings: "No job postings have been saved.",
     emptyApplications: "No applications have been started.",
     startApplication: "Start application",
+    applicationInProgress: "Application in progress",
     stage: "Current stage",
     move: "Move stage",
     notes: "Notes",

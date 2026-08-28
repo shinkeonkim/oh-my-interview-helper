@@ -77,6 +77,7 @@ const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `applications.${key}`)
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
+const startingPostIds = ref<ReadonlySet<string>>(new Set())
 const stages = ref<Stage[]>([])
 const stageNames = ref<Record<string, string>>({})
 const source = ref<Source>("manual")
@@ -116,6 +117,12 @@ const updatingPost = ref(false)
 const loadController = new AbortController()
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
 const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
+const activeApplicationPostIds = computed(
+  () =>
+    new Set(
+      applications.value.filter((item) => item.archivedAt === null).map((item) => item.jobPostId)
+    )
+)
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -209,6 +216,8 @@ const savePosting = async () => {
   }
 }
 const startApplication = async (post: Posting) => {
+  if (startingPostIds.value.has(post.id) || activeApplicationPostIds.value.has(post.id)) return
+  startingPostIds.value = new Set([...startingPostIds.value, post.id])
   try {
     await request(
       "/api/applications",
@@ -218,6 +227,10 @@ const startApplication = async (post: Posting) => {
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    const next = new Set(startingPostIds.value)
+    next.delete(post.id)
+    startingPostIds.value = next
   }
 }
 const move = async (application: Application) => {
@@ -512,8 +525,18 @@ onBeforeUnmount(() => loadController.abort())
               ><RouterLink :to="`/jobs/${post.id}/overview`"
                 ><Sparkles />{{ copy("prepare") }}</RouterLink
               ></Button
-            ><Button :disabled="post.state !== 'active'" @click="startApplication(post)"
-              ><BriefcaseBusiness />{{ copy("startApplication") }}</Button
+            ><Button
+              :disabled="
+                post.state !== 'active' ||
+                startingPostIds.has(post.id) ||
+                activeApplicationPostIds.has(post.id)
+              "
+              @click="startApplication(post)"
+              ><BriefcaseBusiness />{{
+                activeApplicationPostIds.has(post.id)
+                  ? copy("applicationInProgress")
+                  : copy("startApplication")
+              }}</Button
             ><Button variant="outline" @click="showVersions(post)"
               ><History />{{ copy("versionHistory") }}</Button
             ><Button v-if="post.state === 'active'" variant="ghost" @click="archivePosting(post)"

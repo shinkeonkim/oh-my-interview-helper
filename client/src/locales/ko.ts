@@ -111,6 +111,7 @@ export const ko = {
     emptyPostings: "저장된 채용 공고가 없습니다.",
     emptyApplications: "아직 시작한 지원이 없습니다.",
     startApplication: "지원 시작",
+    applicationInProgress: "지원 진행 중",
     stage: "현재 단계",
     move: "단계 이동",
     notes: "메모",
