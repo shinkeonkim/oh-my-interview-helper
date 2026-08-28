@@ -15,7 +15,7 @@ export type OutboundWebSocket = RunnerSocket & {
   onopen: (() => void) | null
   onmessage: ((event: { readonly data: string }) => void) | null
   onerror: (() => void) | null
-  onclose: (() => void) | null
+  onclose: ((event: { readonly code: number; readonly reason: string }) => void) | null
   binaryType: string
 }
 
@@ -30,22 +30,25 @@ export type RunnerSupervisorOptions = {
 export const superviseOutboundRunner = async (options: RunnerSupervisorOptions): Promise<void> => {
   const reconnectMilliseconds = options.reconnectMilliseconds ?? 1_000
   while (!options.signal.aborted) {
-    await new Promise<void>((resolve) => {
-      const socket = connectOutboundRunner(
-        options.endpoint,
-        options.connection,
-        options.createSocket
-      )
-      const stop = (): void => {
-        socket.close()
-        resolve()
+    const closed = await new Promise<{ readonly code: number; readonly reason: string }>(
+      (resolve) => {
+        const socket = connectOutboundRunner(
+          options.endpoint,
+          options.connection,
+          options.createSocket
+        )
+        const stop = (): void => {
+          socket.close()
+          resolve({ code: 1000, reason: "aborted" })
+        }
+        socket.onclose = (event) => {
+          options.signal.removeEventListener("abort", stop)
+          resolve(event)
+        }
+        options.signal.addEventListener("abort", stop, { once: true })
       }
-      socket.onclose = () => {
-        options.signal.removeEventListener("abort", stop)
-        resolve()
-      }
-      options.signal.addEventListener("abort", stop, { once: true })
-    })
+    )
+    if (closed.code === 1008) throw new RunnerConnectionError("authentication_rejected")
     if (!options.signal.aborted) await abortableDelay(reconnectMilliseconds, options.signal)
   }
 }
@@ -216,7 +219,10 @@ const chunkOutput = (value: string): readonly string[] => {
 
 export class RunnerConnectionError extends Error {
   override readonly name = "RunnerConnectionError"
-  constructor(readonly code: "endpoint_denied" | "lease_conflict" | "not_connected") {
+  constructor(
+    readonly code:
+      "authentication_rejected" | "endpoint_denied" | "lease_conflict" | "not_connected"
+  ) {
     super(`RUNNER_CONNECTION_${code.toUpperCase()}`)
   }
 }
