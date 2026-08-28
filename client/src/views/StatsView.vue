@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { BriefcaseBusiness, FileText, ListChecks, RefreshCw, Workflow, X } from "lucide-vue-next"
+import {
+  BriefcaseBusiness,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  ListChecks,
+  RefreshCw,
+  Workflow,
+  X
+} from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +26,7 @@ type Job = {
   state: "queued" | "leased" | "running" | "succeeded" | "failed" | "cancelled"
   updatedAt: string
 }
+type JobEvent = { id: string; sequence: number; kind: string; createdAt: string }
 
 const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `statistics.${key}`)
@@ -26,6 +36,9 @@ const applications = ref<Application[]>([])
 const documents = ref<Document[]>([])
 const jobs = ref<Job[]>([])
 const cancellingJobId = ref<string | null>(null)
+const expandedJobId = ref<string | null>(null)
+const jobEvents = ref<JobEvent[]>([])
+const eventsLoading = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const stageCounts = computed(() => {
   const counts = new Map<string, number>()
@@ -79,6 +92,29 @@ const cancelJob = async (job: Job) => {
     await refreshJobs()
   } finally {
     cancellingJobId.value = null
+  }
+}
+const toggleEvents = async (job: Job) => {
+  if (expandedJobId.value === job.id) {
+    expandedJobId.value = null
+    jobEvents.value = []
+    return
+  }
+  expandedJobId.value = job.id
+  jobEvents.value = []
+  eventsLoading.value = true
+  try {
+    const response = await fetch(`/api/jobs/${job.id}/events?transport=poll`, {
+      signal: controller.signal
+    })
+    if (!response.ok) throw new Error("request")
+    const body = (await response.json()) as { events?: unknown }
+    if (!Array.isArray(body.events)) throw new Error("response")
+    if (expandedJobId.value === job.id) jobEvents.value = body.events as JobEvent[]
+  } catch {
+    if (!controller.signal.aborted) toast.error(copy("eventsFailed"))
+  } finally {
+    eventsLoading.value = false
   }
 }
 const load = async () => {
@@ -218,26 +254,54 @@ onBeforeUnmount(() => {
             {{ copy("noJobs") }}
           </p>
           <ul v-else class="divide-y">
-            <li
-              v-for="job in recentJobs"
-              :key="job.id"
-              class="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
-            >
-              <span class="font-medium">{{ job.kind }}</span>
-              <span class="flex flex-wrap items-center justify-end gap-2"
-                ><Badge variant="outline">{{ copy(`state.${job.state}`) }}</Badge
-                ><time :datetime="job.updatedAt">{{
-                  new Date(job.updatedAt).toLocaleString(settings.locale)
-                }}</time
-                ><Button
-                  v-if="['queued', 'leased', 'running'].includes(job.state)"
-                  size="sm"
-                  variant="outline"
-                  :disabled="cancellingJobId === job.id"
-                  @click="cancelJob(job)"
-                  ><X />{{ copy("cancel") }}</Button
-                ></span
+            <li v-for="job in recentJobs" :key="job.id" class="grid gap-3 py-3 text-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="font-medium">{{ job.kind }}</span>
+                <span class="flex flex-wrap items-center justify-end gap-2"
+                  ><Badge variant="outline">{{ copy(`state.${job.state}`) }}</Badge
+                  ><time :datetime="job.updatedAt">{{
+                    new Date(job.updatedAt).toLocaleString(settings.locale)
+                  }}</time
+                  ><Button
+                    size="sm"
+                    variant="ghost"
+                    :aria-expanded="expandedJobId === job.id"
+                    @click="toggleEvents(job)"
+                    ><ChevronUp v-if="expandedJobId === job.id" /><ChevronDown v-else />{{
+                      copy("events")
+                    }}</Button
+                  ><Button
+                    v-if="['queued', 'leased', 'running'].includes(job.state)"
+                    size="sm"
+                    variant="outline"
+                    :disabled="cancellingJobId === job.id"
+                    @click="cancelJob(job)"
+                    ><X />{{ copy("cancel") }}</Button
+                  ></span
+                >
+              </div>
+              <div
+                v-if="expandedJobId === job.id"
+                class="rounded-lg border bg-muted/30 p-3"
+                :aria-label="copy('eventHistory')"
               >
+                <p v-if="eventsLoading" class="text-muted-foreground">{{ copy("loading") }}</p>
+                <p v-else-if="jobEvents.length === 0" class="text-muted-foreground">
+                  {{ copy("noEvents") }}
+                </p>
+                <ol v-else class="grid gap-2">
+                  <li
+                    v-for="event in jobEvents"
+                    :key="event.id"
+                    class="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>#{{ event.sequence }} · {{ event.kind }}</span>
+                    <time :datetime="event.createdAt">{{
+                      new Date(event.createdAt).toLocaleString(settings.locale)
+                    }}</time>
+                  </li>
+                </ol>
+              </div>
             </li>
           </ul>
         </CardContent>
