@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      BIND_HOST: "0.0.0.0"
+      DATA_DIR: /app/data
+      LOCAL_HOSTS: "localhost:${APP_PORT:-3000},127.0.0.1:${APP_PORT:-3000},[::1]:${APP_PORT:-3000}"
+    volumes:
+      - interview-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "const r=await fetch('http://127.0.0.1:3000/api/health');if(!r.ok)process.exit(1)"
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  interview-data:
