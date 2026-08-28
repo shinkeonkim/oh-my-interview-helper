@@ -32,6 +32,32 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "stats-csrf-token" } })
   )
+  await page.route(
+    "**/api/jobs/22222222-2222-4222-8222-222222222222/events?transport=poll",
+    (route) =>
+      route.fulfill({
+        json: {
+          events: [
+            {
+              id: "33333333-3333-4333-8333-333333333333",
+              jobId: "22222222-2222-4222-8222-222222222222",
+              sequence: 1,
+              kind: "enqueued",
+              payload: { state: "queued" },
+              createdAt: "2026-08-28T08:59:00.000Z"
+            },
+            {
+              id: "44444444-4444-4444-8444-444444444444",
+              jobId: "22222222-2222-4222-8222-222222222222",
+              sequence: 2,
+              kind: "started",
+              payload: { state: "running" },
+              createdAt: "2026-08-28T09:00:00.000Z"
+            }
+          ]
+        }
+      })
+  )
   await page.route("**/api/jobs/22222222-2222-4222-8222-222222222222/cancel", (route) => {
     cancelCsrfToken = route.request().headers()["x-csrf-token"]
     runningState = "cancelled"
@@ -75,6 +101,12 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await expect(page.getByText("실행 중 · 1")).toBeVisible()
   await expect(page.getByText("완료 · 1")).toBeVisible()
   await expect(page.getByText("provider.invoke")).toBeVisible()
+
+  await page.getByRole("button", { name: "이벤트 보기" }).first().click()
+  const eventHistory = page.getByLabel("작업 이벤트 이력")
+  await expect(eventHistory).toContainText("#1 · enqueued")
+  await expect(eventHistory).toContainText("#2 · started")
+  await expect(eventHistory).not.toContainText('queued":')
 
   const requestsBeforeRefresh = jobsRequestCount
   await page.getByRole("button", { name: "새로고침" }).click()
