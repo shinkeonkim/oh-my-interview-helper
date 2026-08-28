@@ -70,7 +70,7 @@ test("creates cited research, distinguishes judgments, and refreshes its history
   })
   await page.route("**/api/research/*", (route) => route.fulfill({ json: records[0] }))
 
-  await page.goto("/job-search")
+  await page.goto("/research")
   await page.getByRole("combobox").click()
   await page.getByRole("option", { name: "팀 리드" }).click()
   await page.getByText("이름 또는 회사명").locator("..").getByRole("textbox").fill("Kim")
