@@ -109,6 +109,7 @@ export const en = {
     sourceUrl: "Posting URL",
     chooseFile: "Posting file",
     save: "Save posting",
+    saving: "Saving",
     postings: "Job postings",
     applications: "Applications",
     emptyPostings: "No job postings have been saved.",

@@ -106,6 +106,7 @@ export const ko = {
     sourceUrl: "공고 URL",
     chooseFile: "공고 파일",
     save: "공고 저장",
+    saving: "저장 중",
     postings: "채용 공고",
     applications: "지원 현황",
     emptyPostings: "저장된 채용 공고가 없습니다.",

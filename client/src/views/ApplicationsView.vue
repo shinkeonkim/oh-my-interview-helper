@@ -89,6 +89,7 @@ const employmentType = ref("")
 const body = ref("")
 const sourceUrl = ref("")
 const file = ref<File | null>(null)
+const savingPosting = ref(false)
 const selectedStages = ref<Record<string, string>>({})
 const note = ref("")
 const interviewAt = ref("")
@@ -125,6 +126,22 @@ const activeApplicationPostIds = computed(
 )
 const isTerminalApplication = (application: Application) =>
   typeof stages.value.find((stage) => stage.id === application.stageId)?.outcome === "string"
+const hasPublicUrl = computed(() => {
+  try {
+    const parsed = new URL(sourceUrl.value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+})
+const postingReady = computed(
+  () =>
+    title.value.trim().length > 0 &&
+    company.value.trim().length > 0 &&
+    ((source.value === "manual" && body.value.trim().length > 0) ||
+      (source.value === "url" && hasPublicUrl.value) ||
+      (source.value === "file" && file.value !== null))
+)
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -183,6 +200,8 @@ const load = async () => {
 }
 
 const savePosting = async () => {
+  if (!postingReady.value || savingPosting.value) return
+  savingPosting.value = true
   try {
     if (source.value === "file") {
       if (file.value === null) throw new Error("file")
@@ -215,6 +234,8 @@ const savePosting = async () => {
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    savingPosting.value = false
   }
 }
 const startApplication = async (post: Posting) => {
@@ -472,9 +493,12 @@ onBeforeUnmount(() => loadController.abort())
           v-else
           type="file"
           accept=".pdf,.docx,.md,.txt"
+          :aria-label="copy('chooseFile')"
           @change="file = ($event.target as HTMLInputElement).files?.[0] ?? null"
         />
-        <Button class="w-fit" @click="savePosting"><Plus />{{ copy("save") }}</Button>
+        <Button class="w-fit" :disabled="!postingReady || savingPosting" @click="savePosting"
+          ><Plus />{{ savingPosting ? copy("saving") : copy("save") }}</Button
+        >
       </CardContent></Card
     >
 
