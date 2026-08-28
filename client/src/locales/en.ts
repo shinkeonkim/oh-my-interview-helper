@@ -125,10 +125,12 @@ export const en = {
     addStage: "Add stage",
     version: "Version",
     versionHistory: "Version history",
+    versionSource: "New version source",
     updateUrl: "Public posting URL to refresh",
+    versionFile: "New posting version file",
     addVersion: "Collect new version",
     versionHelp:
-      "Keep the current source immutable and add the public URL content as a new version.",
+      "Keep the current source immutable and add manual, file, or public URL content as a new version.",
     versionSaved: "A new job posting version was saved.",
     saved: "Saved.",
     failed: "The request could not be completed.",

@@ -83,7 +83,10 @@ const interviews = ref<Array<{ id: string; scheduledAt: string; kind: string; no
 const newStage = ref("")
 const activePost = ref<Posting | null>(null)
 const postingVersions = ref<PostingVersion[]>([])
+const versionSource = ref<Source>("url")
 const updateUrl = ref("")
+const versionBody = ref("")
+const versionFile = ref<File | null>(null)
 const updatingPost = ref(false)
 const loadController = new AbortController()
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
@@ -231,20 +234,32 @@ const showVersions = async (post: Posting) => {
     if (!Array.isArray(body.versions)) throw new Error("response")
     activePost.value = post
     postingVersions.value = body.versions as PostingVersion[]
+    versionSource.value = post.canonicalUrl === null ? "manual" : "url"
     updateUrl.value = post.canonicalUrl ?? ""
+    versionBody.value = ""
+    versionFile.value = null
   } catch {
     toast.error(copy("failed"))
   }
 }
-const addUrlVersion = async () => {
+const addPostingVersion = async () => {
   if (activePost.value === null) return
   updatingPost.value = true
   try {
-    await request(
-      `/api/postings/${activePost.value.id}/versions/url`,
-      "POST",
-      JSON.stringify({ url: updateUrl.value })
-    )
+    if (versionSource.value === "file") {
+      if (versionFile.value === null) throw new Error("file")
+      const form = new FormData()
+      form.set("file", versionFile.value)
+      await request(`/api/postings/${activePost.value.id}/versions/file`, "POST", form)
+    } else {
+      await request(
+        `/api/postings/${activePost.value.id}/versions/${versionSource.value}`,
+        "POST",
+        JSON.stringify(
+          versionSource.value === "url" ? { url: updateUrl.value } : { text: versionBody.value }
+        )
+      )
+    }
     await load()
     const refreshed = postings.value.find((post) => post.id === activePost.value?.id)
     if (refreshed !== undefined) await showVersions(refreshed)
@@ -367,13 +382,46 @@ onBeforeUnmount(() => loadController.abort())
       </CardHeader>
       <CardContent class="grid gap-5 lg:grid-cols-2">
         <div class="grid gap-3">
-          <Label for="posting-update-url">{{ copy("updateUrl") }}</Label>
-          <div class="flex flex-col gap-2 sm:flex-row">
-            <Input id="posting-update-url" v-model="updateUrl" type="url" />
-            <Button :disabled="updatingPost || !updateUrl.trim()" @click="addUrlVersion">
-              <RefreshCw />{{ copy("addVersion") }}
-            </Button>
-          </div>
+          <Label>{{ copy("versionSource") }}</Label>
+          <Select v-model="versionSource">
+            <SelectTrigger class="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="manual">{{ copy("manual") }}</SelectItem>
+              <SelectItem value="file">{{ copy("file") }}</SelectItem>
+              <SelectItem value="url">{{ copy("url") }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            v-if="versionSource === 'url'"
+            v-model="updateUrl"
+            type="url"
+            :aria-label="copy('updateUrl')"
+          />
+          <textarea
+            v-else-if="versionSource === 'manual'"
+            v-model="versionBody"
+            class="min-h-28 rounded-lg border bg-background p-3"
+            :placeholder="copy('body')"
+          />
+          <Input
+            v-else
+            type="file"
+            accept=".pdf,.docx,.md,.txt"
+            :aria-label="copy('versionFile')"
+            @change="versionFile = ($event.target as HTMLInputElement).files?.[0] ?? null"
+          />
+          <Button
+            class="w-fit"
+            :disabled="
+              updatingPost ||
+              (versionSource === 'url' && !updateUrl.trim()) ||
+              (versionSource === 'manual' && !versionBody.trim()) ||
+              (versionSource === 'file' && versionFile === null)
+            "
+            @click="addPostingVersion"
+          >
+            <RefreshCw />{{ copy("addVersion") }}
+          </Button>
           <p class="text-sm text-muted-foreground">{{ copy("versionHelp") }}</p>
         </div>
         <ol class="grid gap-2 text-sm">
