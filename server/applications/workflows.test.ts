@@ -314,6 +314,24 @@ describe("job posting and hiring pipeline API", () => {
     })
     const stage = (await created.json()) as { id: string }
     expect(created.status).toBe(201)
+    const additionalStages = await Promise.all(
+      ["Recruiter screen", "Team interview", "Reference check"].map((name, index) =>
+        app.request(`${base}/pipeline/stages`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ key: `parallel_${index}`, name })
+        })
+      )
+    )
+    expect(additionalStages.map((response) => response.status)).toEqual([201, 201, 201])
+    const orderedAfterCreation = (
+      (await (await app.request(`${base}/pipeline/stages`)).json()) as {
+        stages: Array<{ position: number }>
+      }
+    ).stages
+    expect(orderedAfterCreation.map((item) => item.position)).toEqual(
+      orderedAfterCreation.map((_, index) => index + 1)
+    )
     expect(
       (
         await app.request(`${base}/pipeline/stages/${stage.id}`, {
@@ -344,7 +362,7 @@ describe("job posting and hiring pipeline API", () => {
     expect(
       ((await (await app.request(`${base}/pipeline/stages`)).json()) as { stages: unknown[] })
         .stages
-    ).toHaveLength(6)
+    ).toHaveLength(beforeOrder.length - 1)
     expect(
       (
         await app.request(`${base}/pipeline/stages/${beforeOrder[0] ?? "missing"}`, {
