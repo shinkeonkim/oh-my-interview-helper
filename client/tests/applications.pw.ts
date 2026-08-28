@@ -276,7 +276,9 @@ test("creates a posting and moves an application through the local pipeline", as
     location: string | null
     notes: string
   }> = []
+  let noteRequests = 0
   await page.route("**/api/applications/*/notes", async (route) => {
+    noteRequests += 1
     expect(route.request().postDataJSON()).toEqual({ text: "Ask about the on-call rotation" })
     events.push({
       id: crypto.randomUUID(),
@@ -285,14 +287,18 @@ test("creates a posting and moves an application through the local pipeline", as
       payload: { text: "Ask about the on-call rotation" },
       createdAt: "2026-08-28T01:00:00.000Z"
     })
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 204 })
   })
+  let interviewRequests = 0
   await page.route("**/api/applications/*/interviews", async (route) => {
+    interviewRequests += 1
     const input = route.request().postDataJSON() as Omit<(typeof interviews)[number], "id">
     expect(input.kind).toBe("Technical interview")
     expect(input.location).toBe("https://meet.example.com/acme")
     expect(input.notes).toBe("Review distributed systems examples")
     interviews.push({ id: "88888888-8888-4888-8888-888888888888", ...input })
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 201 })
   })
 
@@ -358,18 +364,30 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText(/#2 단계 변경/)).toBeVisible()
   await expect(page.getByText("Saved → Applied")).toBeVisible()
   await expect(page.getByText("Applied → Interviewing")).toBeVisible()
-  await page.getByPlaceholder("메모", { exact: true }).fill("Ask about the on-call rotation")
-  await page.getByRole("button", { name: "메모 추가" }).click()
+  const noteInput = page.getByPlaceholder("메모", { exact: true })
+  const noteButton = noteInput.locator("..").getByRole("button")
+  await expect(noteButton).toBeDisabled()
+  await noteInput.fill("  Ask about the on-call rotation  ")
+  await expect(noteButton).toBeEnabled()
+  await noteButton.click()
+  await expect(noteButton).toBeDisabled()
   await expect(page.getByText(/#4 메모 추가/)).toBeVisible()
   await expect(page.getByText("Ask about the on-call rotation")).toBeVisible()
-  await page.locator('input[type="datetime-local"]').fill("2026-09-01T14:30")
+  expect(noteRequests).toBe(1)
+  const interviewAt = page.locator('input[type="datetime-local"]')
+  const interviewButton = interviewAt.locator("..").getByRole("button")
+  await expect(interviewButton).toBeDisabled()
+  await interviewAt.fill("2026-09-01T14:30")
   await page.getByPlaceholder("면접 종류").fill("Technical interview")
   await page.getByPlaceholder("면접 장소 또는 링크").fill("https://meet.example.com/acme")
   await page.getByPlaceholder("면접 준비 메모").fill("Review distributed systems examples")
-  await page.getByRole("button", { name: "면접 기록" }).click()
+  await expect(interviewButton).toBeEnabled()
+  await interviewButton.click()
+  await expect(interviewButton).toBeDisabled()
   await expect(page.getByText("Technical interview", { exact: false })).toBeVisible()
   await expect(page.getByText("면접 장소 또는 링크 · https://meet.example.com/acme")).toBeVisible()
   await expect(page.getByText("Review distributed systems examples")).toBeVisible()
+  expect(interviewRequests).toBe(1)
   await page.getByRole("combobox").last().click()
   await page.getByRole("option", { name: "Offered" }).click()
   await page.getByRole("button", { name: "단계 이동" }).click()
