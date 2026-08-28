@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import PreparationView from "./PreparationView.vue"
 import ResearchView from "./ResearchView.vue"
+import WorkspaceChat from "./WorkspaceChat.vue"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
 
@@ -150,6 +151,12 @@ onBeforeUnmount(() => controller.abort())
           </div></CardContent
         ></Card
       >
+      <WorkspaceChat
+        v-if="application && posting?.currentVersionId"
+        :application-id="application.id"
+        :posting-title="posting.title"
+        :posting-version-id="posting.currentVersionId"
+      />
     </div>
     <ResearchView
       v-else-if="props.area === 'company'"

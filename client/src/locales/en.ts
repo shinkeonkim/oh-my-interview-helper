@@ -162,6 +162,25 @@ export const en = {
     currentStage: "Current stage",
     upcoming: "Upcoming interviews",
     noInterview: "No upcoming interviews.",
+    chat: {
+      title: "Application AI chat",
+      empty: "No messages yet. Ask using the current posting and selected document as evidence.",
+      you: "You",
+      assistant: "AI answer",
+      citation: "Evidence",
+      provider: "Provider",
+      document: "Reference document",
+      noDocument: "Posting only",
+      message: "Question",
+      placeholder: "Which experience should I emphasize for this role?",
+      review: "Review disclosure",
+      disclosureTitle: "Review external disclosure",
+      disclosureCopy: "Confirm the exact source versions sent to the selected provider.",
+      cancel: "Cancel",
+      send: "Confirm and send",
+      sending: "Sending",
+      failed: "The chat request could not be completed."
+    },
     failed: "The job workspace could not be loaded."
   },
   research: {

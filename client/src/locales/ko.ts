@@ -160,6 +160,25 @@ export const ko = {
     currentStage: "현재 단계",
     upcoming: "예정된 면접",
     noInterview: "예정된 면접이 없습니다.",
+    chat: {
+      title: "지원별 AI 대화",
+      empty: "아직 대화가 없습니다. 현재 공고와 선택한 문서를 근거로 질문해 보세요.",
+      you: "나",
+      assistant: "AI 답변",
+      citation: "근거",
+      provider: "Provider",
+      document: "참고 문서",
+      noDocument: "공고만 사용",
+      message: "질문",
+      placeholder: "이 역할에 맞춰 어떤 경험을 강조해야 할까요?",
+      review: "전송 내용 확인",
+      disclosureTitle: "외부 전송 내용 확인",
+      disclosureCopy: "선택한 Provider로 전송할 정확한 버전의 자료를 확인하세요.",
+      cancel: "취소",
+      send: "확인하고 전송",
+      sending: "전송 중",
+      failed: "대화 요청을 처리하지 못했습니다."
+    },
     failed: "공고 워크스페이스를 불러오지 못했습니다."
   },
   research: {
