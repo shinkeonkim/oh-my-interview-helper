@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { toast } from "vue-sonner"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -34,6 +36,67 @@ const themeValue = computed({
     toast.success(copy("settings.saved"))
   }
 })
+
+type Provider = {
+  id: string
+  mode: string
+  model: { id: string; displayName: string }
+  capabilities: Record<string, boolean>
+  configured: boolean
+}
+type PairingCode = { code: string; expiresAt: string }
+const providers = ref<Provider[]>([])
+const pairing = ref<PairingCode | null>(null)
+const savingProvider = ref<string | null>(null)
+const loadingProviders = ref(true)
+const csrf = async () =>
+  ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
+const loadProviders = async () => {
+  loadingProviders.value = true
+  try {
+    const response = await fetch("/api/providers/status")
+    if (!response.ok) throw new Error("request")
+    providers.value = ((await response.json()) as { providers: Provider[] }).providers
+  } catch {
+    toast.error(copy("settings.providersFailed"))
+  } finally {
+    loadingProviders.value = false
+  }
+}
+const setProvider = async (provider: Provider, enabled: boolean) => {
+  savingProvider.value = provider.id
+  try {
+    const response = await fetch(`/api/settings/providers/${provider.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
+      body: JSON.stringify({
+        selectedModel: enabled ? provider.model.id : null,
+        enabled,
+        capabilities: provider.capabilities
+      })
+    })
+    if (!response.ok) throw new Error("request")
+    await loadProviders()
+    toast.success(copy("settings.providerSaved"))
+  } catch {
+    toast.error(copy("settings.providersFailed"))
+  } finally {
+    savingProvider.value = null
+  }
+}
+const issuePairingCode = async () => {
+  try {
+    const response = await fetch("/api/runners/pairing-code", {
+      method: "POST",
+      headers: { "X-CSRF-Token": await csrf() }
+    })
+    if (!response.ok) throw new Error("request")
+    pairing.value = (await response.json()) as PairingCode
+  } catch {
+    toast.error(copy("settings.pairingFailed"))
+  }
+}
+onMounted(() => void loadProviders())
 </script>
 
 <template>
@@ -85,6 +148,80 @@ const themeValue = computed({
               <SelectItem value="dark">{{ copy("settings.dark") }}</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card class="max-w-3xl">
+      <CardHeader>
+        <CardTitle>{{ copy("settings.providers") }}</CardTitle>
+        <CardDescription>{{ copy("settings.providersHelp") }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p v-if="loadingProviders" class="text-sm text-muted-foreground">
+          {{ copy("states.loading") }}
+        </p>
+        <p v-else-if="providers.length === 0" class="text-sm text-muted-foreground">
+          {{ copy("settings.noProviders") }}
+        </p>
+        <ul v-else class="divide-y">
+          <li
+            v-for="provider in providers"
+            :key="provider.id"
+            class="flex flex-wrap items-center justify-between gap-4 py-4"
+          >
+            <div class="grid gap-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium">{{ provider.id }}</span>
+                <Badge variant="outline">{{ provider.mode }}</Badge>
+                <Badge :variant="provider.configured ? 'secondary' : 'outline'">
+                  {{
+                    provider.configured
+                      ? copy("settings.providerEnabled")
+                      : copy("settings.providerDisabled")
+                  }}
+                </Badge>
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {{ provider.model.displayName }} · {{ provider.model.id }}
+              </p>
+            </div>
+            <Button
+              :variant="provider.configured ? 'outline' : 'default'"
+              :disabled="savingProvider === provider.id"
+              @click="setProvider(provider, !provider.configured)"
+            >
+              {{
+                provider.configured
+                  ? copy("settings.disableProvider")
+                  : copy("settings.enableProvider")
+              }}
+            </Button>
+          </li>
+        </ul>
+      </CardContent>
+    </Card>
+
+    <Card class="max-w-3xl">
+      <CardHeader>
+        <CardTitle>{{ copy("settings.runner") }}</CardTitle>
+        <CardDescription>{{ copy("settings.runnerHelp") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="grid gap-4">
+        <Button class="w-fit" variant="outline" @click="issuePairingCode">
+          {{ copy("settings.issuePairing") }}
+        </Button>
+        <div v-if="pairing" class="rounded-lg border p-4" aria-live="polite">
+          <p class="text-sm text-muted-foreground">{{ copy("settings.pairingCode") }}</p>
+          <code class="mt-2 block text-2xl font-semibold tracking-[0.25em]">{{
+            pairing.code
+          }}</code>
+          <p class="mt-2 text-sm text-muted-foreground">
+            {{ copy("settings.pairingExpires") }} ·
+            <time :datetime="pairing.expiresAt">{{
+              new Date(pairing.expiresAt).toLocaleString(settings.locale)
+            }}</time>
+          </p>
         </div>
       </CardContent>
     </Card>
