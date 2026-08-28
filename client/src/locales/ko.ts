@@ -47,8 +47,19 @@ export const ko = {
       "아직 연결된 기록이 없습니다. 문서나 공고를 추가하면 이 공간이 다음 준비 순서를 안내합니다.",
     focusMeta: "준비 공간",
     noteTitle: "작게 시작해도 됩니다",
-    noteCopy:
-      "이 셸은 현재 빈 상태를 숨기지 않습니다. 실제 자료가 들어오면 여기서 흐름이 이어집니다."
+    noteCopy: "채용공고나 문서 하나를 추가하면 다음 준비 흐름을 여기서 이어갈 수 있습니다.",
+    summary: "로컬 준비 현황",
+    postings: "채용공고",
+    applications: "지원서",
+    documents: "활성 문서",
+    applicationFocus: "가장 최근 지원의 공고, 단계와 준비 자료를 이어서 확인하세요.",
+    postingFocus:
+      "아직 지원을 시작하지 않은 공고입니다. 내용을 검토하고 준비를 시작할 수 있습니다.",
+    continue: "워크스페이스 계속하기",
+    addPosting: "채용공고 추가하기",
+    nextTitle: "다음 준비",
+    nextCopy: "통합 검색에서 저장한 공고, 문서와 리서치를 연결해 다음 답변의 근거를 찾으세요.",
+    failed: "홈 준비 현황을 불러오지 못했습니다."
   },
   documents: {
     overline: "근거 자료",

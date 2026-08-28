@@ -49,8 +49,20 @@ export const en = {
       "Nothing is connected yet. Add a document or posting and this space will suggest what to prepare next.",
     focusMeta: "Preparation space",
     noteTitle: "Start with one useful thing",
-    noteCopy:
-      "This shell does not hide an empty state. Once real material arrives, the next step will continue here."
+    noteCopy: "Add one posting or document to continue the next preparation step from here.",
+    summary: "Local preparation summary",
+    postings: "Job postings",
+    applications: "Applications",
+    documents: "Active documents",
+    applicationFocus:
+      "Continue with the posting, stage, and preparation material for your latest application.",
+    postingFocus: "This posting has no application yet. Review it and start preparing when ready.",
+    continue: "Continue workspace",
+    addPosting: "Add a job posting",
+    nextTitle: "Next preparation",
+    nextCopy:
+      "Use unified search to connect saved postings, documents, and research as evidence for your next answer.",
+    failed: "The home preparation summary could not be loaded."
   },
   documents: {
     overline: "SOURCE MATERIAL",
