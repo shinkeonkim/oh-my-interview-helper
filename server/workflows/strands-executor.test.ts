@@ -87,7 +87,8 @@ describe("Strands preparation executor", () => {
       providerId: "anthropic-api",
       seriesId: null,
       inputs: [{ kind: "job_post_version" as const, jobPostVersionId: version.id }],
-      practiceAnswer: null
+      practiceAnswer: null,
+      generationKey: crypto.randomUUID()
     }
     const preview = executor.preview(request)
     expect(preview.manifest.action).toBe("prepare:cover_letter")
@@ -111,5 +112,16 @@ describe("Strands preparation executor", () => {
         signal: new AbortController().signal
       })
     ).rejects.toThrow("PREPARATION_EXECUTOR_UNAVAILABLE")
+    const regeneration = { ...request, generationKey: crypto.randomUUID() }
+    const regenerationPreview = executor.preview(regeneration)
+    const regenerationConfirmation = disclosures.confirm({
+      authorizationToken: regenerationPreview.authorizationToken
+    })
+    const regenerated = await executor.execute({
+      ...regeneration,
+      disclosureId: regenerationConfirmation.id,
+      signal: new AbortController().signal
+    })
+    expect(regenerated.providerRunId).not.toBe(execution.providerRunId)
   })
 })

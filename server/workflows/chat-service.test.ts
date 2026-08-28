@@ -69,6 +69,7 @@ describe("per-application chat workflow", () => {
         message: "강점을 정리해줘",
         providerId: "openai-api",
         disclosureId: crypto.randomUUID(),
+        turnKey: crypto.randomUUID(),
         inputs: [{ kind: "job_post_version", jobPostVersionId: inputId }]
       },
       new AbortController().signal
@@ -91,6 +92,7 @@ describe("per-application chat workflow", () => {
           message: "답변",
           providerId: "claude-cli",
           disclosureId: crypto.randomUUID(),
+          turnKey: crypto.randomUUID(),
           inputs: [{ kind: "job_post_version", jobPostVersionId: inputId }]
         },
         new AbortController().signal

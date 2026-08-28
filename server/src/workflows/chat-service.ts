@@ -14,6 +14,7 @@ export const ChatRequestSchema = z
     message: z.string().trim().min(1).max(20_000),
     providerId: z.string().trim().min(1).max(64),
     disclosureId: z.string().uuid(),
+    turnKey: z.string().uuid(),
     inputs: z.array(DisclosureInputRefSchema).min(1).max(30)
   })
   .strict()
@@ -36,6 +37,7 @@ export type ChatExecutor = {
     readonly message: string
     readonly providerId: string
     readonly disclosureId: string
+    readonly turnKey: string
     readonly inputs: readonly DisclosureInputRef[]
     readonly signal: AbortSignal
   }) => Promise<{ readonly output: unknown; readonly providerRunId: string }>
@@ -71,6 +73,7 @@ export class ChatWorkflowService {
       message: request.message,
       providerId: request.providerId,
       disclosureId: request.disclosureId,
+      turnKey: request.turnKey,
       inputs: request.inputs,
       signal
     })

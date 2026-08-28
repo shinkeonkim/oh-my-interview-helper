@@ -58,6 +58,7 @@ export const PreparationRequestSchema = z
     workflow: PreparationWorkflowKindSchema,
     providerId: z.string().trim().min(1).max(64),
     disclosureId: z.string().uuid(),
+    generationKey: z.string().uuid(),
     seriesId: z.string().uuid().nullable().default(null),
     inputs: z.array(DisclosureInputRefSchema).min(1).max(30),
     practiceAnswer: z.string().trim().min(1).max(20_000).nullable().default(null)

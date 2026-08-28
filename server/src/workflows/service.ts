@@ -22,6 +22,7 @@ export type PreparationExecutor = {
     readonly workflow: PreparationWorkflowKind
     readonly providerId: string
     readonly disclosureId: string
+    readonly generationKey: string
     readonly inputs: readonly DisclosureInputRef[]
     readonly practiceAnswer: string | null
     readonly signal: AbortSignal
@@ -56,6 +57,7 @@ export class PreparationWorkflowService {
       workflow: request.workflow,
       providerId: request.providerId,
       disclosureId: request.disclosureId,
+      generationKey: request.generationKey,
       inputs: request.inputs,
       practiceAnswer: request.practiceAnswer,
       signal

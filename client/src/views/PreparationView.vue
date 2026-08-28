@@ -74,6 +74,7 @@ const workflow = ref<Workflow>("cover_letter")
 const providerId = ref("")
 const documentVersionId = ref("none")
 const practiceAnswer = ref("")
+const generationKey = ref(crypto.randomUUID())
 const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
 const revision = ref<Revision | null>(null)
 const running = ref(false)
@@ -110,7 +111,8 @@ const requestBody = () => ({
   providerId: providerId.value,
   seriesId: revision.value?.seriesId ?? null,
   inputs: inputs.value,
-  practiceAnswer: practiceAnswer.value.trim() || null
+  practiceAnswer: practiceAnswer.value.trim() || null,
+  generationKey: generationKey.value
 })
 const load = async () => {
   const [postingsResponse, documentsResponse, providersResponse] = await Promise.all([
@@ -154,6 +156,7 @@ const generate = async () => {
     toast.error(copy("failed"))
   } finally {
     running.value = false
+    generationKey.value = crypto.randomUUID()
   }
 }
 const copyResult = async () => {

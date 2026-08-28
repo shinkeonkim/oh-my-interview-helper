@@ -66,6 +66,7 @@ describe("preparation workflow service", () => {
           workflow: "interview_prep",
           providerId,
           disclosureId,
+          generationKey: crypto.randomUUID(),
           seriesId: null,
           inputs: [{ kind: "job_post_version", jobPostVersionId: inputId }],
           practiceAnswer: null
@@ -86,6 +87,7 @@ describe("preparation workflow service", () => {
           workflow: "interview_prep",
           providerId: "anthropic-api",
           disclosureId,
+          generationKey: crypto.randomUUID(),
           seriesId: null,
           inputs: [{ kind: "job_post_version", jobPostVersionId: inputId }],
           practiceAnswer: null

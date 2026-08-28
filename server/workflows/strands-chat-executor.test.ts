@@ -81,6 +81,7 @@ describe("Strands application chat executor", () => {
       title: "지원 상담",
       message: "공고와 제 경험을 어떻게 연결할까요?",
       providerId: "openai-api",
+      turnKey: crypto.randomUUID(),
       inputs: [{ kind: "job_post_version" as const, jobPostVersionId: version.id }]
     }
     const preview = executor.preview(request)
