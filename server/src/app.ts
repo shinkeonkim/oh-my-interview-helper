@@ -32,6 +32,8 @@ import {
 import { defaultLocalSecuritySettings, type LocalSecuritySettings } from "./security/config"
 import type { PinnedTransport, Resolver } from "./ingest/safe-fetcher"
 import { createCsrfProtection, localSecurityMiddleware } from "./security/local-security"
+import { createRunnerRoutes } from "./routes/runner"
+import type { RunnerPairingService } from "./runner/pairing"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -46,6 +48,7 @@ export type AppOptions = {
   readonly providerRegistry?: ProviderRegistry
   readonly providerRequests?: ProviderRequestSource
   readonly promptTemplates?: PromptTemplateRevisionRegistry
+  readonly runnerPairing?: RunnerPairingService
 }
 
 export const createApp = ({
@@ -60,7 +63,8 @@ export const createApp = ({
   jobRuntime,
   providerRegistry = new ProviderRegistry([]),
   providerRequests = unavailableProviderRequestSource,
-  promptTemplates = defaultPromptTemplateRevisionRegistry
+  promptTemplates = defaultPromptTemplateRevisionRegistry,
+  runnerPairing
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -115,6 +119,7 @@ export const createApp = ({
     })
   )
   app.route("/api/disclosures", createDisclosureRoutes(disclosures))
+  if (runnerPairing !== undefined) app.route("/api/runners", createRunnerRoutes(runnerPairing))
   const artifacts = new DraftArtifactService(
     new DraftArtifactRepository(persistence.database),
     new CurrentGenerationContextResolver({
