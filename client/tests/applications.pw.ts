@@ -8,7 +8,8 @@ test("creates a posting and moves an application through the local pipeline", as
     teamName: "Platform",
     state: "active",
     versionNumber: 1,
-    sourceKind: "manual"
+    sourceKind: "manual",
+    canonicalUrl: "https://careers.example.com/backend"
   }
   const stages = [
     {
@@ -46,6 +47,15 @@ test("creates a posting and moves an application through the local pipeline", as
     outcomeAt: string | null
     archivedAt: null
   }> = []
+  let versions = [
+    {
+      id: "44444444-4444-4444-8444-444444444444",
+      postId: post.id,
+      versionNumber: 1,
+      sourceKind: "manual",
+      createdAt: "2026-08-28T00:00:00.000Z"
+    }
+  ]
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "token" } })
   )
@@ -53,6 +63,26 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route("**/api/pipeline/stages", (route) => route.fulfill({ json: { stages } }))
   await page.route("**/api/postings/manual", async (route) => {
     postings = [post]
+    await route.fulfill({ status: 201, json: post })
+  })
+  await page.route(`**/api/postings/${post.id}/versions`, (route) =>
+    route.fulfill({ json: { versions: [...versions].reverse() } })
+  )
+  await page.route(`**/api/postings/${post.id}/versions/url`, async (route) => {
+    expect(route.request().headers()["x-csrf-token"]).toBe("token")
+    expect(route.request().postDataJSON()).toEqual({ url: post.canonicalUrl })
+    post.versionNumber = 2
+    post.sourceKind = "url"
+    versions = [
+      ...versions,
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        postId: post.id,
+        versionNumber: 2,
+        sourceKind: "url",
+        createdAt: "2026-08-28T01:00:00.000Z"
+      }
+    ]
     await route.fulfill({ status: 201, json: post })
   })
   await page.route("**/api/applications", async (route) => {
@@ -107,6 +137,11 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.getByPlaceholder("공고 내용").fill("Role body")
   await page.getByRole("button", { name: "공고 저장" }).click()
   await expect(page.getByText(post.title)).toBeVisible()
+  await page.getByRole("button", { name: "버전 기록" }).click()
+  await expect(page.getByText("버전 1 · 직접 입력")).toBeVisible()
+  await expect(page.getByLabel("갱신할 공개 공고 URL")).toHaveValue(post.canonicalUrl)
+  await page.getByRole("button", { name: "새 버전 수집" }).click()
+  await expect(page.getByText("버전 2 · URL")).toBeVisible()
   await page.getByRole("button", { name: "지원 시작" }).click()
   await expect(page.getByText("Saved", { exact: true }).first()).toBeVisible()
   await page.getByRole("combobox").last().click()
