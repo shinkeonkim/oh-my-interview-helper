@@ -154,10 +154,25 @@ test("creates a posting and moves an application through the local pipeline", as
             createdAt: "2026-08-28T00:00:00.000Z"
           }
         ],
-        interviews: []
+        interviews
       }
     })
   )
+  const interviews: Array<{
+    id: string
+    scheduledAt: string
+    kind: string
+    location: string | null
+    notes: string
+  }> = []
+  await page.route("**/api/applications/*/interviews", async (route) => {
+    const input = route.request().postDataJSON() as Omit<(typeof interviews)[number], "id">
+    expect(input.kind).toBe("Technical interview")
+    expect(input.location).toBe("https://meet.example.com/acme")
+    expect(input.notes).toBe("Review distributed systems examples")
+    interviews.push({ id: "88888888-8888-4888-8888-888888888888", ...input })
+    await route.fulfill({ status: 201 })
+  })
 
   await page.goto("/jobs")
   await page.getByText("직무명").locator("..").getByRole("textbox").fill(post.title)
@@ -198,4 +213,12 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("Interviewing", { exact: true }).first()).toBeVisible()
   await page.getByRole("button", { name: "전체 이력" }).click()
   await expect(page.getByText(/#1 created/)).toBeVisible()
+  await page.locator('input[type="datetime-local"]').fill("2026-09-01T14:30")
+  await page.getByPlaceholder("면접 종류").fill("Technical interview")
+  await page.getByPlaceholder("면접 장소 또는 링크").fill("https://meet.example.com/acme")
+  await page.getByPlaceholder("면접 준비 메모").fill("Review distributed systems examples")
+  await page.getByRole("button", { name: "면접 기록" }).click()
+  await expect(page.getByText("Technical interview", { exact: false })).toBeVisible()
+  await expect(page.getByText("면접 장소 또는 링크 · https://meet.example.com/acme")).toBeVisible()
+  await expect(page.getByText("Review distributed systems examples")).toBeVisible()
 })
