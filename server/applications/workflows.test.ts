@@ -115,6 +115,19 @@ describe("job posting and hiring pipeline API", () => {
     const first = await create()
     const application = (await first.json()) as { id: string }
     expect((await create()).status).toBe(201)
+    expect(
+      (
+        await app.request(`${base}/applications`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ jobPostId: post.id, idempotencyKey: crypto.randomUUID() })
+        })
+      ).status
+    ).toBe(409)
+    expect(
+      ((await (await app.request(`${base}/applications`)).json()) as { applications: unknown[] })
+        .applications
+    ).toHaveLength(1)
     const stages = (
       (await (await app.request(`${base}/pipeline/stages`)).json()) as {
         stages: Array<{ id: string; key: string }>

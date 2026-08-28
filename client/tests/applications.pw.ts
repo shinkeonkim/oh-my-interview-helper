@@ -308,6 +308,7 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("버전 4 · 파일")).toBeVisible()
   await page.getByRole("button", { name: "지원 시작" }).click()
   await expect(page.getByText("Saved", { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "지원 진행 중" })).toBeDisabled()
   await page.getByRole("combobox").last().click()
   await page.getByRole("option", { name: "Interviewing" }).click()
   await page.getByRole("button", { name: "단계 이동" }).click()
