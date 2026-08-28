@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { Archive, BriefcaseBusiness, CalendarPlus, History, Plus, Sparkles } from "lucide-vue-next"
+import {
+  Archive,
+  BriefcaseBusiness,
+  CalendarPlus,
+  History,
+  Plus,
+  RefreshCw,
+  Sparkles
+} from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +35,13 @@ type Posting = {
   state: string
   versionNumber: number
   sourceKind: Source
+  canonicalUrl: string | null
+}
+type PostingVersion = {
+  id: string
+  versionNumber: number
+  sourceKind: Source
+  createdAt: string
 }
 type Stage = { id: string; key: string; name: string; position: number; outcome: string | null }
 type Application = {
@@ -66,6 +81,10 @@ const activeApplication = ref<string | null>(null)
 const history = ref<HistoryEntry[]>([])
 const interviews = ref<Array<{ id: string; scheduledAt: string; kind: string; notes: string }>>([])
 const newStage = ref("")
+const activePost = ref<Posting | null>(null)
+const postingVersions = ref<PostingVersion[]>([])
+const updateUrl = ref("")
+const updatingPost = ref(false)
 const loadController = new AbortController()
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
 
@@ -204,6 +223,38 @@ const archivePosting = async (post: Posting) => {
     toast.error(copy("failed"))
   }
 }
+const showVersions = async (post: Posting) => {
+  try {
+    const response = await fetch(`/api/postings/${post.id}/versions`)
+    if (!response.ok) throw new Error("request")
+    const body = (await response.json()) as { versions?: unknown }
+    if (!Array.isArray(body.versions)) throw new Error("response")
+    activePost.value = post
+    postingVersions.value = body.versions as PostingVersion[]
+    updateUrl.value = post.canonicalUrl ?? ""
+  } catch {
+    toast.error(copy("failed"))
+  }
+}
+const addUrlVersion = async () => {
+  if (activePost.value === null) return
+  updatingPost.value = true
+  try {
+    await request(
+      `/api/postings/${activePost.value.id}/versions/url`,
+      "POST",
+      JSON.stringify({ url: updateUrl.value })
+    )
+    await load()
+    const refreshed = postings.value.find((post) => post.id === activePost.value?.id)
+    if (refreshed !== undefined) await showVersions(refreshed)
+    toast.success(copy("versionSaved"))
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    updatingPost.value = false
+  }
+}
 const addStage = async () => {
   try {
     const key = `custom_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`
@@ -300,6 +351,8 @@ onBeforeUnmount(() => loadController.abort())
               ></Button
             ><Button @click="startApplication(post)"
               ><BriefcaseBusiness />{{ copy("startApplication") }}</Button
+            ><Button variant="outline" @click="showVersions(post)"
+              ><History />{{ copy("versionHistory") }}</Button
             ><Button variant="ghost" @click="archivePosting(post)"
               ><Archive />{{ copy("archive") }}</Button
             ></CardContent
@@ -307,6 +360,39 @@ onBeforeUnmount(() => loadController.abort())
         >
       </div>
     </section>
+
+    <Card v-if="activePost">
+      <CardHeader>
+        <CardTitle>{{ activePost.title }} · {{ copy("versionHistory") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="grid gap-5 lg:grid-cols-2">
+        <div class="grid gap-3">
+          <Label for="posting-update-url">{{ copy("updateUrl") }}</Label>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <Input id="posting-update-url" v-model="updateUrl" type="url" />
+            <Button :disabled="updatingPost || !updateUrl.trim()" @click="addUrlVersion">
+              <RefreshCw />{{ copy("addVersion") }}
+            </Button>
+          </div>
+          <p class="text-sm text-muted-foreground">{{ copy("versionHelp") }}</p>
+        </div>
+        <ol class="grid gap-2 text-sm">
+          <li
+            v-for="version in postingVersions"
+            :key="version.id"
+            class="flex items-center justify-between gap-3 rounded border p-3"
+          >
+            <span
+              >{{ copy("version") }} {{ version.versionNumber }} ·
+              {{ copy(version.sourceKind) }}</span
+            >
+            <time :datetime="version.createdAt">{{
+              new Date(version.createdAt).toLocaleString(settings.locale)
+            }}</time>
+          </li>
+        </ol>
+      </CardContent>
+    </Card>
 
     <section>
       <h2 class="text-xl font-semibold">{{ copy("applications") }}</h2>

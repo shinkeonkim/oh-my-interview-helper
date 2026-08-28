@@ -124,6 +124,12 @@ export const en = {
     newStage: "New stage name",
     addStage: "Add stage",
     version: "Version",
+    versionHistory: "Version history",
+    updateUrl: "Public posting URL to refresh",
+    addVersion: "Collect new version",
+    versionHelp:
+      "Keep the current source immutable and add the public URL content as a new version.",
+    versionSaved: "A new job posting version was saved.",
     saved: "Saved.",
     failed: "The request could not be completed.",
     prepare: "AI prep"

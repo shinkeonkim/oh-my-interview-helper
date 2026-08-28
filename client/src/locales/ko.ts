@@ -121,6 +121,11 @@ export const ko = {
     newStage: "새 단계 이름",
     addStage: "단계 추가",
     version: "버전",
+    versionHistory: "버전 기록",
+    updateUrl: "갱신할 공개 공고 URL",
+    addVersion: "새 버전 수집",
+    versionHelp: "현재 원문은 보존하고 공개 URL에서 가져온 내용을 새 버전으로 추가합니다.",
+    versionSaved: "채용공고의 새 버전을 저장했습니다.",
     saved: "저장했습니다.",
     failed: "요청을 처리하지 못했습니다.",
     prepare: "AI 준비"
