@@ -181,6 +181,16 @@ const move = async (application: Application) => {
     await load()
   }
 }
+const archiveApplication = async (application: Application) => {
+  try {
+    await request(`/api/applications/${application.id}/archive`, "POST")
+    if (activeApplication.value === application.id) activeApplication.value = null
+    await load()
+    toast.success(copy("applicationArchived"))
+  } catch {
+    toast.error(copy("failed"))
+  }
+}
 const addNote = async () => {
   if (activeApplication.value === null) return
   try {
@@ -462,18 +472,34 @@ onBeforeUnmount(() => loadController.abort())
           ><CardContent class="flex flex-col gap-4 py-5 lg:flex-row lg:items-center"
             ><div class="min-w-48 flex-1">
               <p class="font-semibold">{{ postingById.get(application.jobPostId)?.title }}</p>
-              <p class="text-sm text-muted-foreground">{{ application.stageName }}</p>
+              <div class="mt-1 flex items-center gap-2">
+                <p class="text-sm text-muted-foreground">{{ application.stageName }}</p>
+                <Badge v-if="application.archivedAt" variant="secondary">{{
+                  copy("archived")
+                }}</Badge>
+              </div>
             </div>
-            <Select v-model="selectedStages[application.id]"
+            <Select
+              v-model="selectedStages[application.id]"
+              :disabled="application.archivedAt !== null"
               ><SelectTrigger class="w-48"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
                   stage.name
                 }}</SelectItem></SelectContent
               ></Select
-            ><Button variant="secondary" @click="move(application)">{{ copy("move") }}</Button
+            ><Button
+              variant="secondary"
+              :disabled="application.archivedAt !== null"
+              @click="move(application)"
+              >{{ copy("move") }}</Button
             ><Button variant="outline" @click="showHistory(application.id)"
               ><History />{{ copy("history") }}</Button
+            ><Button
+              v-if="application.archivedAt === null"
+              variant="ghost"
+              @click="archiveApplication(application)"
+              ><Archive />{{ copy("archiveApplication") }}</Button
             ></CardContent
           ></Card
         >
