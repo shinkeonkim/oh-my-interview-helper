@@ -6,6 +6,7 @@ test("enables a fixed provider model and issues a one-use runner pairing code", 
   let configured = false
   let savedBody: unknown = null
   let csrfHeader = ""
+  let runnerStatus = "active"
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "csrf-token" } })
   )
@@ -42,6 +43,29 @@ test("enables a fixed provider model and issues a one-use runner pairing code", 
       json: { code: "AB12CD34", expiresAt: "2026-08-28T12:05:00.000Z" }
     })
   })
+  await page.route("**/api/runners/desk-runner", async (route) => {
+    expect(route.request().method()).toBe("DELETE")
+    expect(route.request().headers()["x-csrf-token"]).toBe("csrf-token")
+    runnerStatus = "revoked"
+    await route.fulfill({ status: 204 })
+  })
+  await page.route("**/api/runners", (route) =>
+    route.fulfill({
+      json: {
+        runners: [
+          {
+            runnerName: "desk-runner",
+            capabilities: {
+              claudeVersion: "claude 1.2.3",
+              codexVersion: "codex 1.2.3"
+            },
+            status: runnerStatus,
+            lastSeenAt: "2026-08-28T12:00:00.000Z"
+          }
+        ]
+      }
+    })
+  )
 
   await page.goto("/settings")
   await expect(page.getByText("anthropic-api")).toBeVisible()
@@ -63,4 +87,10 @@ test("enables a fixed provider model and issues a one-use runner pairing code", 
   await expect(page.getByText("AB12CD34")).toBeVisible()
   await expect(page.getByText("일회용 연결 코드")).toBeVisible()
   await expect(page.getByLabel(/API|키|token/i)).toHaveCount(0)
+
+  await expect(page.getByText("desk-runner")).toBeVisible()
+  await expect(page.getByText("claude 1.2.3 · codex 1.2.3")).toBeVisible()
+  await page.getByRole("button", { name: "연결 해제" }).click()
+  await expect(page.getByText("해제됨")).toBeVisible()
+  await expect(page.getByRole("button", { name: "연결 해제" })).toHaveCount(0)
 })
