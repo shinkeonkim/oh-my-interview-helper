@@ -11,7 +11,8 @@
   "workspaces": [
     "server",
     "client",
-    "shared"
+    "shared",
+    "packages/*"
   ],
   "scripts": {
     "build": "bun run build:client && bun run build:server",
@@ -26,7 +27,7 @@
     "test": "bun test server client/src",
     "test:security": "bun test server/security server/ingest server/routes",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p server/tsconfig.json && vue-tsc --noEmit -p client/tsconfig.app.json && tsc --noEmit -p client/tsconfig.node.json"
+    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p packages/runner/tsconfig.json && tsc --noEmit -p server/tsconfig.json && vue-tsc --noEmit -p client/tsconfig.app.json && tsc --noEmit -p client/tsconfig.node.json"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

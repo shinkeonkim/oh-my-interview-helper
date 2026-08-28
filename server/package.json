@@ -6,6 +6,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.109.1",
     "@interview-helper/shared": "workspace:*",
+    "@interview-helper/runner": "workspace:*",
     "@strands-agents/sdk": "1.14.0",
     "fflate": "0.8.2",
     "hono": "4.13.4",
