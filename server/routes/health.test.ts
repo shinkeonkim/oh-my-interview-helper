@@ -32,7 +32,7 @@ describe("server startup contracts", () => {
     const app = createApp()
 
     // When
-    const response = await app.request("http://localhost/api/health")
+    const response = await app.request("http://localhost:3000/api/health")
 
     // Then
     expect(response.status).toBe(200)
