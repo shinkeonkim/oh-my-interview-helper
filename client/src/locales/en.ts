@@ -116,6 +116,8 @@ export const en = {
     startApplication: "Start application",
     applicationInProgress: "Application in progress",
     stage: "Current stage",
+    appliedAt: "Applied at",
+    outcomeAt: "Outcome recorded at",
     move: "Move stage",
     notes: "Notes",
     addNote: "Add note",

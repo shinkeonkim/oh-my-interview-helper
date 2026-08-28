@@ -123,6 +123,8 @@ const activeApplicationPostIds = computed(
       applications.value.filter((item) => item.archivedAt === null).map((item) => item.jobPostId)
     )
 )
+const isTerminalApplication = (application: Application) =>
+  typeof stages.value.find((stage) => stage.id === application.stageId)?.outcome === "string"
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -633,10 +635,18 @@ onBeforeUnmount(() => loadController.abort())
                   copy("archived")
                 }}</Badge>
               </div>
+              <p v-if="application.appliedAt" class="mt-1 text-xs text-muted-foreground">
+                {{ copy("appliedAt") }} ·
+                {{ new Date(application.appliedAt).toLocaleString(settings.locale) }}
+              </p>
+              <p v-if="application.outcomeAt" class="mt-1 text-xs text-muted-foreground">
+                {{ copy("outcomeAt") }} ·
+                {{ new Date(application.outcomeAt).toLocaleString(settings.locale) }}
+              </p>
             </div>
             <Select
               v-model="selectedStages[application.id]"
-              :disabled="application.archivedAt !== null"
+              :disabled="application.archivedAt !== null || isTerminalApplication(application)"
               ><SelectTrigger class="w-48"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
@@ -645,7 +655,11 @@ onBeforeUnmount(() => loadController.abort())
               ></Select
             ><Button
               variant="secondary"
-              :disabled="application.archivedAt !== null"
+              :disabled="
+                application.archivedAt !== null ||
+                isTerminalApplication(application) ||
+                selectedStages[application.id] === application.stageId
+              "
               @click="move(application)"
               >{{ copy("move") }}</Button
             ><Button variant="outline" @click="showHistory(application.id)"

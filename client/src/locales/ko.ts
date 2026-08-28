@@ -113,6 +113,8 @@ export const ko = {
     startApplication: "지원 시작",
     applicationInProgress: "지원 진행 중",
     stage: "현재 단계",
+    appliedAt: "지원일",
+    outcomeAt: "결과 확정일",
     move: "단계 이동",
     notes: "메모",
     addNote: "메모 추가",
