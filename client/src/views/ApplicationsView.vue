@@ -92,10 +92,12 @@ const file = ref<File | null>(null)
 const savingPosting = ref(false)
 const selectedStages = ref<Record<string, string>>({})
 const note = ref("")
+const addingNote = ref(false)
 const interviewAt = ref("")
 const interviewKind = ref("")
 const interviewLocation = ref("")
 const interviewNotes = ref("")
+const schedulingInterview = ref(false)
 const activeApplication = ref<string | null>(null)
 const history = ref<HistoryEntry[]>([])
 const interviews = ref<
@@ -142,6 +144,11 @@ const postingReady = computed(
       (source.value === "url" && hasPublicUrl.value) ||
       (source.value === "file" && file.value !== null))
 )
+const noteReady = computed(() => note.value.trim().length > 0)
+const interviewReady = computed(() => {
+  if (interviewAt.value.length === 0 || interviewKind.value.trim().length === 0) return false
+  return !Number.isNaN(new Date(interviewAt.value).getTime())
+})
 
 const payloadText = (event: HistoryEntry, key: string) => {
   const value = event.payload[key]
@@ -280,24 +287,32 @@ const archiveApplication = async (application: Application) => {
   }
 }
 const addNote = async () => {
-  if (activeApplication.value === null) return
+  if (activeApplication.value === null || !noteReady.value || addingNote.value) return
+  const applicationId = activeApplication.value
+  addingNote.value = true
   try {
     await request(
-      `/api/applications/${activeApplication.value}/notes`,
+      `/api/applications/${applicationId}/notes`,
       "POST",
-      JSON.stringify({ text: note.value })
+      JSON.stringify({ text: note.value.trim() })
     )
-    note.value = ""
-    await showHistory(activeApplication.value)
+    if (activeApplication.value === applicationId) {
+      note.value = ""
+      await showHistory(applicationId)
+    }
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    addingNote.value = false
   }
 }
 const schedule = async () => {
-  if (activeApplication.value === null) return
+  if (activeApplication.value === null || !interviewReady.value || schedulingInterview.value) return
+  const applicationId = activeApplication.value
+  schedulingInterview.value = true
   try {
     await request(
-      `/api/applications/${activeApplication.value}/interviews`,
+      `/api/applications/${applicationId}/interviews`,
       "POST",
       JSON.stringify({
         scheduledAt: new Date(interviewAt.value).toISOString(),
@@ -306,10 +321,14 @@ const schedule = async () => {
         notes: interviewNotes.value.trim()
       })
     )
-    interviewAt.value = interviewKind.value = interviewLocation.value = interviewNotes.value = ""
-    await showHistory(activeApplication.value)
+    if (activeApplication.value === applicationId) {
+      interviewAt.value = interviewKind.value = interviewLocation.value = interviewNotes.value = ""
+      await showHistory(applicationId)
+    }
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    schedulingInterview.value = false
   }
 }
 const showHistory = async (id: string) => {
@@ -705,9 +724,11 @@ onBeforeUnmount(() => loadController.abort())
       ><CardContent class="grid gap-6 lg:grid-cols-2"
         ><div class="grid gap-3">
           <div class="flex gap-2">
-            <Input v-model="note" :placeholder="copy('notes')" /><Button @click="addNote">{{
-              copy("addNote")
-            }}</Button>
+            <Input v-model="note" :placeholder="copy('notes')" /><Button
+              :disabled="!noteReady || addingNote"
+              @click="addNote"
+              >{{ addingNote ? copy("saving") : copy("addNote") }}</Button
+            >
           </div>
           <div class="grid gap-2 sm:grid-cols-2">
             <Input v-model="interviewAt" type="datetime-local" /><Input
@@ -718,9 +739,11 @@ onBeforeUnmount(() => loadController.abort())
             <Input v-model="interviewNotes" :placeholder="copy('interviewNotes')" />
             <Button
               class="w-fit"
-              :disabled="!interviewAt || !interviewKind.trim()"
+              :disabled="!interviewReady || schedulingInterview"
               @click="schedule"
-              ><CalendarPlus />{{ copy("scheduleInterview") }}</Button
+              ><CalendarPlus />{{
+                schedulingInterview ? copy("saving") : copy("scheduleInterview")
+              }}</Button
             >
           </div>
         </div>
