@@ -124,7 +124,7 @@ describe("uploaded career document library", () => {
   })
 
   test("previews and downloads originals while returning actionable extraction failures", async () => {
-    const { app, headers } = await setup()
+    const { app, headers, persistence } = await setup()
     const manual = await app.request(url("/api/documents/manual"), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
@@ -150,5 +150,27 @@ describe("uploaded career document library", () => {
     })
     expect(failed.status).toBe(422)
     expect(await failed.json()).toEqual({ error: { code: "MAGIC_MISMATCH" } })
+
+    const documentCount = () =>
+      persistence.database
+        .query<{ count: number }, []>("SELECT count(*) count FROM documents")
+        .get()?.count ?? 0
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count ?? 0
+    const documentsBeforeBatch = documentCount()
+    const blobsBeforeBatch = blobCount()
+    const mixed = new FormData()
+    mixed.set("kind", "resume")
+    mixed.append("files", new File(["valid profile"], "valid.txt", { type: "text/plain" }))
+    mixed.append("files", new File(["not pdf"], "invalid.pdf", { type: "application/pdf" }))
+    const rejectedBatch = await app.request(url("/api/documents/upload"), {
+      method: "POST",
+      headers,
+      body: mixed
+    })
+    expect(rejectedBatch.status).toBe(422)
+    expect(documentCount()).toBe(documentsBeforeBatch)
+    expect(blobCount()).toBe(blobsBeforeBatch)
   })
 })
