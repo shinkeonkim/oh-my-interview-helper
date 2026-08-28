@@ -20,14 +20,18 @@ const setup = async () => {
   const persistence = createPersistence({ dataDirectory: directory })
   handles.push(persistence)
   const resolver: Resolver = { resolve: async () => ["93.184.216.34"] }
+  let transportRequests = 0
   const transport: PinnedTransport = {
-    request: async () => ({
-      status: 200,
-      headers: new Headers({ "content-type": "text/html" }),
-      body: (async function* () {
-        yield new TextEncoder().encode("<h1>URL posting</h1>")
-      })()
-    })
+    request: async () => {
+      transportRequests += 1
+      return {
+        status: 200,
+        headers: new Headers({ "content-type": "text/html" }),
+        body: (async function* () {
+          yield new TextEncoder().encode("<h1>URL posting</h1>")
+        })()
+      }
+    }
   }
   const app = createApp({ dataDirectory: directory, persistence, resolver, transport })
   const csrfResponse = await app.request(`${base}/security/csrf`)
@@ -36,12 +40,12 @@ const setup = async () => {
     Cookie: csrfResponse.headers.get("set-cookie")?.split(";", 1)[0] ?? "",
     "X-CSRF-Token": token
   }
-  return { app, headers }
+  return { app, headers, persistence, transportRequestCount: () => transportRequests }
 }
 
 describe("job posting and hiring pipeline API", () => {
   test("ingests manual, file, and pinned URL postings with immutable versions", async () => {
-    const { app, headers } = await setup()
+    const { app, headers, persistence, transportRequestCount } = await setup()
     const jsonHeaders = { ...headers, "Content-Type": "application/json" }
     const manual = await app.request(`${base}/postings/manual`, {
       method: "POST",
@@ -88,6 +92,58 @@ describe("job posting and hiring pipeline API", () => {
     expect(
       ((await (await app.request(`${base}/postings`)).json()) as { postings: unknown[] }).postings
     ).toHaveLength(3)
+
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT COUNT(*) count FROM blobs").get()
+        ?.count ?? 0
+    const blobsBeforeArchive = blobCount()
+    const requestsBeforeArchive = transportRequestCount()
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/manual`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ text: "must not persist" })
+        })
+      ).status
+    ).toBe(400)
+    const archivedFile = new FormData()
+    archivedFile.set("file", new File(["must not extract"], "post.txt", { type: "text/plain" }))
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/file`, {
+          method: "POST",
+          headers,
+          body: archivedFile
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/url`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ url: "https://jobs.example/archived" })
+        })
+      ).status
+    ).toBe(400)
+    expect(blobCount()).toBe(blobsBeforeArchive)
+    expect(transportRequestCount()).toBe(requestsBeforeArchive)
+    expect(
+      (
+        (await (await app.request(`${base}/postings/${manualPost.id}/versions`)).json()) as {
+          versions: unknown[]
+        }
+      ).versions
+    ).toHaveLength(2)
   })
 
   test("enforces idempotency and terminal transitions while retaining notes and interview history", async () => {
