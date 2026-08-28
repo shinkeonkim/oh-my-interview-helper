@@ -177,6 +177,11 @@ test("creates a posting and moves an application through the local pipeline", as
     ]
     await route.fulfill({ status: 201, json: post })
   })
+  await page.route(`**/api/postings/${post.id}/archive`, async (route) => {
+    expect(route.request().headers()["x-csrf-token"]).toBe("token")
+    post.state = "archived"
+    await route.fulfill({ status: 204 })
+  })
   await page.route("**/api/applications", async (route) => {
     if (route.request().method() === "POST")
       applications = [
@@ -324,4 +329,10 @@ test("creates a posting and moves an application through the local pipeline", as
   ).toHaveText("3")
   await page.getByRole("button", { name: "단계 삭제: Recruiter screen" }).click()
   await expect(page.getByRole("button", { name: "단계 삭제: Recruiter screen" })).toHaveCount(0)
+  await page.getByRole("button", { name: "보관", exact: true }).click()
+  await expect(page.getByText("보관됨").first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "지원 시작" })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "보관", exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "버전 기록" }).click()
+  await expect(page.getByRole("button", { name: "새 버전 수집" })).toBeDisabled()
 })
