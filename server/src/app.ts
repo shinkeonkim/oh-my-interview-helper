@@ -41,17 +41,15 @@ import { createApplicationRoutes } from "./routes/applications"
 import { localEvidenceAnalyzer, type ResearchAnalyzer } from "./research/contracts"
 import { ResearchService } from "./research/service"
 import { createResearchRoutes } from "./routes/research"
-import {
-  PreparationWorkflowService,
-  unavailablePreparationExecutor,
-  type PreparationExecutor
-} from "./workflows/service"
+import { PreparationWorkflowService, type PreparationExecutor } from "./workflows/service"
 import { createChatRoutes, createWorkflowRoutes } from "./routes/workflows"
 import {
   ChatWorkflowService,
   unavailableChatExecutor,
   type ChatExecutor
 } from "./workflows/chat-service"
+import { StrandsPreparationExecutor } from "./workflows/strands-executor"
+import { WorkflowSourceContentResolver } from "./workflows/source-content"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -87,7 +85,7 @@ export const createApp = ({
   promptTemplates = defaultPromptTemplateRevisionRegistry,
   runnerPairing,
   researchAnalyzer = localEvidenceAnalyzer,
-  preparationExecutor = unavailablePreparationExecutor,
+  preparationExecutor,
   chatExecutor = unavailableChatExecutor
 }: AppOptions = {}): Hono => {
   const app = new Hono()
@@ -98,8 +96,9 @@ export const createApp = ({
     providers: providerRegistry,
     secret: disclosureSecret ?? randomBytes(32)
   })
+  const kernel = new ProviderKernel({ providers: providerRegistry, tools: new ToolRegistry([]) })
   const providerDefinition = createProviderInvokeJobDefinition({
-    kernel: new ProviderKernel({ providers: providerRegistry, tools: new ToolRegistry([]) }),
+    kernel,
     providerRuns: persistence.repositories.providerArtifacts,
     jobs: persistence.repositories.jobs,
     requests: providerRequests,
@@ -182,9 +181,20 @@ export const createApp = ({
     persistence.database
   )
   app.route("/api/artifacts", createArtifactRoutes(artifacts))
+  const strandsPreparationExecutor = new StrandsPreparationExecutor({
+    kernel,
+    providers: providerRegistry,
+    providerRuns: persistence.repositories.providerArtifacts,
+    disclosures,
+    sources: new WorkflowSourceContentResolver(persistence.database)
+  })
+  const activePreparationExecutor = preparationExecutor ?? strandsPreparationExecutor
   app.route(
     "/api/workflows",
-    createWorkflowRoutes(new PreparationWorkflowService(artifacts, preparationExecutor))
+    createWorkflowRoutes(
+      new PreparationWorkflowService(artifacts, activePreparationExecutor),
+      preparationExecutor === undefined ? strandsPreparationExecutor : undefined
+    )
   )
   app.route(
     "/api/conversations",

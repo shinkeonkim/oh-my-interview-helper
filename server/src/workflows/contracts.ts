@@ -63,6 +63,9 @@ export const PreparationRequestSchema = z
     practiceAnswer: z.string().trim().min(1).max(20_000).nullable().default(null)
   })
   .strict()
+export const PreparationDisclosureRequestSchema = PreparationRequestSchema.omit({
+  disclosureId: true
+}).strict()
 
 export const artifactKindForWorkflow = (
   workflow: PreparationWorkflowKind

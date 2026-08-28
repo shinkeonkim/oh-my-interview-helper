@@ -17,7 +17,7 @@ const ChatRequestSchema = z
     inputs: z.array(DisclosureInputRefSchema).min(1).max(30)
   })
   .strict()
-const ChatOutputSchema = z
+export const ChatOutputSchema = z
   .object({
     answer: z.string().trim().min(1).max(40_000),
     citations: z

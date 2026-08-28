@@ -14,9 +14,24 @@ import {
   ChatWorkflowError,
   type ChatWorkflowService
 } from "../workflows/chat-service"
+import type { StrandsPreparationExecutor } from "../workflows/strands-executor"
 
-export const createWorkflowRoutes = (service: PreparationWorkflowService): Hono => {
+export const createWorkflowRoutes = (
+  service: PreparationWorkflowService,
+  previewer?: Pick<StrandsPreparationExecutor, "preview">
+): Hono => {
   const routes = new Hono()
+  routes.post("/preview", async (context) => {
+    if (previewer === undefined)
+      return context.json({ error: { code: "PREPARATION_PREVIEW_UNAVAILABLE" } }, 503)
+    try {
+      return context.json(previewer.preview(await context.req.json()))
+    } catch (error) {
+      if (error instanceof z.ZodError || error instanceof PreparationExecutorError)
+        return context.json(safeErrorCode(error, "PREPARATION_REJECTED"), 422)
+      throw error
+    }
+  })
   routes.post("/run", async (context) => {
     try {
       return context.json(await service.run(await context.req.json(), context.req.raw.signal), 201)
