@@ -31,12 +31,15 @@ test("uploads, selects, previews, and exposes document source usage", async ({ p
   await page.route("**/api/documents/*/preview", (route) =>
     route.fulfill({ json: { title: "resume", text: "Selected profile evidence" } })
   )
+  let archiveRequests = 0
   await page.route("**/api/documents/*/archive", async (route) => {
+    archiveRequests += 1
     documents = documents.map((document) => ({
       ...(document as object),
       state: "archived",
       selected: false
     }))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 204 })
   })
   await page.route("**/api/documents/*/delete", async (route) => {
@@ -60,8 +63,14 @@ test("uploads, selects, previews, and exposes document source usage", async ({ p
   await expect(page.getByText("프로필에 선택됨")).toBeVisible()
   await page.getByRole("button", { name: "미리보기" }).click()
   await expect(page.getByText("Selected profile evidence")).toBeVisible()
-  await page.getByRole("button", { name: "보관" }).click()
+  const archiveButton = page.getByRole("button", { name: "보관" })
+  await archiveButton.click()
+  await expect(archiveButton).toBeDisabled()
+  await expect(page.getByRole("button", { name: "선택 해제" })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "삭제" })).toBeDisabled()
+  await expect(page.locator('input[type="file"]').nth(1)).toBeDisabled()
   await expect(page.getByText("보관됨")).toBeVisible()
+  expect(archiveRequests).toBe(1)
   await expect(page.getByRole("button", { name: "프로필에 사용" })).toBeDisabled()
   await expect(page.getByText("새 버전")).toBeDisabled()
   await expect(page.getByRole("button", { name: "보관" })).toHaveCount(0)
