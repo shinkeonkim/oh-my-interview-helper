@@ -26,7 +26,8 @@ export class DocumentLibraryService {
   }
 
   get(id: string) {
-    return this.repository.get(id)
+    const document = this.repository.get(id)
+    return document?.state === "deleted" ? null : document
   }
 
   async upload(input: {
