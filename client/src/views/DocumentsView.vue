@@ -38,6 +38,7 @@ const documents = ref<DocumentItem[]>([])
 const kind = ref<Kind>("resume")
 const loading = ref(true)
 const uploading = ref(false)
+const pendingDocumentIds = ref<ReadonlySet<string>>(new Set())
 const preview = ref<{ title: string; text: string } | null>(null)
 const history = ref<{
   title: string
@@ -73,6 +74,12 @@ const mutate = async (path: string, method: string, body?: FormData) => {
   const response = await fetch(path, { method, body, headers: { "X-CSRF-Token": await csrf() } })
   if (!response.ok) throw new Error("mutation")
 }
+const setDocumentPending = (id: string, pending: boolean) => {
+  const next = new Set(pendingDocumentIds.value)
+  if (pending) next.add(id)
+  else next.delete(id)
+  pendingDocumentIds.value = next
+}
 
 const uploadFiles = async (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -96,7 +103,13 @@ const uploadFiles = async (event: Event) => {
 const uploadVersion = async (event: Event, document: DocumentItem) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file === undefined || document.state !== "active") return
+  if (
+    file === undefined ||
+    document.state !== "active" ||
+    pendingDocumentIds.value.has(document.id)
+  )
+    return
+  setDocumentPending(document.id, true)
   const form = new FormData()
   form.set("file", file)
   try {
@@ -106,26 +119,34 @@ const uploadVersion = async (event: Event, document: DocumentItem) => {
   } catch {
     toast.error(copy("failed"))
   } finally {
+    setDocumentPending(document.id, false)
     input.value = ""
   }
 }
 
 const toggleSelection = async (document: DocumentItem) => {
-  if (document.state !== "active") return
+  if (document.state !== "active" || pendingDocumentIds.value.has(document.id)) return
+  setDocumentPending(document.id, true)
   try {
     await mutate(`/api/documents/${document.id}/selection`, document.selected ? "DELETE" : "PUT")
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    setDocumentPending(document.id, false)
   }
 }
 
 const transition = async (document: DocumentItem, action: "archive" | "delete") => {
+  if (pendingDocumentIds.value.has(document.id)) return
+  setDocumentPending(document.id, true)
   try {
     await mutate(`/api/documents/${document.id}/${action}`, "POST")
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    setDocumentPending(document.id, false)
   }
 }
 
@@ -197,7 +218,11 @@ onMounted(load)
       }}</CardContent></Card
     >
     <section v-else class="grid gap-4 xl:grid-cols-2" aria-live="polite">
-      <Card v-for="document in documents" :key="document.id">
+      <Card
+        v-for="document in documents"
+        :key="document.id"
+        :aria-busy="pendingDocumentIds.has(document.id)"
+      >
         <CardHeader class="flex-row items-start justify-between gap-4">
           <div class="flex gap-3">
             <FileText class="mt-1 size-5 text-primary" />
@@ -224,7 +249,7 @@ onMounted(load)
           <div class="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              :disabled="document.state !== 'active'"
+              :disabled="document.state !== 'active' || pendingDocumentIds.has(document.id)"
               @click="toggleSelection(document)"
               >{{ document.selected ? copy("unselect") : copy("select") }}</Button
             >
@@ -232,13 +257,21 @@ onMounted(load)
               ><Eye />{{ copy("preview") }}</Button
             >
             <Button variant="outline" @click="showHistory(document)">{{ copy("history") }}</Button>
-            <Button variant="outline" as-child :disabled="document.state !== 'active'"
-              ><label :class="document.state === 'active' ? 'cursor-pointer' : 'cursor-not-allowed'"
+            <Button
+              variant="outline"
+              as-child
+              :disabled="document.state !== 'active' || pendingDocumentIds.has(document.id)"
+              ><label
+                :class="
+                  document.state === 'active' && !pendingDocumentIds.has(document.id)
+                    ? 'cursor-pointer'
+                    : 'cursor-not-allowed'
+                "
                 ><input
                   class="sr-only"
                   type="file"
                   accept=".pdf,.docx,.md,.txt"
-                  :disabled="document.state !== 'active'"
+                  :disabled="document.state !== 'active' || pendingDocumentIds.has(document.id)"
                   @change="uploadVersion($event, document)"
                 />{{ copy("newVersion") }}</label
               ></Button
@@ -251,10 +284,14 @@ onMounted(load)
             <Button
               v-if="document.state === 'active'"
               variant="ghost"
+              :disabled="pendingDocumentIds.has(document.id)"
               @click="transition(document, 'archive')"
               ><Archive />{{ copy("archive") }}</Button
             >
-            <Button variant="destructive" @click="transition(document, 'delete')"
+            <Button
+              variant="destructive"
+              :disabled="pendingDocumentIds.has(document.id)"
+              @click="transition(document, 'delete')"
               ><Trash2 />{{ copy("remove") }}</Button
             >
           </div>
