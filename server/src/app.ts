@@ -38,6 +38,9 @@ import { DocumentLibraryService } from "./documents/service"
 import { createDocumentRoutes } from "./routes/documents"
 import { ApplicationService } from "./applications/service"
 import { createApplicationRoutes } from "./routes/applications"
+import { localEvidenceAnalyzer, type ResearchAnalyzer } from "./research/contracts"
+import { ResearchService } from "./research/service"
+import { createResearchRoutes } from "./routes/research"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -53,6 +56,7 @@ export type AppOptions = {
   readonly providerRequests?: ProviderRequestSource
   readonly promptTemplates?: PromptTemplateRevisionRegistry
   readonly runnerPairing?: RunnerPairingService
+  readonly researchAnalyzer?: ResearchAnalyzer
 }
 
 export const createApp = ({
@@ -68,7 +72,8 @@ export const createApp = ({
   providerRegistry = new ProviderRegistry([]),
   providerRequests = unavailableProviderRequestSource,
   promptTemplates = defaultPromptTemplateRevisionRegistry,
-  runnerPairing
+  runnerPairing,
+  researchAnalyzer = localEvidenceAnalyzer
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -111,6 +116,12 @@ export const createApp = ({
     "/api",
     createApplicationRoutes(
       new ApplicationService(persistence, dataDirectory, security, resolver, transport)
+    )
+  )
+  app.route(
+    "/api/research",
+    createResearchRoutes(
+      new ResearchService(persistence, security, researchAnalyzer, resolver, transport)
     )
   )
   app.route("/api/jobs", createJobsRoutes(jobs))

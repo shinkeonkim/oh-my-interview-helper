@@ -84,3 +84,46 @@ export type ResearchAnalyzerInput = {
 export type ResearchAnalyzer = {
   readonly analyze: (input: ResearchAnalyzerInput) => Promise<unknown>
 }
+
+export const localEvidenceAnalyzer: ResearchAnalyzer = {
+  analyze: async (input) => {
+    const person = input.subject.subjectType !== "company"
+    const candidates = person
+      ? input.sources.map((source) => ({
+          name: input.subject.subjectName,
+          role: input.subject.roleHint,
+          organization: input.subject.organization,
+          sourceIds: [source.id]
+        }))
+      : input.sources.length === 0
+        ? []
+        : [
+            {
+              name: input.subject.subjectName,
+              role: null,
+              organization: input.subject.organization,
+              sourceIds: input.sources.map((source) => source.id)
+            }
+          ]
+    return {
+      identity: {
+        status: input.sources.length === 0 ? "not_found" : person ? "ambiguous" : "confirmed",
+        candidates
+      },
+      summary: { career: [], stack: [], projects: [] },
+      claims: input.sources.map((source) => ({
+        statement: `Public source available: ${source.title}`,
+        classification: "fact",
+        sourceIds: [source.id],
+        confidence: "high"
+      })),
+      fitAssessment: {
+        label: "advisory",
+        summary:
+          "Review the cited public evidence before drawing candidate or team-fit conclusions.",
+        strengths: [],
+        risks: ["Local evidence mode does not infer fit."]
+      }
+    }
+  }
+}
