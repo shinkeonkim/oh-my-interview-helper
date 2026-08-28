@@ -144,6 +144,22 @@ CREATE TRIGGER job_post_versions_immutable_update BEFORE UPDATE ON job_post_vers
 CREATE TRIGGER job_post_versions_immutable_delete BEFORE DELETE ON job_post_versions BEGIN SELECT RAISE(ABORT,'job post versions are immutable'); END;
 `
 
+const citedResearchSql = `
+ALTER TABLE research_records ADD COLUMN subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('company','executive','team_lead','team_member'));
+ALTER TABLE research_records ADD COLUMN subject_name TEXT;
+ALTER TABLE research_records ADD COLUMN parent_record_id TEXT REFERENCES research_records(id) ON DELETE RESTRICT;
+ALTER TABLE research_records ADD COLUMN identity_status TEXT CHECK(identity_status IS NULL OR identity_status IN ('confirmed','ambiguous','not_found'));
+ALTER TABLE research_records ADD COLUMN identity_candidates_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(identity_candidates_json) AND json_type(identity_candidates_json)='array');
+ALTER TABLE research_records ADD COLUMN analysis_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(analysis_json) AND json_type(analysis_json)='object');
+CREATE TABLE research_claims (id TEXT PRIMARY KEY,research_record_id TEXT NOT NULL REFERENCES research_records(id) ON DELETE RESTRICT,statement TEXT NOT NULL CHECK(length(trim(statement))>0),classification TEXT NOT NULL CHECK(classification IN ('fact','inference','advisory','unverified')),source_ids_json TEXT NOT NULL CHECK(json_valid(source_ids_json) AND json_type(source_ids_json)='array'),confidence TEXT NOT NULL CHECK(confidence IN ('high','medium','low')),created_at TEXT NOT NULL);
+CREATE INDEX research_claims_record_idx ON research_claims(research_record_id,created_at,id);
+CREATE TRIGGER research_claims_sources_valid BEFORE INSERT ON research_claims WHEN EXISTS (SELECT 1 FROM json_each(NEW.source_ids_json) entry WHERE entry.type!='text' OR NOT EXISTS (SELECT 1 FROM research_sources source WHERE source.id=entry.value AND source.research_record_id=NEW.research_record_id AND source.status='available')) BEGIN SELECT RAISE(ABORT,'research claim source missing'); END;
+CREATE TRIGGER research_claims_fact_cited BEFORE INSERT ON research_claims WHEN NEW.classification='fact' AND json_array_length(NEW.source_ids_json)=0 BEGIN SELECT RAISE(ABORT,'research fact requires citation'); END;
+CREATE TRIGGER research_claims_immutable_update BEFORE UPDATE ON research_claims BEGIN SELECT RAISE(ABORT,'research claims are immutable'); END;
+CREATE TRIGGER research_claims_immutable_delete BEFORE DELETE ON research_claims BEGIN SELECT RAISE(ABORT,'research claims are immutable'); END;
+CREATE TRIGGER research_records_analysis_immutable BEFORE UPDATE OF subject_type,subject_name,parent_record_id,identity_status,identity_candidates_json,analysis_json ON research_records BEGIN SELECT RAISE(ABORT,'research analysis is immutable'); END;
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
@@ -156,7 +172,8 @@ export const migrations: readonly Migration[] = [
   { id: "0009_consent_artifacts", sql: consentArtifactsSql },
   { id: "0010_consent_artifact_integrity", sql: consentArtifactIntegritySql },
   { id: "0011_document_library", sql: documentLibrarySql },
-  { id: "0012_application_pipeline", sql: applicationPipelineSql }
+  { id: "0012_application_pipeline", sql: applicationPipelineSql },
+  { id: "0013_cited_research", sql: citedResearchSql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>
