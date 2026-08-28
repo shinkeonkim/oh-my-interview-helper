@@ -16,6 +16,7 @@ import {
   type ArtifactKind,
   type ProviderRun
 } from "./provider-artifact-repository-schemas"
+import { transitionProviderRun, type ProviderRunTerminal } from "./provider-run-transitions"
 
 export {
   ArtifactCreateSchema,
@@ -34,6 +35,7 @@ export type {
   ArtifactKind,
   ProviderRun
 } from "./provider-artifact-repository-schemas"
+export { ProviderRunTransitionError } from "./provider-run-transitions"
 
 const now = (): string => new Date().toISOString()
 
@@ -47,7 +49,6 @@ export class ArtifactVersionConflictError extends Error {
     super(`ARTIFACT_VERSION_CONFLICT: ${kind}@${version}`)
   }
 }
-
 export class ProviderArtifactRepository {
   constructor(private readonly database: Database) {}
 
@@ -73,6 +74,43 @@ export class ProviderArtifactRepository {
       ]
     )
     return value
+  }
+  createRunning(
+    input: Omit<ProviderRun, "status" | "usage" | "cost" | "error" | "completedAt">
+  ): ProviderRun {
+    return this.createProviderRun({
+      ...input,
+      status: "running",
+      usage: null,
+      cost: null,
+      error: null,
+      completedAt: null
+    })
+  }
+  completeProviderRun(
+    id: ProviderRunId,
+    usage: ProviderRun["usage"],
+    cost: ProviderRun["cost"]
+  ): ProviderRun {
+    return this.transition(id, "succeeded", usage, cost, null)
+  }
+  failProviderRun(
+    id: ProviderRunId,
+    usage: ProviderRun["usage"],
+    cost: ProviderRun["cost"],
+    error: NonNullable<ProviderRun["error"]>
+  ): ProviderRun {
+    return this.transition(id, "failed", usage, cost, error)
+  }
+  cancelProviderRun(
+    id: ProviderRunId,
+    usage: ProviderRun["usage"],
+    cost: ProviderRun["cost"]
+  ): ProviderRun {
+    return this.transition(id, "cancelled", usage, cost, {
+      category: "cancelled",
+      retryable: false
+    })
   }
 
   getProviderRun(id: ProviderRunId): ProviderRun | null {
@@ -193,5 +231,19 @@ export class ProviderArtifactRepository {
 
   transaction<Result>(action: () => Result): Result {
     return this.database.transaction(action).immediate()
+  }
+  transitionInTransaction(id: ProviderRunId, terminal: ProviderRunTerminal): ProviderRun {
+    return transitionProviderRun(this.database, id, terminal)
+  }
+  private transition(
+    id: ProviderRunId,
+    status: "succeeded" | "failed" | "cancelled",
+    usage: ProviderRun["usage"],
+    cost: ProviderRun["cost"],
+    error: ProviderRun["error"]
+  ): ProviderRun {
+    return this.database
+      .transaction(() => this.transitionInTransaction(id, { status, usage, cost, error }))
+      .immediate()
   }
 }

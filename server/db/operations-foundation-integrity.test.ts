@@ -34,13 +34,12 @@ test("enforces durable lease errors, disclosures, runner hashes, and ordered eve
   const jobInput = {
     id: crypto.randomUUID(),
     kind: "research",
-    state: "leased",
+    state: "queued",
     idempotencyKey: crypto.randomUUID(),
     payload: { source: "manual" },
-    leaseOwner: "runner-a",
-    leaseExpiresAt: "2026-08-26T12:05:00.000Z",
-    errorCode: null,
-    errorMessage: null
+    retryClass: "local",
+    executionTarget: "app",
+    maxAttempts: 1
   }
   const job = operations.createJob(jobInput)
 
@@ -78,7 +77,7 @@ test("enforces durable lease errors, disclosures, runner hashes, and ordered eve
   })
 
   // Then
-  expect([firstEvent.sequence, secondEvent.sequence]).toEqual([1, 2])
+  expect([firstEvent.sequence, secondEvent.sequence]).toEqual([2, 3])
   expect(operations.getJob(job.id)).toEqual(job)
   expect(operations.getDisclosure(disclosure.id)).toEqual(disclosure)
   expect(operations.getRunnerRegistration(runner.runnerName)).toEqual(runner)

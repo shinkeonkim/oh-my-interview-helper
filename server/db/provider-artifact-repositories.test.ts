@@ -37,7 +37,7 @@ const providerRun = () =>
     model: "gpt-4.1",
     requestHash: requestHash(),
     status: "succeeded",
-    usage: { inputTokens: 120, outputTokens: 36 },
+    usage: { inputTokens: 120, outputTokens: 36, cacheTokens: 4, totalTokens: 160 },
     cost: { currency: "USD", microunits: 840 },
     error: null,
     completedAt: new Date().toISOString()
@@ -100,6 +100,16 @@ describe("provider artifact repositories", () => {
           providerMessage: "Do not persist provider response bodies"
         },
         completedAt: new Date().toISOString()
+      })
+    ).toThrow(z.ZodError)
+  })
+
+  test("rejects provider usage whose total does not match its components", () => {
+    // Given / When / Then
+    expect(() =>
+      ProviderRunCreateSchema.parse({
+        ...providerRun(),
+        usage: { inputTokens: 3, outputTokens: 2, cacheTokens: 1, totalTokens: 99 }
       })
     ).toThrow(z.ZodError)
   })
