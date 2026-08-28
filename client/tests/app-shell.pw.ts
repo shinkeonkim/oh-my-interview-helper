@@ -14,7 +14,9 @@ test.describe("application shell contract", () => {
   test.setTimeout(20_000)
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/**", (route) =>
-      route.fulfill({ json: { applications: [], documents: [], postings: [], stages: [] } })
+      route.fulfill({
+        json: { applications: [], documents: [], postings: [], records: [], stages: [] }
+      })
     )
   })
   test("shows every required destination and Korean as the default locale", async ({ page }) => {
