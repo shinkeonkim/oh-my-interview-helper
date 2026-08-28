@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { DisclosureInputRefSchema } from "../disclosures/sources"
+
 export const PreparationWorkflowKindSchema = z.enum([
   "cover_letter",
   "resume_feedback",
@@ -57,25 +59,7 @@ export const PreparationRequestSchema = z
     providerId: z.string().trim().min(1).max(64),
     disclosureId: z.string().uuid(),
     seriesId: z.string().uuid().nullable().default(null),
-    inputs: z
-      .array(
-        z.discriminatedUnion("kind", [
-          z
-            .object({ kind: z.literal("document_version"), documentVersionId: z.string().uuid() })
-            .strict(),
-          z
-            .object({ kind: z.literal("job_post_version"), jobPostVersionId: z.string().uuid() })
-            .strict(),
-          z
-            .object({ kind: z.literal("research_source"), researchSourceId: z.string().uuid() })
-            .strict(),
-          z
-            .object({ kind: z.literal("artifact_revision"), artifactRevisionId: z.string().uuid() })
-            .strict()
-        ])
-      )
-      .min(1)
-      .max(30),
+    inputs: z.array(DisclosureInputRefSchema).min(1).max(30),
     practiceAnswer: z.string().trim().min(1).max(20_000).nullable().default(null)
   })
   .strict()
