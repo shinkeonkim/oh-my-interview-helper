@@ -180,6 +180,40 @@ describe("job posting and hiring pipeline API", () => {
     ).json()) as { events: unknown[]; interviews: unknown[] }
     expect(history.events).toHaveLength(5)
     expect(history.interviews).toHaveLength(1)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/notes`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ text: "Late mutation" })
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/interviews`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            scheduledAt: "2026-09-02T01:00:00.000Z",
+            kind: "late interview"
+          })
+        })
+      ).status
+    ).toBe(400)
+    const archivedHistory = (await (
+      await app.request(`${base}/applications/${application.id}/history`)
+    ).json()) as { events: unknown[]; interviews: unknown[] }
+    expect(archivedHistory.events).toHaveLength(5)
+    expect(archivedHistory.interviews).toHaveLength(1)
   })
 
   test("allows bounded custom stage CRUD and rejects deleted-stage transitions atomically", async () => {
