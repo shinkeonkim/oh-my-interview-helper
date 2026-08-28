@@ -12,6 +12,11 @@ const requiredRoutes = [
 
 test.describe("application shell contract", () => {
   test.setTimeout(20_000)
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/**", (route) =>
+      route.fulfill({ json: { applications: [], documents: [], postings: [], stages: [] } })
+    )
+  })
   test("shows every required destination and Korean as the default locale", async ({ page }) => {
     await page.goto("/")
 
@@ -175,7 +180,7 @@ test.describe("application shell contract", () => {
       await expect(page.locator("#main-content")).toBeVisible()
       await expect(page.locator("h1")).toBeVisible()
     }
-    await page.goto("/route-that-does-not-exist", { waitUntil: "commit" })
+    await page.goto("/route-that-does-not-exist", { waitUntil: "domcontentloaded" })
     await expect(page.locator("#main-content")).toContainText(
       /공간은 아직 없습니다|space is not available/
     )
