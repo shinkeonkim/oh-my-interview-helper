@@ -188,6 +188,20 @@ describe("job posting and hiring pipeline API", () => {
         })
       ).status
     ).toBe(204)
+    const beforeOrder = (
+      (await (await app.request(`${base}/pipeline/stages`)).json()) as {
+        stages: Array<{ id: string }>
+      }
+    ).stages.map((item) => item.id)
+    expect(
+      (
+        await app.request(`${base}/pipeline/stages/order`, {
+          method: "PUT",
+          headers: jsonHeaders,
+          body: JSON.stringify({ stageIds: [...beforeOrder].reverse() })
+        })
+      ).status
+    ).toBe(204)
     expect(
       (await app.request(`${base}/pipeline/stages/${stage.id}`, { method: "DELETE", headers }))
         .status
@@ -196,5 +210,13 @@ describe("job posting and hiring pipeline API", () => {
       ((await (await app.request(`${base}/pipeline/stages`)).json()) as { stages: unknown[] })
         .stages
     ).toHaveLength(6)
+    expect(
+      (
+        await app.request(`${base}/pipeline/stages/${beforeOrder[0] ?? "missing"}`, {
+          method: "DELETE",
+          headers
+        })
+      ).status
+    ).toBe(400)
   })
 })

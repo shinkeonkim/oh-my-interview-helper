@@ -135,8 +135,8 @@ export class DomainRepository {
   createApplication(input: z.input<typeof ApplicationCreateSchema>): Application {
     const value = ApplicationCreateSchema.parse(input)
     this.database.run(
-      "INSERT INTO applications (id,job_post_id,status,idempotency_key,created_at) VALUES (?,?,?,?,?)",
-      [value.id, value.jobPostId, value.status, value.idempotencyKey, now()]
+      "INSERT INTO applications (id,job_post_id,status,idempotency_key,current_stage_id,created_at) VALUES (?,?,?,?,(SELECT id FROM pipeline_stages WHERE stage_key=?),?)",
+      [value.id, value.jobPostId, value.status, value.idempotencyKey, value.status, now()]
     )
     return value
   }

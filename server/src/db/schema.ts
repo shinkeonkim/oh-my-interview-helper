@@ -140,6 +140,8 @@ CREATE INDEX application_interviews_application_idx ON application_interviews(ap
 CREATE TRIGGER pipeline_stages_no_delete_in_use BEFORE DELETE ON pipeline_stages WHEN EXISTS (SELECT 1 FROM applications WHERE current_stage_id=OLD.id) BEGIN SELECT RAISE(ABORT,'pipeline stage in use'); END;
 CREATE TRIGGER application_events_immutable_update BEFORE UPDATE ON application_events BEGIN SELECT RAISE(ABORT,'application events are immutable'); END;
 CREATE TRIGGER application_events_immutable_delete BEFORE DELETE ON application_events BEGIN SELECT RAISE(ABORT,'application events are immutable'); END;
+CREATE TRIGGER job_post_versions_immutable_update BEFORE UPDATE ON job_post_versions BEGIN SELECT RAISE(ABORT,'job post versions are immutable'); END;
+CREATE TRIGGER job_post_versions_immutable_delete BEFORE DELETE ON job_post_versions BEGIN SELECT RAISE(ABORT,'job post versions are immutable'); END;
 `
 
 export const migrations: readonly Migration[] = [

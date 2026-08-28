@@ -44,5 +44,21 @@ describe("application pipeline schema", () => {
         ]
       )
     ).toThrow()
+    const post = persistence.repositories.domain.createJobPost({
+      id: crypto.randomUUID(),
+      title: "Immutable",
+      companyName: "Acme"
+    })
+    const version = persistence.repositories.domain.addJobPostVersion({
+      id: crypto.randomUUID(),
+      jobPostId: post.id,
+      sourceKind: "manual",
+      content: { text: "original" }
+    })
+    expect(() =>
+      persistence.database.run("UPDATE job_post_versions SET structured_content='{}' WHERE id=?", [
+        version.id
+      ])
+    ).toThrow("job post versions are immutable")
   })
 })
