@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 test("deep-links all seven job workspace areas while preserving job context", async ({ page }) => {
+  test.setTimeout(20_000)
   const postId = "11111111-1111-4111-8111-111111111111"
   const versionId = "22222222-2222-4222-8222-222222222222"
   const applicationId = "33333333-3333-4333-8333-333333333333"
