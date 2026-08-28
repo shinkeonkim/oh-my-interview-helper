@@ -41,6 +41,12 @@ import { createApplicationRoutes } from "./routes/applications"
 import { localEvidenceAnalyzer, type ResearchAnalyzer } from "./research/contracts"
 import { ResearchService } from "./research/service"
 import { createResearchRoutes } from "./routes/research"
+import {
+  PreparationWorkflowService,
+  unavailablePreparationExecutor,
+  type PreparationExecutor
+} from "./workflows/service"
+import { createWorkflowRoutes } from "./routes/workflows"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -57,6 +63,7 @@ export type AppOptions = {
   readonly promptTemplates?: PromptTemplateRevisionRegistry
   readonly runnerPairing?: RunnerPairingService
   readonly researchAnalyzer?: ResearchAnalyzer
+  readonly preparationExecutor?: PreparationExecutor
 }
 
 export const createApp = ({
@@ -73,7 +80,8 @@ export const createApp = ({
   providerRequests = unavailableProviderRequestSource,
   promptTemplates = defaultPromptTemplateRevisionRegistry,
   runnerPairing,
-  researchAnalyzer = localEvidenceAnalyzer
+  researchAnalyzer = localEvidenceAnalyzer,
+  preparationExecutor = unavailablePreparationExecutor
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -167,6 +175,10 @@ export const createApp = ({
     persistence.database
   )
   app.route("/api/artifacts", createArtifactRoutes(artifacts))
+  app.route(
+    "/api/workflows",
+    createWorkflowRoutes(new PreparationWorkflowService(artifacts, preparationExecutor))
+  )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))
   app.get("/", serveStatic({ root: "./server/public" }))
   app.notFound(async (context) => {

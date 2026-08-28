@@ -29,6 +29,7 @@ const RevisionCreateSchema = z
     disclosureId: z.string().uuid().nullable()
   })
   .strict()
+export type DraftArtifactRevisionInput = z.input<typeof RevisionCreateSchema>
 export type DraftArtifactProvenance = DraftArtifactRevision & {
   readonly inputs: readonly {
     readonly ref: DisclosureInputRef
@@ -67,7 +68,10 @@ export class DraftArtifactService {
   }): DraftArtifactSeries {
     return this.repository.createSeries(input)
   }
-  createRevision(input: z.input<typeof RevisionCreateSchema>): DraftArtifactRevision {
+  getSeries(id: string): DraftArtifactSeries | null {
+    return this.repository.getSeries(id)
+  }
+  createRevision(input: DraftArtifactRevisionInput): DraftArtifactRevision {
     const value = RevisionCreateSchema.parse(input)
     const provider = this.current.resolveProvider(value.providerId)
     if (provider.kind !== "current") throw new CurrentGenerationContextError(provider.kind)
