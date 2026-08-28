@@ -10,6 +10,7 @@ import ApplicationsView from "./views/ApplicationsView.vue"
 import ResearchView from "./views/ResearchView.vue"
 import JobWorkspaceView from "./views/JobWorkspaceView.vue"
 import PreparationView from "./views/PreparationView.vue"
+import StatsView from "./views/StatsView.vue"
 
 const placeholderRoute = (name: string, path: string, key: string) => ({
   name,
@@ -48,7 +49,7 @@ export const router = createRouter({
     { name: "preparation", path: "/jobs/:postId/prepare", component: PreparationView },
     { name: "documents", path: "/documents", component: DocumentsView },
     { name: "jobSearch", path: "/job-search", component: ResearchView },
-    placeholderRoute("stats", "/stats", "stats"),
+    { name: "stats", path: "/stats", component: StatsView },
     { name: "settings", path: "/settings", component: SettingsView },
     { name: "not-found", path: "/:pathMatch(.*)*", component: NotFoundView }
   ]

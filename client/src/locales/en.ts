@@ -265,6 +265,30 @@ export const en = {
     emptyCopy:
       "This is the place for the next feature flow. For now, the empty state is explicit and safe."
   },
+  statistics: {
+    overline: "LOCAL ACTIVITY STATS",
+    title: "Stats",
+    copy: "Counts only the preparation records stored on this device, without external tracking or estimates.",
+    summary: "Key statistics",
+    postings: "Job postings",
+    applications: "Applications",
+    documents: "Active documents",
+    jobs: "Job records",
+    pipeline: "Application stage distribution",
+    noApplications: "There are no applications to summarize yet.",
+    jobStates: "Job states",
+    recentJobs: "Recent jobs",
+    noJobs: "No background jobs have run yet.",
+    failed: "Stats could not be loaded.",
+    state: {
+      queued: "Queued",
+      leased: "Leased",
+      running: "Running",
+      succeeded: "Succeeded",
+      failed: "Failed",
+      cancelled: "Cancelled"
+    }
+  },
   settings: {
     overline: "ENVIRONMENT",
     title: "Settings",
