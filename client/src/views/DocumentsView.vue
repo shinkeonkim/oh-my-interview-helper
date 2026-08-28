@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { Archive, Download, Eye, FileText, Trash2, Upload } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
@@ -40,11 +40,15 @@ const loading = ref(true)
 const uploading = ref(false)
 const pendingDocumentIds = ref<ReadonlySet<string>>(new Set())
 const preview = ref<{ title: string; text: string } | null>(null)
+const previewDocumentId = ref<string | null>(null)
 const history = ref<{
   title: string
   versions: Array<{ id: string; versionNumber: number; displayName: string; createdAt: string }>
 } | null>(null)
+const historyDocumentId = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+let previewRequestId = 0
+let historyRequestId = 0
 const kindLabels = computed<Record<Kind, string>>(() => ({
   resume: copy("resume"),
   portfolio: copy("portfolio"),
@@ -116,6 +120,8 @@ const uploadVersion = async (event: Event, document: DocumentItem) => {
     await mutate(`/api/documents/${document.id}/versions`, "POST", form)
     toast.success(copy("saved"))
     await load()
+    if (previewDocumentId.value === document.id) await showPreview(document)
+    if (historyDocumentId.value === document.id) await showHistory(document)
   } catch {
     toast.error(copy("failed"))
   } finally {
@@ -142,6 +148,10 @@ const transition = async (document: DocumentItem, action: "archive" | "delete") 
   setDocumentPending(document.id, true)
   try {
     await mutate(`/api/documents/${document.id}/${action}`, "POST")
+    if (action === "delete") {
+      if (previewDocumentId.value === document.id) closePreview()
+      if (historyDocumentId.value === document.id) closeHistory()
+    }
     await load()
   } catch {
     toast.error(copy("failed"))
@@ -151,29 +161,60 @@ const transition = async (document: DocumentItem, action: "archive" | "delete") 
 }
 
 const showPreview = async (document: DocumentItem) => {
-  const response = await fetch(`/api/documents/${document.id}/preview`)
-  if (!response.ok) {
-    toast.error(copy("failed"))
-    return
+  const requestId = ++previewRequestId
+  previewDocumentId.value = document.id
+  preview.value = null
+  try {
+    const response = await fetch(`/api/documents/${document.id}/preview`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as { title: string; text: string }
+    if (requestId !== previewRequestId) return
+    preview.value = value
+  } catch {
+    if (requestId === previewRequestId) {
+      previewDocumentId.value = null
+      toast.error(copy("failed"))
+    }
   }
-  preview.value = (await response.json()) as { title: string; text: string }
 }
 
 const showHistory = async (document: DocumentItem) => {
-  const response = await fetch(`/api/documents/${document.id}/versions`)
-  if (!response.ok) {
-    toast.error(copy("failed"))
-    return
-  }
-  history.value = {
-    title: document.title,
-    ...((await response.json()) as {
+  const requestId = ++historyRequestId
+  historyDocumentId.value = document.id
+  history.value = null
+  try {
+    const response = await fetch(`/api/documents/${document.id}/versions`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as {
       versions: Array<{ id: string; versionNumber: number; displayName: string; createdAt: string }>
-    })
+    }
+    if (requestId !== historyRequestId) return
+    history.value = { title: document.title, ...value }
+  } catch {
+    if (requestId === historyRequestId) {
+      historyDocumentId.value = null
+      toast.error(copy("failed"))
+    }
   }
 }
 
+const closePreview = () => {
+  previewRequestId += 1
+  previewDocumentId.value = null
+  preview.value = null
+}
+
+const closeHistory = () => {
+  historyRequestId += 1
+  historyDocumentId.value = null
+  history.value = null
+}
+
 onMounted(load)
+onBeforeUnmount(() => {
+  previewRequestId += 1
+  historyRequestId += 1
+})
 </script>
 
 <template>
@@ -253,10 +294,18 @@ onMounted(load)
               @click="toggleSelection(document)"
               >{{ document.selected ? copy("unselect") : copy("select") }}</Button
             >
-            <Button variant="outline" @click="showPreview(document)"
+            <Button
+              variant="outline"
+              :disabled="pendingDocumentIds.has(document.id)"
+              @click="showPreview(document)"
               ><Eye />{{ copy("preview") }}</Button
             >
-            <Button variant="outline" @click="showHistory(document)">{{ copy("history") }}</Button>
+            <Button
+              variant="outline"
+              :disabled="pendingDocumentIds.has(document.id)"
+              @click="showHistory(document)"
+              >{{ copy("history") }}</Button
+            >
             <Button
               variant="outline"
               as-child
@@ -302,7 +351,7 @@ onMounted(load)
     <Card v-if="preview">
       <CardHeader class="flex-row items-center justify-between"
         ><CardTitle>{{ preview.title }}</CardTitle
-        ><Button variant="ghost" @click="preview = null">{{
+        ><Button variant="ghost" @click="closePreview">{{
           translate(settings.locale, "actions.close")
         }}</Button></CardHeader
       >
@@ -315,7 +364,7 @@ onMounted(load)
     <Card v-if="history">
       <CardHeader class="flex-row items-center justify-between"
         ><CardTitle>{{ history.title }} · {{ copy("history") }}</CardTitle
-        ><Button variant="ghost" @click="history = null">{{
+        ><Button variant="ghost" @click="closeHistory">{{
           translate(settings.locale, "actions.close")
         }}</Button></CardHeader
       >
