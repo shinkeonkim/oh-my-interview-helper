@@ -30,7 +30,11 @@ const failure = (context: Context, error: unknown) => {
     return context.json(safeErrorCode(error, error.code), 422)
   if (error instanceof ApplicationDomainError || error instanceof ApplicationServiceError) {
     const status =
-      error.code === "idempotency_conflict" || error.code === "transition_denied" ? 409 : 400
+      error.code === "idempotency_conflict" ||
+      error.code === "active_application_exists" ||
+      error.code === "transition_denied"
+        ? 409
+        : 400
     return context.json(safeErrorCode(error, error.code.toUpperCase()), status)
   }
   return context.json(safeErrorCode(error, "APPLICATION_OPERATION_FAILED"), 400)

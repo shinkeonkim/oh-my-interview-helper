@@ -284,6 +284,12 @@ export class ApplicationRepository {
       throw new ApplicationDomainError("post_unavailable")
     this.database
       .transaction(() => {
+        const active = this.database
+          .query<{ id: string }, [string]>(
+            "SELECT id FROM applications WHERE job_post_id=? AND archived_at IS NULL LIMIT 1"
+          )
+          .get(input.postId)
+        if (active !== null) throw new ApplicationDomainError("active_application_exists")
         this.database.run(
           "INSERT INTO applications (id,job_post_id,status,idempotency_key,current_stage_id,created_at) VALUES (?,?,?,?,?,?)",
           [
@@ -436,6 +442,7 @@ export class ApplicationDomainError extends Error {
   constructor(
     readonly code:
       | "application_unavailable"
+      | "active_application_exists"
       | "idempotency_conflict"
       | "invalid_stage_order"
       | "post_unavailable"
