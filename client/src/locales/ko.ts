@@ -303,6 +303,10 @@ export const ko = {
     noApplications: "아직 집계할 지원 기록이 없습니다.",
     jobStates: "작업 상태",
     recentJobs: "최근 작업",
+    refresh: "새로고침",
+    cancel: "작업 취소",
+    cancelled: "작업 취소를 요청했습니다.",
+    cancelFailed: "작업을 취소하지 못했습니다.",
     noJobs: "아직 실행된 백그라운드 작업이 없습니다.",
     failed: "통계를 불러오지 못했습니다.",
     state: {

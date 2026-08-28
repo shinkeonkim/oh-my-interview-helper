@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { BriefcaseBusiness, FileText, ListChecks, Workflow } from "lucide-vue-next"
+import { BriefcaseBusiness, FileText, ListChecks, RefreshCw, Workflow, X } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
@@ -24,6 +25,8 @@ const postingCount = ref(0)
 const applications = ref<Application[]>([])
 const documents = ref<Document[]>([])
 const jobs = ref<Job[]>([])
+const cancellingJobId = ref<string | null>(null)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 const stageCounts = computed(() => {
   const counts = new Map<string, number>()
   for (const application of applications.value)
@@ -45,6 +48,39 @@ const recentJobs = computed(() =>
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     .slice(0, 5)
 )
+const csrf = async () =>
+  ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
+const parseJobs = async (response: Response): Promise<Job[]> => {
+  if (!response.ok) throw new Error("request")
+  const body = await response.json()
+  if (!Array.isArray(body)) throw new Error("response")
+  return body as Job[]
+}
+const refreshJobs = async (notify = false) => {
+  try {
+    jobs.value = await parseJobs(await fetch("/api/jobs", { signal: controller.signal }))
+  } catch {
+    if (notify) toast.error(copy("failed"))
+  }
+}
+const cancelJob = async (job: Job) => {
+  cancellingJobId.value = job.id
+  try {
+    const response = await fetch(`/api/jobs/${job.id}/cancel`, {
+      method: "POST",
+      headers: { "X-CSRF-Token": await csrf() }
+    })
+    if (!response.ok) throw new Error("request")
+    const updated = (await response.json()) as Job
+    jobs.value = jobs.value.map((item) => (item.id === updated.id ? updated : item))
+    toast.success(copy("cancelled"))
+  } catch {
+    toast.error(copy("cancelFailed"))
+    await refreshJobs()
+  } finally {
+    cancellingJobId.value = null
+  }
+}
 const load = async () => {
   const [postingsResponse, applicationsResponse, documentsResponse, jobsResponse] =
     await Promise.all([
@@ -75,8 +111,14 @@ const load = async () => {
   documents.value = documentsBody.documents as Document[]
   jobs.value = jobsBody as Job[]
 }
-onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => controller.abort())
+onMounted(() => {
+  void load().catch(() => toast.error(copy("failed")))
+  refreshTimer = setInterval(() => void refreshJobs(), 5_000)
+})
+onBeforeUnmount(() => {
+  controller.abort()
+  if (refreshTimer !== null) clearInterval(refreshTimer)
+})
 </script>
 
 <template>
@@ -165,8 +207,11 @@ onBeforeUnmount(() => controller.abort())
         </CardContent>
       </Card>
       <Card class="lg:col-span-2">
-        <CardHeader
-          ><CardTitle>{{ copy("recentJobs") }}</CardTitle></CardHeader
+        <CardHeader class="flex-row items-center justify-between gap-4"
+          ><CardTitle>{{ copy("recentJobs") }}</CardTitle
+          ><Button size="sm" variant="outline" @click="refreshJobs(true)"
+            ><RefreshCw />{{ copy("refresh") }}</Button
+          ></CardHeader
         >
         <CardContent>
           <p v-if="recentJobs.length === 0" class="text-sm text-muted-foreground">
@@ -179,11 +224,19 @@ onBeforeUnmount(() => controller.abort())
               class="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
             >
               <span class="font-medium">{{ job.kind }}</span>
-              <span class="flex items-center gap-2"
+              <span class="flex flex-wrap items-center justify-end gap-2"
                 ><Badge variant="outline">{{ copy(`state.${job.state}`) }}</Badge
                 ><time :datetime="job.updatedAt">{{
                   new Date(job.updatedAt).toLocaleString(settings.locale)
-                }}</time></span
+                }}</time
+                ><Button
+                  v-if="['queued', 'leased', 'running'].includes(job.state)"
+                  size="sm"
+                  variant="outline"
+                  :disabled="cancellingJobId === job.id"
+                  @click="cancelJob(job)"
+                  ><X />{{ copy("cancel") }}</Button
+                ></span
               >
             </li>
           </ul>

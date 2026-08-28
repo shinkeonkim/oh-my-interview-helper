@@ -306,6 +306,10 @@ export const en = {
     noApplications: "There are no applications to summarize yet.",
     jobStates: "Job states",
     recentJobs: "Recent jobs",
+    refresh: "Refresh",
+    cancel: "Cancel job",
+    cancelled: "Job cancellation requested.",
+    cancelFailed: "The job could not be cancelled.",
     noJobs: "No background jobs have run yet.",
     failed: "Stats could not be loaded.",
     state: {
