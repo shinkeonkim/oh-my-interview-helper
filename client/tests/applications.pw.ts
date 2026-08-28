@@ -156,7 +156,9 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route(`**/api/postings/${post.id}/versions`, (route) =>
     route.fulfill({ json: { versions: [...versions].reverse() } })
   )
+  let versionUpdateRequests = 0
   await page.route(`**/api/postings/${post.id}/versions/url`, async (route) => {
+    versionUpdateRequests += 1
     expect(route.request().headers()["x-csrf-token"]).toBe("token")
     expect(route.request().postDataJSON()).toEqual({ url: post.canonicalUrl })
     post.versionNumber = 2
@@ -171,6 +173,7 @@ test("creates a posting and moves an application through the local pipeline", as
         createdAt: "2026-08-28T01:00:00.000Z"
       }
     ]
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 201, json: post })
   })
   await page.route(`**/api/postings/${post.id}/versions/manual`, async (route) => {
@@ -341,8 +344,17 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.getByRole("button", { name: "버전 기록" }).click()
   await expect(page.getByText("버전 1 · 직접 입력")).toBeVisible()
   await expect(page.getByLabel("갱신할 공개 공고 URL")).toHaveValue(post.canonicalUrl)
-  await page.getByRole("button", { name: "새 버전 수집" }).click()
+  const updateUrlInput = page.getByLabel("갱신할 공개 공고 URL")
+  const addVersionButton = page.getByRole("button", { name: "새 버전 수집" })
+  await updateUrlInput.fill("ftp://jobs.example.com/backend")
+  await expect(addVersionButton).toBeDisabled()
+  await updateUrlInput.fill(post.canonicalUrl)
+  await addVersionButton.click()
+  await expect(addVersionButton).toBeDisabled()
+  await expect(updateUrlInput).toBeDisabled()
+  await expect(page.getByRole("button", { name: "버전 기록" }).first()).toBeDisabled()
   await expect(page.getByText("버전 2 · URL")).toBeVisible()
+  expect(versionUpdateRequests).toBe(1)
   const versionCard = page.getByText(`${post.title} · 버전 기록`).locator("../..")
   await versionCard.getByRole("combobox").click()
   await page.getByRole("option", { name: "직접 입력" }).click()
