@@ -43,13 +43,10 @@ import { ResearchService } from "./research/service"
 import { createResearchRoutes } from "./routes/research"
 import { PreparationWorkflowService, type PreparationExecutor } from "./workflows/service"
 import { createChatRoutes, createWorkflowRoutes } from "./routes/workflows"
-import {
-  ChatWorkflowService,
-  unavailableChatExecutor,
-  type ChatExecutor
-} from "./workflows/chat-service"
+import { ChatWorkflowService, type ChatExecutor } from "./workflows/chat-service"
 import { StrandsPreparationExecutor } from "./workflows/strands-executor"
 import { WorkflowSourceContentResolver } from "./workflows/source-content"
+import { StrandsChatExecutor } from "./workflows/strands-chat-executor"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -86,7 +83,7 @@ export const createApp = ({
   runnerPairing,
   researchAnalyzer = localEvidenceAnalyzer,
   preparationExecutor,
-  chatExecutor = unavailableChatExecutor
+  chatExecutor
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -198,13 +195,25 @@ export const createApp = ({
   )
   app.route(
     "/api/conversations",
-    createChatRoutes(
-      new ChatWorkflowService(
-        persistence.repositories.researchConversations,
-        chatExecutor,
-        persistence.database
+    (() => {
+      const strandsChatExecutor = new StrandsChatExecutor({
+        kernel,
+        providers: providerRegistry,
+        providerRuns: persistence.repositories.providerArtifacts,
+        disclosures,
+        conversations: persistence.repositories.researchConversations,
+        sources: new WorkflowSourceContentResolver(persistence.database)
+      })
+      const activeChatExecutor = chatExecutor ?? strandsChatExecutor
+      return createChatRoutes(
+        new ChatWorkflowService(
+          persistence.repositories.researchConversations,
+          activeChatExecutor,
+          persistence.database
+        ),
+        chatExecutor === undefined ? strandsChatExecutor : undefined
       )
-    )
+    })()
   )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))
   app.get("/", serveStatic({ root: "./server/public" }))

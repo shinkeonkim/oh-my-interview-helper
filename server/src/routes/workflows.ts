@@ -18,6 +18,7 @@ import {
   type ChatWorkflowService
 } from "../workflows/chat-service"
 import type { StrandsPreparationExecutor } from "../workflows/strands-executor"
+import type { StrandsChatExecutor } from "../workflows/strands-chat-executor"
 
 export const createWorkflowRoutes = (
   service: PreparationWorkflowService,
@@ -62,7 +63,10 @@ export const createWorkflowRoutes = (
   return routes
 }
 
-export const createChatRoutes = (service: ChatWorkflowService): Hono => {
+export const createChatRoutes = (
+  service: ChatWorkflowService,
+  previewer?: Pick<StrandsChatExecutor, "preview">
+): Hono => {
   const routes = new Hono()
   routes.get("/", (context) =>
     context.json({ conversations: service.list(context.req.query("applicationId") ?? "") })
@@ -70,6 +74,23 @@ export const createChatRoutes = (service: ChatWorkflowService): Hono => {
   routes.get("/:id/messages", (context) =>
     context.json({ messages: service.messages(context.req.param("id")) })
   )
+  routes.post("/preview", async (context) => {
+    if (previewer === undefined)
+      return context.json({ error: { code: "CHAT_PREVIEW_UNAVAILABLE" } }, 503)
+    try {
+      return context.json(previewer.preview(await context.req.json()))
+    } catch (error) {
+      if (
+        error instanceof z.ZodError ||
+        error instanceof ChatExecutorError ||
+        error instanceof DisclosureError ||
+        error instanceof DisclosureSourceError ||
+        error instanceof WorkflowSourceContentError
+      )
+        return context.json(safeErrorCode(error, "CHAT_REJECTED"), 422)
+      throw error
+    }
+  })
   routes.post("/send", async (context) => {
     try {
       return context.json(await service.send(await context.req.json(), context.req.raw.signal), 201)

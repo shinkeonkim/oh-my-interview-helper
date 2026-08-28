@@ -6,7 +6,7 @@ import { DisclosureInputRefSchema, type DisclosureInputRef } from "../disclosure
 import { DisclosureSourceResolver } from "../disclosures/sources"
 import type { Database } from "bun:sqlite"
 
-const ChatRequestSchema = z
+export const ChatRequestSchema = z
   .object({
     conversationId: ConversationIdSchema.nullable().default(null),
     applicationId: ApplicationIdSchema,
@@ -17,6 +17,7 @@ const ChatRequestSchema = z
     inputs: z.array(DisclosureInputRefSchema).min(1).max(30)
   })
   .strict()
+export const ChatDisclosureRequestSchema = ChatRequestSchema.omit({ disclosureId: true }).strict()
 export const ChatOutputSchema = z
   .object({
     answer: z.string().trim().min(1).max(40_000),
