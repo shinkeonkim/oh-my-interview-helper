@@ -297,6 +297,7 @@ test("creates a posting and moves an application through the local pipeline", as
   })
 
   await page.goto("/jobs")
+  await expect(page.getByRole("button", { name: "공고 저장" })).toBeDisabled()
   await page.getByText("직무명").locator("..").getByRole("textbox").fill(post.title)
   await page
     .getByText("회사", { exact: true })
@@ -315,6 +316,7 @@ test("creates a posting and moves an application through the local pipeline", as
     .getByRole("textbox")
     .fill(post.metadata.employmentType)
   await page.getByPlaceholder("공고 내용").fill("Role body")
+  await expect(page.getByRole("button", { name: "공고 저장" })).toBeEnabled()
   await page.getByRole("button", { name: "공고 저장" }).click()
   await expect(page.getByText(post.title)).toBeVisible()
   await expect(page.getByText("Seoul · Hybrid · Full-time")).toBeVisible()
