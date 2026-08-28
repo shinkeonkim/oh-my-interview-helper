@@ -5,7 +5,10 @@ import type { RunnerPairingService } from "../runner/pairing"
 
 const RunnerNameParameterSchema = z.string().trim().min(1).max(128)
 
-export const createRunnerRoutes = (pairing: RunnerPairingService): Hono => {
+export const createRunnerRoutes = (
+  pairing: RunnerPairingService,
+  onRevoke: (runnerId: string) => void = () => undefined
+): Hono => {
   const routes = new Hono()
 
   routes.get("/", (context) => {
@@ -21,7 +24,8 @@ export const createRunnerRoutes = (pairing: RunnerPairingService): Hono => {
   routes.delete("/:runnerName", (context) => {
     const parsed = RunnerNameParameterSchema.safeParse(context.req.param("runnerName"))
     if (!parsed.success) return context.json({ error: { code: "INVALID_RUNNER_NAME" } }, 400)
-    pairing.revoke(parsed.data)
+    const runnerId = pairing.revoke(parsed.data)
+    if (runnerId !== null) onRevoke(runnerId)
     return context.body(null, 204)
   })
 

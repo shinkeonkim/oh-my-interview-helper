@@ -54,7 +54,8 @@ const main = (): void => {
       persistence,
       jobRuntime: jobs,
       providerRegistry: providers,
-      runnerPairing: pairing
+      runnerPairing: pairing,
+      revokeRunnerConnection: (runnerId) => runnerHub.revoke(runnerId)
     })
     const server = Bun.serve<HubSocketData>({
       fetch: (request, bunServer) => {

@@ -62,6 +62,7 @@ export type AppOptions = {
   readonly providerRequests?: ProviderRequestSource
   readonly promptTemplates?: PromptTemplateRevisionRegistry
   readonly runnerPairing?: RunnerPairingService
+  readonly revokeRunnerConnection?: (runnerId: string) => void
   readonly researchAnalyzer?: ResearchAnalyzer
   readonly preparationExecutor?: PreparationExecutor
   readonly chatExecutor?: ChatExecutor
@@ -81,6 +82,7 @@ export const createApp = ({
   providerRequests = unavailableProviderRequestSource,
   promptTemplates = defaultPromptTemplateRevisionRegistry,
   runnerPairing,
+  revokeRunnerConnection,
   researchAnalyzer = localEvidenceAnalyzer,
   preparationExecutor,
   chatExecutor
@@ -155,7 +157,8 @@ export const createApp = ({
     "/api/documents",
     createDocumentRoutes(new DocumentLibraryService(persistence, dataDirectory, security))
   )
-  if (runnerPairing !== undefined) app.route("/api/runners", createRunnerRoutes(runnerPairing))
+  if (runnerPairing !== undefined)
+    app.route("/api/runners", createRunnerRoutes(runnerPairing, revokeRunnerConnection))
   const artifacts = new DraftArtifactService(
     new DraftArtifactRepository(persistence.database),
     new CurrentGenerationContextResolver({

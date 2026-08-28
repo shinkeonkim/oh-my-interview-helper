@@ -127,12 +127,19 @@ export class RunnerPairingService {
       }))
   }
 
-  revoke(runnerName: string): void {
+  revoke(runnerName: string): string | null {
+    const registration = this.database
+      .query<{ readonly id: string }, [string]>(
+        "SELECT id FROM runner_registrations WHERE runner_name=? AND status='active'"
+      )
+      .get(RunnerNameSchema.parse(runnerName))
+    if (registration === null) return null
     const timestamp = new Date(this.now()).toISOString()
     this.database.run(
       "UPDATE runner_registrations SET status='revoked',revoked_at=?,last_seen_at=? WHERE runner_name=? AND status='active'",
       [timestamp, timestamp, RunnerNameSchema.parse(runnerName)]
     )
+    return registration.id
   }
 }
 

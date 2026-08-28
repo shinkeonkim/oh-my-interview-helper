@@ -49,6 +49,19 @@ export class RunnerWebSocketHub implements CliRunnerTransport {
     this.sockets.delete(socket)
   }
 
+  revoke(runnerId: string): void {
+    for (const socket of this.sockets) {
+      if (socket.data.runnerId !== runnerId) continue
+      this.sockets.delete(socket)
+      socket.close(1008, "runner_revoked")
+    }
+    for (const [runId, pending] of this.pending) {
+      if (pending.runnerId !== runnerId) continue
+      pending.queue.fail(new RunnerHubError("runner_revoked"))
+      this.pending.delete(runId)
+    }
+  }
+
   async message(socket: HubSocket, raw: string): Promise<void> {
     let value: unknown
     try {
