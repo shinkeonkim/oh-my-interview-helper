@@ -15,8 +15,51 @@ export type OutboundWebSocket = RunnerSocket & {
   onopen: (() => void) | null
   onmessage: ((event: { readonly data: string }) => void) | null
   onerror: (() => void) | null
+  onclose: (() => void) | null
   binaryType: string
 }
+
+export type RunnerSupervisorOptions = {
+  readonly endpoint: string
+  readonly connection: RunnerConnection
+  readonly signal: AbortSignal
+  readonly reconnectMilliseconds?: number
+  readonly createSocket?: OutboundWebSocketFactory
+}
+
+export const superviseOutboundRunner = async (options: RunnerSupervisorOptions): Promise<void> => {
+  const reconnectMilliseconds = options.reconnectMilliseconds ?? 1_000
+  while (!options.signal.aborted) {
+    await new Promise<void>((resolve) => {
+      const socket = connectOutboundRunner(
+        options.endpoint,
+        options.connection,
+        options.createSocket
+      )
+      const stop = (): void => {
+        socket.close()
+        resolve()
+      }
+      socket.onclose = () => {
+        options.signal.removeEventListener("abort", stop)
+        resolve()
+      }
+      options.signal.addEventListener("abort", stop, { once: true })
+    })
+    if (!options.signal.aborted) await abortableDelay(reconnectMilliseconds, options.signal)
+  }
+}
+
+const abortableDelay = async (milliseconds: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(done, milliseconds)
+    function done(): void {
+      clearTimeout(timer)
+      signal.removeEventListener("abort", done)
+      resolve()
+    }
+    signal.addEventListener("abort", done, { once: true })
+  })
 export type OutboundWebSocketFactory = (url: string) => OutboundWebSocket
 
 type ActiveRun = { readonly leaseId: string; readonly controller: AbortController }

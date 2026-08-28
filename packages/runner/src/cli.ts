@@ -2,7 +2,7 @@ import { hostname } from "node:os"
 
 import { PairAcceptedSchema, RUNNER_PROTOCOL_VERSION } from "./protocol"
 import { CliProbe, type CliProbeResult } from "./probes"
-import { RunnerConnection, connectOutboundRunner, validateRunnerEndpoint } from "./connection"
+import { RunnerConnection, superviseOutboundRunner, validateRunnerEndpoint } from "./connection"
 import { RunnerProcessExecutor } from "./process-executor"
 import {
   defaultCredentialsPath,
@@ -104,13 +104,20 @@ const run = async (value: CliOptions): Promise<void> => {
       codexSkipGitRepoCheck: stored.capabilities.codexSkipGitRepoCheck
     }
   })
-  await new Promise<void>((resolve) => {
-    const socket = connectOutboundRunner(
-      stored.endpoint,
-      new RunnerConnection(stored, executor)
-    ) as WebSocket
-    socket.onclose = () => resolve()
-  })
+  const controller = new AbortController()
+  const stop = () => controller.abort()
+  process.once("SIGINT", stop)
+  process.once("SIGTERM", stop)
+  try {
+    await superviseOutboundRunner({
+      endpoint: stored.endpoint,
+      connection: new RunnerConnection(stored, executor),
+      signal: controller.signal
+    })
+  } finally {
+    process.off("SIGINT", stop)
+    process.off("SIGTERM", stop)
+  }
 }
 
 export const runnerCli = async (args: readonly string[]): Promise<void> => {
