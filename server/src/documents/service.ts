@@ -1,7 +1,12 @@
 import type { Persistence } from "../db"
 import { previewFile } from "../ingest/file-preview"
 import type { LocalSecuritySettings } from "../security/config"
-import { DocumentKindSchema, DocumentLibraryRepository, type DocumentKind } from "./repository"
+import {
+  DocumentKindSchema,
+  DocumentLibraryError,
+  DocumentLibraryRepository,
+  type DocumentKind
+} from "./repository"
 
 export class DocumentLibraryService {
   readonly repository: DocumentLibraryRepository
@@ -29,6 +34,11 @@ export class DocumentLibraryService {
     readonly title?: string
     readonly documentId?: string
   }) {
+    if (input.documentId !== undefined) {
+      const document = this.repository.get(input.documentId)
+      if (document === null || document.state !== "active")
+        throw new DocumentLibraryError("document_unavailable")
+    }
     const extracted = await previewFile({
       dataDirectory: this.dataDirectory,
       file: input.file,

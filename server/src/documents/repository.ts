@@ -173,8 +173,10 @@ export class DocumentLibraryRepository {
       .transaction(() => {
         this.database.run("DELETE FROM profile_document_selections WHERE document_id=?", [id])
         const column = state === "archived" ? "archived_at" : "deleted_at"
+        const sourceState =
+          state === "archived" ? "state='active'" : "state IN ('active','archived')"
         const changed = this.database.run(
-          `UPDATE documents SET state=?,${column}=? WHERE id=? AND state='active'`,
+          `UPDATE documents SET state=?,${column}=? WHERE id=? AND ${sourceState}`,
           [state, TimestampSchema.parse(at), id]
         ).changes
         if (changed !== 1) throw new DocumentLibraryError("document_unavailable")
