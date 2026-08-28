@@ -265,6 +265,22 @@ export const en = {
     emptyCopy:
       "This is the place for the next feature flow. For now, the empty state is explicit and safe."
   },
+  search: {
+    overline: "LOCAL UNIFIED SEARCH",
+    title: "Search",
+    copy: "Search job postings, active documents, and research records stored on this device.",
+    input: "Search query",
+    placeholder: "Search companies, roles, documents, or research subjects",
+    hint: "Enter a query to find matching local records.",
+    results: "Search results",
+    empty: "No matching local records were found.",
+    failed: "Local records could not be loaded for search.",
+    type: {
+      posting: "Job posting",
+      document: "Document",
+      research: "Research"
+    }
+  },
   statistics: {
     overline: "LOCAL ACTIVITY STATS",
     title: "Stats",

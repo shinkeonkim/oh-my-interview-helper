@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from "vue-router"
 
 import { NAVIGATION_ITEMS } from "./types/navigation"
 import HomeView from "./views/HomeView.vue"
-import PlaceholderView from "./views/PlaceholderView.vue"
 import SettingsView from "./views/SettingsView.vue"
 import NotFoundView from "./views/NotFoundView.vue"
 import DocumentsView from "./views/DocumentsView.vue"
@@ -11,19 +10,13 @@ import ResearchView from "./views/ResearchView.vue"
 import JobWorkspaceView from "./views/JobWorkspaceView.vue"
 import PreparationView from "./views/PreparationView.vue"
 import StatsView from "./views/StatsView.vue"
-
-const placeholderRoute = (name: string, path: string, key: string) => ({
-  name,
-  path,
-  component: PlaceholderView,
-  props: { contentKey: key }
-})
+import SearchView from "./views/SearchView.vue"
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { name: "home", path: "/", component: HomeView },
-    placeholderRoute("search", "/search", "search"),
+    { name: "search", path: "/search", component: SearchView },
     { name: "jobs", path: "/jobs", component: ApplicationsView },
     {
       name: "workspace",

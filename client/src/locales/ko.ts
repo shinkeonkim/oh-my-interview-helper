@@ -263,6 +263,22 @@ export const ko = {
     emptyCopy:
       "이 화면은 다음 단계의 기능이 연결될 자리입니다. 지금은 비어 있는 상태를 명확하게 보여줍니다."
   },
+  search: {
+    overline: "로컬 통합 검색",
+    title: "통합 검색",
+    copy: "이 기기에 저장된 채용공고, 활성 문서, 리서치 기록을 함께 찾습니다.",
+    input: "검색어",
+    placeholder: "회사, 역할, 문서 또는 조사 대상 검색",
+    hint: "검색어를 입력하면 로컬 기록에서 일치하는 항목을 표시합니다.",
+    results: "검색 결과",
+    empty: "일치하는 로컬 기록이 없습니다.",
+    failed: "검색할 로컬 기록을 불러오지 못했습니다.",
+    type: {
+      posting: "채용공고",
+      document: "문서",
+      research: "리서치"
+    }
+  },
   statistics: {
     overline: "로컬 활동 통계",
     title: "통계",
