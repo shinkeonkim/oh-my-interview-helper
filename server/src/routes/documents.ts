@@ -38,9 +38,7 @@ export const createDocumentRoutes = (documents: DocumentLibraryService): Hono =>
       const files = form.getAll("files").filter((value): value is File => value instanceof File)
       const kind = DocumentKindSchema.parse(form.get("kind"))
       if (files.length === 0) return context.json({ error: { code: "FILE_REQUIRED" } }, 400)
-      const uploaded = []
-      for (const file of files) uploaded.push(await documents.upload({ file, kind }))
-      return context.json({ documents: uploaded }, 201)
+      return context.json({ documents: await documents.uploadMany(files, kind) }, 201)
     } catch (value) {
       return error(context, value)
     }

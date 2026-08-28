@@ -1,6 +1,7 @@
 import type { Persistence } from "../db"
-import { previewFile } from "../ingest/file-preview"
+import { previewFile, type FilePreview } from "../ingest/file-preview"
 import type { LocalSecuritySettings } from "../security/config"
+import type { BlobRecord } from "../storage/blob-store"
 import {
   DocumentKindSchema,
   DocumentLibraryError,
@@ -39,13 +40,55 @@ export class DocumentLibraryService {
       if (document === null || document.state !== "active")
         throw new DocumentLibraryError("document_unavailable")
     }
-    const extracted = await previewFile({
-      dataDirectory: this.dataDirectory,
-      file: input.file,
-      limits: this.limits
-    })
+    const extracted = await this.extract(input.file)
     const blob = await this.persistence.blobs.put(input.file, input.file.type)
     this.persistence.repositories.blobs.register(blob)
+    return this.persistence.repositories.transaction(() => this.persist(input, extracted, blob))
+  }
+
+  async uploadMany(files: readonly File[], kind: DocumentKind) {
+    const extracted = await Promise.all(files.map((file) => this.extract(file)))
+    const blobs: BlobRecord[] = []
+    for (const file of files) {
+      const blob = await this.persistence.blobs.put(file, file.type)
+      this.persistence.repositories.blobs.register(blob)
+      blobs.push(blob)
+    }
+    return this.persistence.repositories.transaction(() =>
+      files.map((file, index) =>
+        this.persist(
+          { file, kind },
+          extracted[index] ??
+            (() => {
+              throw new DocumentServiceError("preview_unavailable")
+            })(),
+          blobs[index] ??
+            (() => {
+              throw new DocumentServiceError("preview_unavailable")
+            })()
+        )
+      )
+    )
+  }
+
+  private extract(file: File) {
+    return previewFile({
+      dataDirectory: this.dataDirectory,
+      file,
+      limits: this.limits
+    })
+  }
+
+  private persist(
+    input: {
+      readonly file: File
+      readonly kind: DocumentKind
+      readonly title?: string
+      readonly documentId?: string
+    },
+    extracted: FilePreview,
+    blob: BlobRecord
+  ) {
     const documentId = input.documentId ?? crypto.randomUUID()
     if (input.documentId === undefined)
       this.repository.create({

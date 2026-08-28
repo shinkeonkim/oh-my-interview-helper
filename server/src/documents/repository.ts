@@ -98,43 +98,43 @@ export class DocumentLibraryRepository {
   }): void {
     const documentId = DocumentIdSchema.parse(input.documentId)
     const versionId = DocumentVersionIdSchema.parse(input.id)
-    this.database
-      .transaction(() => {
-        const sequence =
-          this.database
-            .query<{ sequence: number }, [string]>(
-              "SELECT COALESCE(MAX(version_number),0)+1 sequence FROM document_versions WHERE document_id=?"
-            )
-            .get(documentId)?.sequence ?? 1
-        this.database.run(
-          "INSERT INTO document_versions (id,document_id,version_number,blob_hash,created_at,display_name,media_type,byte_size,extraction_status,extracted_text) VALUES (?,?,?,?,?,?,?,?,?,?)",
-          [
-            versionId,
-            documentId,
-            sequence,
-            HashSchema.parse(input.blobHash),
-            TimestampSchema.parse(input.createdAt),
-            z.string().min(1).max(120).parse(input.displayName),
-            z.string().min(1).max(200).parse(input.mediaType),
-            z.number().int().nonnegative().parse(input.byteSize),
-            "completed",
-            input.extractedText
-          ]
-        )
-        this.database.run(
-          "UPDATE documents SET current_version_id=? WHERE id=? AND state='active'",
-          [versionId, documentId]
-        )
-        if (
-          this.database
-            .query<{ id: string }, [string, string]>(
-              "SELECT id FROM documents WHERE id=? AND current_version_id=?"
-            )
-            .get(documentId, versionId) === null
-        )
-          throw new DocumentLibraryError("document_unavailable")
-      })
-      .immediate()
+    const insert = () => {
+      const sequence =
+        this.database
+          .query<{ sequence: number }, [string]>(
+            "SELECT COALESCE(MAX(version_number),0)+1 sequence FROM document_versions WHERE document_id=?"
+          )
+          .get(documentId)?.sequence ?? 1
+      this.database.run(
+        "INSERT INTO document_versions (id,document_id,version_number,blob_hash,created_at,display_name,media_type,byte_size,extraction_status,extracted_text) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        [
+          versionId,
+          documentId,
+          sequence,
+          HashSchema.parse(input.blobHash),
+          TimestampSchema.parse(input.createdAt),
+          z.string().min(1).max(120).parse(input.displayName),
+          z.string().min(1).max(200).parse(input.mediaType),
+          z.number().int().nonnegative().parse(input.byteSize),
+          "completed",
+          input.extractedText
+        ]
+      )
+      this.database.run("UPDATE documents SET current_version_id=? WHERE id=? AND state='active'", [
+        versionId,
+        documentId
+      ])
+      if (
+        this.database
+          .query<{ id: string }, [string, string]>(
+            "SELECT id FROM documents WHERE id=? AND current_version_id=?"
+          )
+          .get(documentId, versionId) === null
+      )
+        throw new DocumentLibraryError("document_unavailable")
+    }
+    if (this.database.inTransaction) insert()
+    else this.database.transaction(insert).immediate()
   }
 
   versions(documentId: string): readonly DocumentVersion[] {
