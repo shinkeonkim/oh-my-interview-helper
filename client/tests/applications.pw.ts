@@ -50,6 +50,21 @@ test("creates a posting and moves an application through the local pipeline", as
     outcomeAt: string | null
     archivedAt: string | null
   }> = []
+  const events: Array<{
+    id: string
+    sequence: number
+    kind: string
+    payload: Record<string, string>
+    createdAt: string
+  }> = [
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      sequence: 1,
+      kind: "created",
+      payload: { stageId: savedStage.id },
+      createdAt: "2026-08-28T00:00:00.000Z"
+    }
+  ]
   let versions = [
     {
       id: "44444444-4444-4444-8444-444444444444",
@@ -184,6 +199,13 @@ test("creates a posting and moves an application through the local pipeline", as
     const current = applications[0]
     if (current === undefined) throw new Error("application missing")
     applications[0] = { ...current, stageId: interviewingStage.id, stageName: "Interviewing" }
+    events.push({
+      id: "33333333-3333-4333-8333-333333333334",
+      sequence: 2,
+      kind: "stage_changed",
+      payload: { fromStageId: savedStage.id, toStageId: interviewingStage.id },
+      createdAt: "2026-08-28T00:30:00.000Z"
+    })
     await route.fulfill({ json: applications[0] })
   })
   await page.route("**/api/applications/*/archive", async (route) => {
@@ -196,15 +218,7 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route("**/api/applications/*/history", (route) =>
     route.fulfill({
       json: {
-        events: [
-          {
-            id: "33333333-3333-4333-8333-333333333333",
-            sequence: 1,
-            kind: "created",
-            payload: {},
-            createdAt: "2026-08-28T00:00:00.000Z"
-          }
-        ],
+        events,
         interviews
       }
     })
@@ -216,6 +230,17 @@ test("creates a posting and moves an application through the local pipeline", as
     location: string | null
     notes: string
   }> = []
+  await page.route("**/api/applications/*/notes", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ text: "Ask about the on-call rotation" })
+    events.push({
+      id: "33333333-3333-4333-8333-333333333335",
+      sequence: 3,
+      kind: "note_added",
+      payload: { text: "Ask about the on-call rotation" },
+      createdAt: "2026-08-28T01:00:00.000Z"
+    })
+    await route.fulfill({ status: 204 })
+  })
   await page.route("**/api/applications/*/interviews", async (route) => {
     const input = route.request().postDataJSON() as Omit<(typeof interviews)[number], "id">
     expect(input.kind).toBe("Technical interview")
@@ -263,7 +288,14 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.getByRole("button", { name: "단계 이동" }).click()
   await expect(page.getByText("Interviewing", { exact: true }).first()).toBeVisible()
   await page.getByRole("button", { name: "전체 이력" }).click()
-  await expect(page.getByText(/#1 created/)).toBeVisible()
+  await expect(page.getByText(/#1 지원 시작/)).toBeVisible()
+  await expect(page.getByText("Saved", { exact: true }).last()).toBeVisible()
+  await expect(page.getByText(/#2 단계 변경/)).toBeVisible()
+  await expect(page.getByText("Saved → Interviewing")).toBeVisible()
+  await page.getByPlaceholder("메모", { exact: true }).fill("Ask about the on-call rotation")
+  await page.getByRole("button", { name: "메모 추가" }).click()
+  await expect(page.getByText(/#3 메모 추가/)).toBeVisible()
+  await expect(page.getByText("Ask about the on-call rotation")).toBeVisible()
   await page.locator('input[type="datetime-local"]').fill("2026-09-01T14:30")
   await page.getByPlaceholder("면접 종류").fill("Technical interview")
   await page.getByPlaceholder("면접 장소 또는 링크").fill("https://meet.example.com/acme")
