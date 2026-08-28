@@ -15,13 +15,20 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-const setup = () => {
+const setup = (revokeRunnerConnection?: (runnerId: string) => void) => {
   const directory = mkdtempSync(join(tmpdir(), "runner-routes-"))
   directories.push(directory)
   const persistence = createPersistence({ dataDirectory: directory })
   handles.push(persistence)
   const pairing = new RunnerPairingService(persistence.database)
-  return { app: createApp({ persistence, runnerPairing: pairing }), pairing }
+  return {
+    app: createApp({
+      persistence,
+      runnerPairing: pairing,
+      ...(revokeRunnerConnection === undefined ? {} : { revokeRunnerConnection })
+    }),
+    pairing
+  }
 }
 
 const csrf = async (app: ReturnType<typeof createApp>) => {
@@ -54,7 +61,10 @@ describe("runner administration routes", () => {
   })
 
   test("lists only non-secret runner metadata and revokes by validated name", async () => {
-    const { app, pairing } = setup()
+    let disconnectedRunnerId = ""
+    const { app, pairing } = setup((runnerId) => {
+      disconnectedRunnerId = runnerId
+    })
     const issued = pairing.issueCode()
     pairing.pair({
       code: issued.code,
@@ -85,6 +95,7 @@ describe("runner administration routes", () => {
     })
     expect(JSON.stringify(active)).not.toMatch(/token|hash/i)
     expect(revoked.status).toBe(204)
+    expect(disconnectedRunnerId).toBeString()
     expect(after).toMatchObject({
       runners: [{ runnerName: "desk-runner", status: "revoked", revokedAt: expect.any(String) }]
     })
