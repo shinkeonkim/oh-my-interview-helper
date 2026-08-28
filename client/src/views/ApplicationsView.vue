@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { Archive, BriefcaseBusiness, CalendarPlus, History, Plus } from "lucide-vue-next"
+import { Archive, BriefcaseBusiness, CalendarPlus, History, Plus, Sparkles } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -294,6 +294,10 @@ onBeforeUnmount(() => loadController.abort())
               >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
             ></CardHeader
           ><CardContent class="flex gap-2"
+            ><Button as-child variant="secondary"
+              ><RouterLink :to="`/jobs/${post.id}/prepare`"
+                ><Sparkles />{{ copy("prepare") }}</RouterLink
+              ></Button
             ><Button @click="startApplication(post)"
               ><BriefcaseBusiness />{{ copy("startApplication") }}</Button
             ><Button variant="ghost" @click="archivePosting(post)"
