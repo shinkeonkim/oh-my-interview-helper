@@ -8,6 +8,11 @@ const RunnerNameParameterSchema = z.string().trim().min(1).max(128)
 export const createRunnerRoutes = (pairing: RunnerPairingService): Hono => {
   const routes = new Hono()
 
+  routes.get("/", (context) => {
+    context.header("Cache-Control", "no-store")
+    return context.json({ runners: pairing.list() })
+  })
+
   routes.post("/pairing-code", (context) => {
     context.header("Cache-Control", "no-store")
     return context.json(pairing.issueCode(), 201)

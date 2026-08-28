@@ -20,6 +20,14 @@ const RunnerCapabilitiesSchema = z
   .strict()
 
 type PendingPairing = { readonly hash: string; readonly expiresAt: number }
+export type RunnerSummary = {
+  readonly runnerName: string
+  readonly capabilities: z.output<typeof RunnerCapabilitiesSchema>
+  readonly status: "active" | "revoked"
+  readonly registeredAt: string
+  readonly lastSeenAt: string
+  readonly revokedAt: string | null
+}
 
 export class RunnerPairingService {
   private readonly pending = new Map<string, PendingPairing>()
@@ -95,6 +103,28 @@ export class RunnerPairingService {
       "UPDATE runner_registrations SET last_seen_at=? WHERE id=? AND status='active'",
       [new Date(this.now()).toISOString(), z.string().uuid().parse(runnerId)]
     )
+  }
+
+  list(): readonly RunnerSummary[] {
+    return this.database
+      .query<
+        {
+          readonly runnerName: string
+          readonly capabilities: string
+          readonly status: "active" | "revoked"
+          readonly registeredAt: string
+          readonly lastSeenAt: string
+          readonly revokedAt: string | null
+        },
+        []
+      >(
+        "SELECT runner_name runnerName,capability_json capabilities,status,registered_at registeredAt,last_seen_at lastSeenAt,revoked_at revokedAt FROM runner_registrations ORDER BY last_seen_at DESC,runner_name"
+      )
+      .all()
+      .map((row) => ({
+        ...row,
+        capabilities: RunnerCapabilitiesSchema.parse(JSON.parse(row.capabilities))
+      }))
   }
 
   revoke(runnerName: string): void {
