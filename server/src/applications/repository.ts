@@ -93,29 +93,34 @@ export class ApplicationRepository {
       .map((row) => StageRow.parse(row))
   }
   createStage(input: { id: string; key: string; name: string; createdAt: string }): PipelineStage {
-    const position =
-      this.database
-        .query<{ value: number }, []>(
-          "SELECT COALESCE(MAX(position),0)+1 value FROM pipeline_stages"
+    return this.database
+      .transaction(() => {
+        const position =
+          this.database
+            .query<{ value: number }, []>(
+              "SELECT COALESCE(MAX(position),0)+1 value FROM pipeline_stages"
+            )
+            .get()?.value ?? 1
+        const id = Id.parse(input.id)
+        this.database.run(
+          "INSERT INTO pipeline_stages (id,stage_key,name,position,is_system,created_at) VALUES (?,?,?,?,0,?)",
+          [
+            id,
+            z.string().trim().min(1).max(64).parse(input.key),
+            z.string().trim().min(1).max(80).parse(input.name),
+            position,
+            Timestamp.parse(input.createdAt)
+          ]
         )
-        .get()?.value ?? 1
-    this.database.run(
-      "INSERT INTO pipeline_stages (id,stage_key,name,position,is_system,created_at) VALUES (?,?,?,?,0,?)",
-      [
-        Id.parse(input.id),
-        z.string().trim().min(1).max(64).parse(input.key),
-        z.string().trim().min(1).max(80).parse(input.name),
-        position,
-        Timestamp.parse(input.createdAt)
-      ]
-    )
-    return StageRow.parse(
-      this.database
-        .query<unknown, [string]>(
-          "SELECT id,stage_key key,name,position,outcome,is_system system FROM pipeline_stages WHERE id=?"
+        return StageRow.parse(
+          this.database
+            .query<unknown, [string]>(
+              "SELECT id,stage_key key,name,position,outcome,is_system system FROM pipeline_stages WHERE id=?"
+            )
+            .get(id)
         )
-        .get(input.id)
-    )
+      })
+      .immediate()
   }
   renameStage(id: string, name: string): void {
     if (
