@@ -45,10 +45,21 @@ type Provider = {
   configured: boolean
 }
 type PairingCode = { code: string; expiresAt: string }
+type Runner = {
+  runnerName: string
+  capabilities: {
+    claudeVersion: string | null
+    codexVersion: string | null
+  }
+  status: "active" | "revoked"
+  lastSeenAt: string
+}
 const providers = ref<Provider[]>([])
+const runners = ref<Runner[]>([])
 const pairing = ref<PairingCode | null>(null)
 const savingProvider = ref<string | null>(null)
 const loadingProviders = ref(true)
+const revokingRunner = ref<string | null>(null)
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const loadProviders = async () => {
@@ -98,7 +109,37 @@ const issuePairingCode = async () => {
     toast.error(copy("settings.pairingFailed"))
   }
 }
-onMounted(() => void loadProviders())
+const loadRunners = async () => {
+  try {
+    const response = await fetch("/api/runners")
+    if (!response.ok) throw new Error("request")
+    const body = (await response.json()) as { runners?: unknown }
+    if (!Array.isArray(body.runners)) throw new Error("response")
+    runners.value = body.runners as Runner[]
+  } catch {
+    toast.error(copy("settings.runnersFailed"))
+  }
+}
+const revokeRunner = async (runner: Runner) => {
+  revokingRunner.value = runner.runnerName
+  try {
+    const response = await fetch(`/api/runners/${encodeURIComponent(runner.runnerName)}`, {
+      method: "DELETE",
+      headers: { "X-CSRF-Token": await csrf() }
+    })
+    if (!response.ok) throw new Error("request")
+    await loadRunners()
+    toast.success(copy("settings.runnerRevoked"))
+  } catch {
+    toast.error(copy("settings.runnersFailed"))
+  } finally {
+    revokingRunner.value = null
+  }
+}
+onMounted(() => {
+  void loadProviders()
+  void loadRunners()
+})
 </script>
 
 <template>
@@ -210,6 +251,50 @@ onMounted(() => void loadProviders())
         <CardDescription>{{ copy("settings.runnerHelp") }}</CardDescription>
       </CardHeader>
       <CardContent class="grid gap-4">
+        <div>
+          <p class="text-sm font-medium">{{ copy("settings.registeredRunners") }}</p>
+          <p v-if="runners.length === 0" class="mt-2 text-sm text-muted-foreground">
+            {{ copy("settings.noRunners") }}
+          </p>
+          <ul v-else class="mt-2 divide-y">
+            <li
+              v-for="runner in runners"
+              :key="runner.runnerName"
+              class="flex flex-wrap items-center justify-between gap-3 py-3"
+            >
+              <div class="grid gap-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">{{ runner.runnerName }}</span>
+                  <Badge :variant="runner.status === 'active' ? 'secondary' : 'outline'">
+                    {{ copy(`settings.runnerStatus.${runner.status}`) }}
+                  </Badge>
+                </div>
+                <p class="text-sm text-muted-foreground">
+                  {{
+                    [runner.capabilities.claudeVersion, runner.capabilities.codexVersion]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }}
+                </p>
+                <p class="text-xs text-muted-foreground">
+                  {{ copy("settings.lastSeen") }} ·
+                  <time :datetime="runner.lastSeenAt">{{
+                    new Date(runner.lastSeenAt).toLocaleString(settings.locale)
+                  }}</time>
+                </p>
+              </div>
+              <Button
+                v-if="runner.status === 'active'"
+                size="sm"
+                variant="outline"
+                :disabled="revokingRunner === runner.runnerName"
+                @click="revokeRunner(runner)"
+                >{{ copy("settings.revokeRunner") }}</Button
+              >
+            </li>
+          </ul>
+        </div>
+        <Separator />
         <Button class="w-fit" variant="outline" @click="issuePairingCode">
           {{ copy("settings.issuePairing") }}
         </Button>

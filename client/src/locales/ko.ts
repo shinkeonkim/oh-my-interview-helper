@@ -345,6 +345,13 @@ export const ko = {
     runner: "CLI runner 연결",
     runnerHelp:
       "Claude Code 또는 Codex runner가 이 서버에 한 번만 연결할 수 있는 5분 유효 코드를 발급합니다.",
+    registeredRunners: "등록된 runner",
+    noRunners: "아직 등록된 runner가 없습니다.",
+    lastSeen: "최근 접속",
+    revokeRunner: "연결 해제",
+    runnerRevoked: "runner 연결을 해제했습니다.",
+    runnersFailed: "runner 정보를 불러오거나 변경하지 못했습니다.",
+    runnerStatus: { active: "연결 허용", revoked: "해제됨" },
     issuePairing: "연결 코드 발급",
     pairingCode: "일회용 연결 코드",
     pairingExpires: "만료 시각",

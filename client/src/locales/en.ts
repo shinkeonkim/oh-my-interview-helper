@@ -349,6 +349,13 @@ export const en = {
     runner: "CLI runner connection",
     runnerHelp:
       "Issue a five-minute, one-use code for a Claude Code or Codex runner to connect to this server.",
+    registeredRunners: "Registered runners",
+    noRunners: "No runners have been registered yet.",
+    lastSeen: "Last seen",
+    revokeRunner: "Revoke connection",
+    runnerRevoked: "Runner connection revoked.",
+    runnersFailed: "Runner information could not be loaded or changed.",
+    runnerStatus: { active: "Allowed", revoked: "Revoked" },
     issuePairing: "Issue pairing code",
     pairingCode: "One-time pairing code",
     pairingExpires: "Expires",
