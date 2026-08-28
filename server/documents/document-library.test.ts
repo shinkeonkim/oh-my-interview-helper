@@ -81,6 +81,46 @@ describe("uploaded career document library", () => {
     expect(
       (await (await app.request(url("/api/documents/context"))).json()) as { documents: unknown[] }
     ).toEqual({ documents: [] })
+
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count ?? 0
+    const blobsBeforeRejectedVersion = blobCount()
+    const rejectedVersion = new FormData()
+    rejectedVersion.set(
+      "file",
+      new File(["must not persist"], "archived-v3.txt", { type: "text/plain" })
+    )
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/versions`), {
+          method: "POST",
+          headers,
+          body: rejectedVersion
+        })
+      ).status
+    ).toBe(409)
+    expect(blobCount()).toBe(blobsBeforeRejectedVersion)
+    expect(
+      (
+        (await (await app.request(url(`/api/documents/${first}/versions`))).json()) as {
+          versions: unknown[]
+        }
+      ).versions
+    ).toHaveLength(2)
+
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/delete`), {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    const remaining = (await (await app.request(url("/api/documents"))).json()) as {
+      documents: Array<{ id: string }>
+    }
+    expect(remaining.documents.some((document) => document.id === first)).toBe(false)
   })
 
   test("previews and downloads originals while returning actionable extraction failures", async () => {
