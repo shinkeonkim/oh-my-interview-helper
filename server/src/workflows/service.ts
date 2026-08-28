@@ -33,6 +33,7 @@ export type PreparationArtifactWriter = {
     readonly kind: DraftArtifactSeries["kind"]
   }) => DraftArtifactSeries
   readonly getSeries: (id: string) => DraftArtifactSeries | null
+  readonly validateInputs: (inputs: readonly DisclosureInputRef[]) => void
   readonly createRevision: (input: DraftArtifactRevisionInput) => DraftArtifactRevision
 }
 
@@ -49,6 +50,7 @@ export class PreparationWorkflowService {
     const existing = this.artifacts.getSeries(seriesId)
     if (existing !== null && (existing.kind !== expectedKind || existing.status !== "draft"))
       throw new PreparationWorkflowError("series_unavailable")
+    this.artifacts.validateInputs(request.inputs)
 
     const execution = await this.executor.execute({
       workflow: request.workflow,

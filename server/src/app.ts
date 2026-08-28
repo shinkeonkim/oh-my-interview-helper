@@ -189,7 +189,11 @@ export const createApp = ({
   app.route(
     "/api/conversations",
     createChatRoutes(
-      new ChatWorkflowService(persistence.repositories.researchConversations, chatExecutor)
+      new ChatWorkflowService(
+        persistence.repositories.researchConversations,
+        chatExecutor,
+        persistence.database
+      )
     )
   )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))

@@ -25,6 +25,7 @@ const harness = (sourceId = inputId) => {
       return value
     },
     getSeries: (id) => series.get(id) ?? null,
+    validateInputs: () => undefined,
     createRevision: (input) => {
       revisions.push(input)
       return {

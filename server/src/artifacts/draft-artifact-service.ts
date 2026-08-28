@@ -71,6 +71,9 @@ export class DraftArtifactService {
   getSeries(id: string): DraftArtifactSeries | null {
     return this.repository.getSeries(id)
   }
+  validateInputs(inputs: readonly DisclosureInputRef[]): void {
+    for (const input of inputs) this.sources.resolve(input)
+  }
   createRevision(input: DraftArtifactRevisionInput): DraftArtifactRevision {
     const value = RevisionCreateSchema.parse(input)
     const provider = this.current.resolveProvider(value.providerId)

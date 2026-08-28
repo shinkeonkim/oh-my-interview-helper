@@ -3,6 +3,8 @@ import { z } from "zod"
 import type { ResearchConversationRepository } from "../db/research-conversation-repositories"
 import { ApplicationIdSchema, ConversationIdSchema } from "../db/ids"
 import { DisclosureInputRefSchema, type DisclosureInputRef } from "../disclosures/sources"
+import { DisclosureSourceResolver } from "../disclosures/sources"
+import type { Database } from "bun:sqlite"
 
 const ChatRequestSchema = z
   .object({
@@ -39,10 +41,14 @@ export type ChatExecutor = {
 }
 
 export class ChatWorkflowService {
+  private readonly sources: DisclosureSourceResolver
   constructor(
     private readonly repository: ResearchConversationRepository,
-    private readonly executor: ChatExecutor
-  ) {}
+    private readonly executor: ChatExecutor,
+    database: Database
+  ) {
+    this.sources = new DisclosureSourceResolver(database)
+  }
 
   async send(raw: unknown, signal: AbortSignal) {
     const request = ChatRequestSchema.parse(raw)
@@ -57,6 +63,7 @@ export class ChatWorkflowService {
         existing.applicationId !== request.applicationId)
     )
       throw new ChatWorkflowError("conversation_unavailable")
+    for (const input of request.inputs) this.sources.resolve(input)
     const execution = await this.executor.execute({
       conversationId: request.conversationId,
       applicationId: request.applicationId,
