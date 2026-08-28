@@ -273,17 +273,17 @@ export class ApplicationRepository {
     idempotencyKey: string
     createdAt: string
   }): HiringApplication {
-    const existing = this.applicationByKey(input.idempotencyKey)
-    if (existing !== null) {
-      if (existing.jobPostId !== input.postId)
-        throw new ApplicationDomainError("idempotency_conflict")
-      return existing
-    }
-    const saved = this.stages().find((stage) => stage.key === "saved")
-    if (saved === undefined || this.post(input.postId)?.state !== "active")
-      throw new ApplicationDomainError("post_unavailable")
-    this.database
+    return this.database
       .transaction(() => {
+        const existing = this.applicationByKey(input.idempotencyKey)
+        if (existing !== null) {
+          if (existing.jobPostId !== input.postId)
+            throw new ApplicationDomainError("idempotency_conflict")
+          return existing
+        }
+        const saved = this.stages().find((stage) => stage.key === "saved")
+        if (saved === undefined || this.post(input.postId)?.state !== "active")
+          throw new ApplicationDomainError("post_unavailable")
         const active = this.database
           .query<{ id: string }, [string]>(
             "SELECT id FROM applications WHERE job_post_id=? AND archived_at IS NULL LIMIT 1"
@@ -302,9 +302,9 @@ export class ApplicationRepository {
           ]
         )
         this.appendEventUnsafe(input.id, "created", { stageId: saved.id }, input.createdAt)
+        return this.requireApplication(input.id)
       })
       .immediate()
-    return this.requireApplication(input.id)
   }
   transition(input: { applicationId: string; stageId: string; at: string }): HiringApplication {
     const application = this.application(input.applicationId)
