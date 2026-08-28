@@ -231,6 +231,13 @@ describe("job posting and hiring pipeline API", () => {
         })
       ).status
     ).toBe(409)
+    const afterDeniedTransition = (
+      (await (await app.request(`${base}/applications`)).json()) as {
+        applications: Array<{ id: string; stageId: string; outcomeAt: string | null }>
+      }
+    ).applications.find((item) => item.id === application.id)
+    expect(afterDeniedTransition?.stageId).toBe(offered.id)
+    expect(afterDeniedTransition?.outcomeAt).not.toBeNull()
     const history = (await (
       await app.request(`${base}/applications/${application.id}/history`)
     ).json()) as { events: unknown[]; interviews: unknown[] }
