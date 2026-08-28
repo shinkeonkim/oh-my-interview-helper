@@ -1,8 +1,8 @@
 import { hostname } from "node:os"
 
-import { PairAcceptedSchema, RUNNER_PROTOCOL_VERSION } from "./protocol"
 import { CliProbe, type CliProbeResult } from "./probes"
-import { RunnerConnection, superviseOutboundRunner, validateRunnerEndpoint } from "./connection"
+import { RunnerConnection, superviseOutboundRunner } from "./connection"
+import { pairOutboundRunner } from "./pairing-client"
 import { RunnerProcessExecutor } from "./process-executor"
 import {
   defaultCredentialsPath,
@@ -59,39 +59,17 @@ const inspect = async (): Promise<StoredRunnerCredentials["capabilities"]> => {
 const pair = async (value: CliOptions, code: string | undefined): Promise<void> => {
   if (code === undefined) throw new Error("pair requires --code")
   const capabilities = await inspect()
-  await new Promise<void>((resolve, reject) => {
-    const socket = new WebSocket(validateRunnerEndpoint(value.endpoint))
-    socket.onopen = () =>
-      socket.send(
-        JSON.stringify({
-          version: RUNNER_PROTOCOL_VERSION,
-          type: "pair_request",
-          runnerName: value.runnerName,
-          pairingCode: code.toUpperCase(),
-          capabilities: {
-            ...capabilities,
-            claudeVersion: capabilities.claudeVersion,
-            codexVersion: capabilities.codexVersion
-          }
-        })
-      )
-    socket.onmessage = (event) => {
-      try {
-        const accepted = PairAcceptedSchema.parse(JSON.parse(String(event.data)))
-        saveRunnerCredentials(value.credentialsPath, {
-          runnerId: accepted.runnerId,
-          token: accepted.token,
-          runnerName: value.runnerName,
-          endpoint: value.endpoint,
-          capabilities
-        })
-        socket.close()
-        resolve()
-      } catch (error) {
-        reject(error)
-      }
-    }
-    socket.onerror = () => reject(new Error("Runner pairing connection failed"))
+  const accepted = await pairOutboundRunner(value.endpoint, {
+    runnerName: value.runnerName,
+    pairingCode: code.toUpperCase(),
+    capabilities
+  })
+  saveRunnerCredentials(value.credentialsPath, {
+    runnerId: accepted.runnerId,
+    token: accepted.token,
+    runnerName: value.runnerName,
+    endpoint: value.endpoint,
+    capabilities
   })
 }
 
