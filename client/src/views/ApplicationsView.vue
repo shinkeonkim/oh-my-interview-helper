@@ -285,7 +285,9 @@ const showHistory = async (id: string) => {
 const archivePosting = async (post: Posting) => {
   try {
     await request(`/api/postings/${post.id}/archive`, "POST")
+    if (activePost.value?.id === post.id) activePost.value = null
     await load()
+    toast.success(copy("postingArchived"))
   } catch {
     toast.error(copy("failed"))
   }
@@ -459,19 +461,24 @@ onBeforeUnmount(() => loadController.abort())
                 {{ post.companyName }}<span v-if="post.teamName"> · {{ post.teamName }}</span>
               </p>
             </div>
-            <Badge variant="outline"
-              >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
-            ></CardHeader
+            <div class="flex flex-wrap gap-2">
+              <Badge v-if="post.state === 'archived'" variant="secondary">{{
+                copy("archived")
+              }}</Badge>
+              <Badge variant="outline"
+                >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
+              >
+            </div></CardHeader
           ><CardContent class="flex gap-2"
             ><Button as-child variant="secondary"
               ><RouterLink :to="`/jobs/${post.id}/overview`"
                 ><Sparkles />{{ copy("prepare") }}</RouterLink
               ></Button
-            ><Button @click="startApplication(post)"
+            ><Button :disabled="post.state !== 'active'" @click="startApplication(post)"
               ><BriefcaseBusiness />{{ copy("startApplication") }}</Button
             ><Button variant="outline" @click="showVersions(post)"
               ><History />{{ copy("versionHistory") }}</Button
-            ><Button variant="ghost" @click="archivePosting(post)"
+            ><Button v-if="post.state === 'active'" variant="ghost" @click="archivePosting(post)"
               ><Archive />{{ copy("archive") }}</Button
             ></CardContent
           ></Card
@@ -486,7 +493,7 @@ onBeforeUnmount(() => loadController.abort())
       <CardContent class="grid gap-5 lg:grid-cols-2">
         <div class="grid gap-3">
           <Label>{{ copy("versionSource") }}</Label>
-          <Select v-model="versionSource">
+          <Select v-model="versionSource" :disabled="activePost.state !== 'active'">
             <SelectTrigger class="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="manual">{{ copy("manual") }}</SelectItem>
@@ -498,18 +505,21 @@ onBeforeUnmount(() => loadController.abort())
             v-if="versionSource === 'url'"
             v-model="updateUrl"
             type="url"
+            :disabled="activePost.state !== 'active'"
             :aria-label="copy('updateUrl')"
           />
           <textarea
             v-else-if="versionSource === 'manual'"
             v-model="versionBody"
             class="min-h-28 rounded-lg border bg-background p-3"
+            :disabled="activePost.state !== 'active'"
             :placeholder="copy('body')"
           />
           <Input
             v-else
             type="file"
             accept=".pdf,.docx,.md,.txt"
+            :disabled="activePost.state !== 'active'"
             :aria-label="copy('versionFile')"
             @change="versionFile = ($event.target as HTMLInputElement).files?.[0] ?? null"
           />
@@ -517,6 +527,7 @@ onBeforeUnmount(() => loadController.abort())
             class="w-fit"
             :disabled="
               updatingPost ||
+              activePost.state !== 'active' ||
               (versionSource === 'url' && !updateUrl.trim()) ||
               (versionSource === 'manual' && !versionBody.trim()) ||
               (versionSource === 'file' && versionFile === null)

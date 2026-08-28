@@ -82,6 +82,7 @@ export const en = {
     preview: "Preview",
     download: "Download original",
     archive: "Archive",
+    postingArchived: "The job posting was archived.",
     remove: "Delete",
     version: "Version",
     newVersion: "New version",
