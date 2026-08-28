@@ -85,6 +85,39 @@ test("creates a posting and moves an application through the local pipeline", as
     ]
     await route.fulfill({ status: 201, json: post })
   })
+  await page.route(`**/api/postings/${post.id}/versions/manual`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ text: "Updated role responsibilities" })
+    post.versionNumber = 3
+    post.sourceKind = "manual"
+    versions = [
+      ...versions,
+      {
+        id: "66666666-6666-4666-8666-666666666666",
+        postId: post.id,
+        versionNumber: 3,
+        sourceKind: "manual",
+        createdAt: "2026-08-28T02:00:00.000Z"
+      }
+    ]
+    await route.fulfill({ status: 201, json: post })
+  })
+  await page.route(`**/api/postings/${post.id}/versions/file`, async (route) => {
+    expect(route.request().headers()["content-type"]).toContain("multipart/form-data")
+    expect(route.request().postDataBuffer()?.toString()).toContain("updated-role.txt")
+    post.versionNumber = 4
+    post.sourceKind = "file"
+    versions = [
+      ...versions,
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        postId: post.id,
+        versionNumber: 4,
+        sourceKind: "file",
+        createdAt: "2026-08-28T03:00:00.000Z"
+      }
+    ]
+    await route.fulfill({ status: 201, json: post })
+  })
   await page.route("**/api/applications", async (route) => {
     if (route.request().method() === "POST")
       applications = [
@@ -142,6 +175,21 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByLabel("갱신할 공개 공고 URL")).toHaveValue(post.canonicalUrl)
   await page.getByRole("button", { name: "새 버전 수집" }).click()
   await expect(page.getByText("버전 2 · URL")).toBeVisible()
+  const versionCard = page.getByText(`${post.title} · 버전 기록`).locator("../..")
+  await versionCard.getByRole("combobox").click()
+  await page.getByRole("option", { name: "직접 입력" }).click()
+  await versionCard.getByPlaceholder("공고 내용").fill("Updated role responsibilities")
+  await versionCard.getByRole("button", { name: "새 버전 수집" }).click()
+  await expect(page.getByText("버전 3 · 직접 입력")).toBeVisible()
+  await versionCard.getByRole("combobox").click()
+  await page.getByRole("option", { name: "파일" }).click()
+  await versionCard.getByLabel("새 공고 버전 파일").setInputFiles({
+    name: "updated-role.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Updated role from file")
+  })
+  await versionCard.getByRole("button", { name: "새 버전 수집" }).click()
+  await expect(page.getByText("버전 4 · 파일")).toBeVisible()
   await page.getByRole("button", { name: "지원 시작" }).click()
   await expect(page.getByText("Saved", { exact: true }).first()).toBeVisible()
   await page.getByRole("combobox").last().click()
