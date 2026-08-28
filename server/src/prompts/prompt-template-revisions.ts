@@ -34,5 +34,10 @@ export const defaultPromptTemplateRevisionRegistry = new PromptTemplateRevisionR
   { id: "cover-letter", revision: "cover-letter@1" },
   { id: "resume", revision: "resume@1" },
   { id: "interview-brief", revision: "interview-brief@1" },
-  { id: "application-answer", revision: "application-answer@1" }
+  { id: "application-answer", revision: "application-answer@1" },
+  { id: "resume-feedback", revision: "resume-feedback@1" },
+  { id: "interview-prep", revision: "interview-prep@1" },
+  { id: "technical-prep", revision: "technical-prep@1" },
+  { id: "topic-answers", revision: "topic-answers@1" },
+  { id: "company-questions", revision: "company-questions@1" }
 ])
