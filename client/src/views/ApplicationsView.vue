@@ -78,6 +78,7 @@ const copy = (key: string) => translate(settings.locale, `applications.${key}`)
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
 const startingPostIds = ref<ReadonlySet<string>>(new Set())
+const pendingPostIds = ref<ReadonlySet<string>>(new Set())
 const stages = ref<Stage[]>([])
 const stageNames = ref<Record<string, string>>({})
 const source = ref<Source>("manual")
@@ -196,6 +197,12 @@ const setApplicationPending = (id: string, pending: boolean) => {
   else next.delete(id)
   pendingApplicationIds.value = next
 }
+const setPostPending = (id: string, pending: boolean) => {
+  const next = new Set(pendingPostIds.value)
+  if (pending) next.add(id)
+  else next.delete(id)
+  pendingPostIds.value = next
+}
 const load = async () => {
   const [postResponse, applicationResponse, stageResponse] = await Promise.all([
     fetch("/api/postings", { signal: loadController.signal }),
@@ -253,7 +260,12 @@ const savePosting = async () => {
   }
 }
 const startApplication = async (post: Posting) => {
-  if (startingPostIds.value.has(post.id) || activeApplicationPostIds.value.has(post.id)) return
+  if (
+    startingPostIds.value.has(post.id) ||
+    pendingPostIds.value.has(post.id) ||
+    activeApplicationPostIds.value.has(post.id)
+  )
+    return
   startingPostIds.value = new Set([...startingPostIds.value, post.id])
   try {
     await request(
@@ -361,6 +373,13 @@ const showHistory = async (id: string) => {
   interviews.value = value.interviews
 }
 const archivePosting = async (post: Posting) => {
+  if (
+    pendingPostIds.value.has(post.id) ||
+    startingPostIds.value.has(post.id) ||
+    (updatingPost.value && activePost.value?.id === post.id)
+  )
+    return
+  setPostPending(post.id, true)
   try {
     await request(`/api/postings/${post.id}/archive`, "POST")
     if (activePost.value?.id === post.id) activePost.value = null
@@ -368,6 +387,8 @@ const archivePosting = async (post: Posting) => {
     toast.success(copy("postingArchived"))
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    setPostPending(post.id, false)
   }
 }
 const showVersions = async (post: Posting) => {
@@ -542,7 +563,10 @@ onBeforeUnmount(() => loadController.abort())
         {{ copy("emptyPostings") }}
       </p>
       <div class="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card v-for="post in postings" :key="post.id"
+        <Card
+          v-for="post in postings"
+          :key="post.id"
+          :aria-busy="pendingPostIds.has(post.id) || startingPostIds.has(post.id)"
           ><CardHeader class="flex-row justify-between"
             ><div>
               <CardTitle>{{ post.title }}</CardTitle>
@@ -589,6 +613,7 @@ onBeforeUnmount(() => loadController.abort())
               :disabled="
                 post.state !== 'active' ||
                 startingPostIds.has(post.id) ||
+                pendingPostIds.has(post.id) ||
                 activeApplicationPostIds.has(post.id)
               "
               @click="startApplication(post)"
@@ -599,7 +624,15 @@ onBeforeUnmount(() => loadController.abort())
               }}</Button
             ><Button variant="outline" @click="showVersions(post)"
               ><History />{{ copy("versionHistory") }}</Button
-            ><Button v-if="post.state === 'active'" variant="ghost" @click="archivePosting(post)"
+            ><Button
+              v-if="post.state === 'active'"
+              variant="ghost"
+              :disabled="
+                pendingPostIds.has(post.id) ||
+                startingPostIds.has(post.id) ||
+                (updatingPost && activePost?.id === post.id)
+              "
+              @click="archivePosting(post)"
               ><Archive />{{ copy("archive") }}</Button
             ></CardContent
           ></Card
