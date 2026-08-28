@@ -76,19 +76,29 @@ export class ApplicationService {
   ) {
     const postId = crypto.randomUUID()
     const at = this.now()
-    this.repository.createPost({
-      id: postId,
-      title: metadata.title,
-      companyName: metadata.companyName,
-      teamName: metadata.teamName,
-      canonicalUrl,
-      metadata: {
-        location: metadata.location ?? null,
-        employmentType: metadata.employmentType ?? null
-      },
-      createdAt: at
+    const stored = await this.storeContent(text)
+    this.persistence.repositories.transaction(() => {
+      this.repository.createPost({
+        id: postId,
+        title: metadata.title,
+        companyName: metadata.companyName,
+        teamName: metadata.teamName,
+        canonicalUrl,
+        metadata: {
+          location: metadata.location ?? null,
+          employmentType: metadata.employmentType ?? null
+        },
+        createdAt: at
+      })
+      this.repository.addPostVersion({
+        id: crypto.randomUUID(),
+        postId,
+        sourceKind,
+        bodyBlobHash: stored.blobHash,
+        content: { text: stored.text, sourceUrl: canonicalUrl },
+        createdAt: at
+      })
     })
-    await this.persistVersion(postId, sourceKind, text, canonicalUrl)
     return this.repository.post(postId)
   }
   private async persistVersion(
@@ -98,6 +108,18 @@ export class ApplicationService {
     sourceUrl: string | null = null
   ) {
     this.assertActivePost(postId)
+    const stored = await this.storeContent(text)
+    this.repository.addPostVersion({
+      id: crypto.randomUUID(),
+      postId,
+      sourceKind,
+      bodyBlobHash: stored.blobHash,
+      content: { text: stored.text, sourceUrl },
+      createdAt: this.now()
+    })
+    return this.repository.post(postId)
+  }
+  private async storeContent(text: string) {
     const normalized = text.trim()
     if (normalized.length === 0) throw new ApplicationServiceError("content_required")
     const blob = await this.persistence.blobs.put(
@@ -105,15 +127,7 @@ export class ApplicationService {
       "text/plain;charset=utf-8"
     )
     this.persistence.repositories.blobs.register(blob)
-    this.repository.addPostVersion({
-      id: crypto.randomUUID(),
-      postId,
-      sourceKind,
-      bodyBlobHash: blob.sha256,
-      content: { text: normalized, sourceUrl },
-      createdAt: this.now()
-    })
-    return this.repository.post(postId)
+    return { blobHash: blob.sha256, text: normalized }
   }
   private assertActivePost(postId: string): void {
     if (this.repository.post(postId)?.state !== "active")

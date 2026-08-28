@@ -207,38 +207,38 @@ export class ApplicationRepository {
     content: Record<string, unknown>
     createdAt: string
   }): void {
-    this.database
-      .transaction(() => {
-        const number =
-          this.database
-            .query<{ value: number }, [string]>(
-              "SELECT COALESCE(MAX(version_number),0)+1 value FROM job_post_versions WHERE job_post_id=?"
-            )
-            .get(Id.parse(input.postId))?.value ?? 1
+    const insert = () => {
+      const number =
+        this.database
+          .query<{ value: number }, [string]>(
+            "SELECT COALESCE(MAX(version_number),0)+1 value FROM job_post_versions WHERE job_post_id=?"
+          )
+          .get(Id.parse(input.postId))?.value ?? 1
+      this.database.run(
+        "INSERT INTO job_post_versions (id,job_post_id,version_number,source_kind,body_blob_hash,structured_content,created_at) VALUES (?,?,?,?,?,?,?)",
+        [
+          Id.parse(input.id),
+          input.postId,
+          number,
+          input.sourceKind,
+          z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .parse(input.bodyBlobHash),
+          JSON.stringify(JsonObject.parse(input.content)),
+          Timestamp.parse(input.createdAt)
+        ]
+      )
+      if (
         this.database.run(
-          "INSERT INTO job_post_versions (id,job_post_id,version_number,source_kind,body_blob_hash,structured_content,created_at) VALUES (?,?,?,?,?,?,?)",
-          [
-            Id.parse(input.id),
-            input.postId,
-            number,
-            input.sourceKind,
-            z
-              .string()
-              .regex(/^[a-f0-9]{64}$/)
-              .parse(input.bodyBlobHash),
-            JSON.stringify(JsonObject.parse(input.content)),
-            Timestamp.parse(input.createdAt)
-          ]
-        )
-        if (
-          this.database.run(
-            "UPDATE job_posts SET current_version_id=? WHERE id=? AND state='active'",
-            [input.id, input.postId]
-          ).changes !== 1
-        )
-          throw new ApplicationDomainError("post_unavailable")
-      })
-      .immediate()
+          "UPDATE job_posts SET current_version_id=? WHERE id=? AND state='active'",
+          [input.id, input.postId]
+        ).changes !== 1
+      )
+        throw new ApplicationDomainError("post_unavailable")
+    }
+    if (this.database.inTransaction) insert()
+    else this.database.transaction(insert).immediate()
   }
   versions(postId: string): readonly JobPostingVersion[] {
     return this.database
