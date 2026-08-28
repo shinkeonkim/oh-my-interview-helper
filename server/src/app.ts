@@ -38,6 +38,15 @@ import { DocumentLibraryService } from "./documents/service"
 import { createDocumentRoutes } from "./routes/documents"
 import { ApplicationService } from "./applications/service"
 import { createApplicationRoutes } from "./routes/applications"
+import { localEvidenceAnalyzer, type ResearchAnalyzer } from "./research/contracts"
+import { ResearchService } from "./research/service"
+import { createResearchRoutes } from "./routes/research"
+import { PreparationWorkflowService, type PreparationExecutor } from "./workflows/service"
+import { createChatRoutes, createWorkflowRoutes } from "./routes/workflows"
+import { ChatWorkflowService, type ChatExecutor } from "./workflows/chat-service"
+import { StrandsPreparationExecutor } from "./workflows/strands-executor"
+import { WorkflowSourceContentResolver } from "./workflows/source-content"
+import { StrandsChatExecutor } from "./workflows/strands-chat-executor"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -53,6 +62,9 @@ export type AppOptions = {
   readonly providerRequests?: ProviderRequestSource
   readonly promptTemplates?: PromptTemplateRevisionRegistry
   readonly runnerPairing?: RunnerPairingService
+  readonly researchAnalyzer?: ResearchAnalyzer
+  readonly preparationExecutor?: PreparationExecutor
+  readonly chatExecutor?: ChatExecutor
 }
 
 export const createApp = ({
@@ -68,7 +80,10 @@ export const createApp = ({
   providerRegistry = new ProviderRegistry([]),
   providerRequests = unavailableProviderRequestSource,
   promptTemplates = defaultPromptTemplateRevisionRegistry,
-  runnerPairing
+  runnerPairing,
+  researchAnalyzer = localEvidenceAnalyzer,
+  preparationExecutor,
+  chatExecutor
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -78,8 +93,9 @@ export const createApp = ({
     providers: providerRegistry,
     secret: disclosureSecret ?? randomBytes(32)
   })
+  const kernel = new ProviderKernel({ providers: providerRegistry, tools: new ToolRegistry([]) })
   const providerDefinition = createProviderInvokeJobDefinition({
-    kernel: new ProviderKernel({ providers: providerRegistry, tools: new ToolRegistry([]) }),
+    kernel,
     providerRuns: persistence.repositories.providerArtifacts,
     jobs: persistence.repositories.jobs,
     requests: providerRequests,
@@ -111,6 +127,12 @@ export const createApp = ({
     "/api",
     createApplicationRoutes(
       new ApplicationService(persistence, dataDirectory, security, resolver, transport)
+    )
+  )
+  app.route(
+    "/api/research",
+    createResearchRoutes(
+      new ResearchService(persistence, security, researchAnalyzer, resolver, transport)
     )
   )
   app.route("/api/jobs", createJobsRoutes(jobs))
@@ -156,6 +178,43 @@ export const createApp = ({
     persistence.database
   )
   app.route("/api/artifacts", createArtifactRoutes(artifacts))
+  const strandsPreparationExecutor = new StrandsPreparationExecutor({
+    kernel,
+    providers: providerRegistry,
+    providerRuns: persistence.repositories.providerArtifacts,
+    disclosures,
+    sources: new WorkflowSourceContentResolver(persistence.database)
+  })
+  const activePreparationExecutor = preparationExecutor ?? strandsPreparationExecutor
+  app.route(
+    "/api/workflows",
+    createWorkflowRoutes(
+      new PreparationWorkflowService(artifacts, activePreparationExecutor),
+      preparationExecutor === undefined ? strandsPreparationExecutor : undefined
+    )
+  )
+  app.route(
+    "/api/conversations",
+    (() => {
+      const strandsChatExecutor = new StrandsChatExecutor({
+        kernel,
+        providers: providerRegistry,
+        providerRuns: persistence.repositories.providerArtifacts,
+        disclosures,
+        conversations: persistence.repositories.researchConversations,
+        sources: new WorkflowSourceContentResolver(persistence.database)
+      })
+      const activeChatExecutor = chatExecutor ?? strandsChatExecutor
+      return createChatRoutes(
+        new ChatWorkflowService(
+          persistence.repositories.researchConversations,
+          activeChatExecutor,
+          persistence.database
+        ),
+        chatExecutor === undefined ? strandsChatExecutor : undefined
+      )
+    })()
+  )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))
   app.get("/", serveStatic({ root: "./server/public" }))
   app.notFound(async (context) => {
