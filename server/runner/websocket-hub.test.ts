@@ -205,12 +205,13 @@ describe("authenticated runner WebSocket hub", () => {
     )
     const accepted = JSON.parse(harness.sent.at(-1) ?? "{}") as { runnerId: string }
     const collecting = (async () => {
-      for await (const _event of harness.hub.stream({
+      for await (const event of harness.hub.stream({
         provider: "claude-cli",
         model: "sonnet",
         prompt: "p"
       })) {
         // No output is expected before revocation.
+        void event
       }
     })()
     await Promise.resolve()
