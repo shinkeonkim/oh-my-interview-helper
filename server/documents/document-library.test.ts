@@ -136,6 +136,8 @@ describe("uploaded career document library", () => {
       documents: Array<{ id: string }>
     }
     expect(remaining.documents.some((document) => document.id === first)).toBe(false)
+    expect((await app.request(url(`/api/documents/${first}`))).status).toBe(404)
+    expect((await app.request(url(`/api/documents/${first}/versions`))).status).toBe(404)
   })
 
   test("previews and downloads originals while returning actionable extraction failures", async () => {
