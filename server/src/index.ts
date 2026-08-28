@@ -84,7 +84,7 @@ const main = (): void => {
         },
         close: (socket) => runnerHub.close(socket as unknown as HubSocket)
       },
-      hostname: "127.0.0.1",
+      hostname: configuration.bindHost,
       port: configuration.port,
       maxRequestBodySize: configuration.security.requestBytes
     })
