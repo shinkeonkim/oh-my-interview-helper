@@ -100,7 +100,21 @@ services:
       - ./.secrets/anthropic_api_key:/run/secrets/anthropic_api_key:ro
 ```
 
-Claude Code와 Codex CLI는 서버가 임의의 로컬 프로세스를 실행하지 않도록 별도의 인증된 outbound runner 프로토콜로 격리됩니다. 현재 저장소에는 runner 프로토콜과 실행 경계가 포함되어 있으며, 일반 사용자를 위한 runner 설치 CLI는 아직 배포 패키지로 제공되지 않습니다.
+Claude Code와 Codex CLI는 서버가 임의의 로컬 프로세스를 실행하지 않도록 별도의 인증된 outbound runner 프로토콜로 격리됩니다. 먼저 사용할 CLI를 설치하고 로그인한 뒤, 설정 화면의 `runner 연결 코드 발급`으로 일회용 코드를 만듭니다.
+
+다른 터미널에서 다음 명령으로 페어링합니다. runner는 Claude/Codex의 버전·필수 옵션·로그인과 도구를 사용하지 않는 최소 호출을 확인하고, 자격 증명을 사용자 설정 디렉터리에 `0600` 권한으로 저장합니다.
+
+```bash
+bun packages/runner/src/bin.ts pair --code ABCD1234 --name my-local-runner
+```
+
+페어링 후 runner를 실행해 둡니다. 서버와 runner의 WebSocket 연결은 loopback 주소만 허용합니다.
+
+```bash
+bun packages/runner/src/bin.ts run
+```
+
+서버 포트가 다르면 두 명령 모두 `--endpoint ws://127.0.0.1:4173/api/runner/ws`를 추가합니다. 자격 증명 위치를 직접 관리하려면 두 명령에 같은 `--credentials /absolute/path/runner.json`을 지정합니다.
 
 ## 안전 모델
 
@@ -133,7 +147,7 @@ bun run build
 - OCR은 지원하지 않아 이미지로만 구성된 PDF는 가져올 수 없습니다.
 - 로그인이나 비공개 페이지를 리서치 출처로 가져오지 않습니다.
 - AI 응답은 초안과 참고 의견이며 채용 의사결정을 대신하지 않습니다.
-- CLI runner의 일반 사용자용 설치·업데이트 도구는 후속 배포 항목입니다.
+- CLI runner는 현재 저장소의 Bun 명령으로 실행하며, 독립 실행 파일과 패키지 레지스트리 배포는 제공하지 않습니다.
 
 ## 라이선스
 
