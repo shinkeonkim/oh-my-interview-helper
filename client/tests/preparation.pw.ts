@@ -6,6 +6,7 @@ test("reviews disclosure and generates a new cited preparation revision", async 
   const documentVersionId = "33333333-3333-4333-8333-333333333333"
   const seriesId = "44444444-4444-4444-8444-444444444444"
   let revisionNumber = 0
+  let provenanceRequests = 0
   const requestBodies: unknown[] = []
 
   await page.route("**/api/security/csrf", (route) =>
@@ -105,6 +106,31 @@ test("reviews disclosure and generates a new cited preparation revision", async 
       }
     })
   })
+  await page.route("**/api/artifacts/revisions/*/provenance", async (route) => {
+    provenanceRequests += 1
+    await route.fulfill({
+      json: {
+        id: crypto.randomUUID(),
+        seriesId,
+        number: revisionNumber,
+        content: {},
+        providerId: "anthropic-api",
+        providerMode: "api",
+        providerModel: "claude",
+        promptTemplateId: "cover-letter",
+        promptTemplateRevision: 1,
+        inputs: [
+          {
+            label: "Backend Engineer",
+            version: 3,
+            hash: "a".repeat(64),
+            ref: { kind: "job_post_version", jobPostVersionId: postVersionId }
+          }
+        ],
+        staleReasons: provenanceRequests > 1 ? ["source_current_version_changed"] : []
+      }
+    })
+  })
 
   await page.goto(`/jobs/${postId}/prepare`)
   await expect(page.getByRole("heading", { name: "맞춤형 면접 준비" })).toBeVisible()
@@ -120,6 +146,11 @@ test("reviews disclosure and generates a new cited preparation revision", async 
 
   await expect(page.getByText("버전 1")).toBeVisible()
   await expect(page.getByText("플랫폼 경험")).toBeVisible()
+  await expect(page.getByText("최신 상태")).toBeVisible()
+  await expect(page.getByText("Backend Engineer · v3")).toBeVisible()
+  await page.getByRole("button", { name: "근거 상태 새로고침" }).click()
+  await expect(page.getByText("변경 감지")).toBeVisible()
+  await expect(page.getByText("사용한 자료의 최신 버전이 변경되었습니다.")).toBeVisible()
   await page.getByRole("button", { name: "새 버전 생성" }).first().click()
   await dialog.getByRole("button", { name: "확인하고 생성" }).click()
   await expect(page.getByText("버전 2")).toBeVisible()
