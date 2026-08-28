@@ -46,7 +46,12 @@ import {
   unavailablePreparationExecutor,
   type PreparationExecutor
 } from "./workflows/service"
-import { createWorkflowRoutes } from "./routes/workflows"
+import { createChatRoutes, createWorkflowRoutes } from "./routes/workflows"
+import {
+  ChatWorkflowService,
+  unavailableChatExecutor,
+  type ChatExecutor
+} from "./workflows/chat-service"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -64,6 +69,7 @@ export type AppOptions = {
   readonly runnerPairing?: RunnerPairingService
   readonly researchAnalyzer?: ResearchAnalyzer
   readonly preparationExecutor?: PreparationExecutor
+  readonly chatExecutor?: ChatExecutor
 }
 
 export const createApp = ({
@@ -81,7 +87,8 @@ export const createApp = ({
   promptTemplates = defaultPromptTemplateRevisionRegistry,
   runnerPairing,
   researchAnalyzer = localEvidenceAnalyzer,
-  preparationExecutor = unavailablePreparationExecutor
+  preparationExecutor = unavailablePreparationExecutor,
+  chatExecutor = unavailableChatExecutor
 }: AppOptions = {}): Hono => {
   const app = new Hono()
   const csrf = createCsrfProtection(csrfSecret)
@@ -178,6 +185,12 @@ export const createApp = ({
   app.route(
     "/api/workflows",
     createWorkflowRoutes(new PreparationWorkflowService(artifacts, preparationExecutor))
+  )
+  app.route(
+    "/api/conversations",
+    createChatRoutes(
+      new ChatWorkflowService(persistence.repositories.researchConversations, chatExecutor)
+    )
   )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))
   app.get("/", serveStatic({ root: "./server/public" }))
