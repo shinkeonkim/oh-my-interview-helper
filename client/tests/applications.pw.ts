@@ -36,11 +36,27 @@ test("creates a posting and moves an application through the local pipeline", as
       position: 3,
       outcome: null,
       system: true
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000004",
+      key: "offered",
+      name: "Offered",
+      position: 4,
+      outcome: "offered",
+      system: true
     }
   ]
   const savedStage = stages[0]
+  const appliedStage = stages[1]
   const interviewingStage = stages[2]
-  if (savedStage === undefined || interviewingStage === undefined) throw new Error("stages missing")
+  const offeredStage = stages[3]
+  if (
+    savedStage === undefined ||
+    appliedStage === undefined ||
+    interviewingStage === undefined ||
+    offeredStage === undefined
+  )
+    throw new Error("stages missing")
   let postings: (typeof post)[] = []
   let applications: Array<{
     id: string
@@ -212,13 +228,28 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route("**/api/applications/*/transition", async (route) => {
     const current = applications[0]
     if (current === undefined) throw new Error("application missing")
-    applications[0] = { ...current, stageId: interviewingStage.id, stageName: "Interviewing" }
+    const { stageId } = route.request().postDataJSON() as { stageId: string }
+    const target = stages.find((stage) => stage.id === stageId)
+    if (target === undefined) throw new Error("target stage missing")
+    const changedAt =
+      target.key === "applied"
+        ? "2026-08-28T00:30:00.000Z"
+        : target.outcome === null
+          ? "2026-08-28T00:45:00.000Z"
+          : "2026-09-02T05:00:00.000Z"
+    applications[0] = {
+      ...current,
+      stageId: target.id,
+      stageName: target.name,
+      appliedAt: target.key === "applied" ? changedAt : current.appliedAt,
+      outcomeAt: target.outcome === null ? current.outcomeAt : changedAt
+    }
     events.push({
-      id: "33333333-3333-4333-8333-333333333334",
-      sequence: 2,
+      id: crypto.randomUUID(),
+      sequence: events.length + 1,
       kind: "stage_changed",
-      payload: { fromStageId: savedStage.id, toStageId: interviewingStage.id },
-      createdAt: "2026-08-28T00:30:00.000Z"
+      payload: { fromStageId: current.stageId, toStageId: target.id },
+      createdAt: changedAt
     })
     await route.fulfill({ json: applications[0] })
   })
@@ -247,8 +278,8 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route("**/api/applications/*/notes", async (route) => {
     expect(route.request().postDataJSON()).toEqual({ text: "Ask about the on-call rotation" })
     events.push({
-      id: "33333333-3333-4333-8333-333333333335",
-      sequence: 3,
+      id: crypto.randomUUID(),
+      sequence: events.length + 1,
       kind: "note_added",
       payload: { text: "Ask about the on-call rotation" },
       createdAt: "2026-08-28T01:00:00.000Z"
@@ -310,6 +341,11 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("Saved", { exact: true }).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "지원 진행 중" })).toBeDisabled()
   await page.getByRole("combobox").last().click()
+  await page.getByRole("option", { name: "Applied" }).click()
+  await page.getByRole("button", { name: "단계 이동" }).click()
+  await expect(page.getByText("Applied", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/지원일 ·/)).toBeVisible()
+  await page.getByRole("combobox").last().click()
   await page.getByRole("option", { name: "Interviewing" }).click()
   await page.getByRole("button", { name: "단계 이동" }).click()
   await expect(page.getByText("Interviewing", { exact: true }).first()).toBeVisible()
@@ -317,10 +353,11 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText(/#1 지원 시작/)).toBeVisible()
   await expect(page.getByText("Saved", { exact: true }).last()).toBeVisible()
   await expect(page.getByText(/#2 단계 변경/)).toBeVisible()
-  await expect(page.getByText("Saved → Interviewing")).toBeVisible()
+  await expect(page.getByText("Saved → Applied")).toBeVisible()
+  await expect(page.getByText("Applied → Interviewing")).toBeVisible()
   await page.getByPlaceholder("메모", { exact: true }).fill("Ask about the on-call rotation")
   await page.getByRole("button", { name: "메모 추가" }).click()
-  await expect(page.getByText(/#3 메모 추가/)).toBeVisible()
+  await expect(page.getByText(/#4 메모 추가/)).toBeVisible()
   await expect(page.getByText("Ask about the on-call rotation")).toBeVisible()
   await page.locator('input[type="datetime-local"]').fill("2026-09-01T14:30")
   await page.getByPlaceholder("면접 종류").fill("Technical interview")
@@ -330,6 +367,12 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("Technical interview", { exact: false })).toBeVisible()
   await expect(page.getByText("면접 장소 또는 링크 · https://meet.example.com/acme")).toBeVisible()
   await expect(page.getByText("Review distributed systems examples")).toBeVisible()
+  await page.getByRole("combobox").last().click()
+  await page.getByRole("option", { name: "Offered" }).click()
+  await page.getByRole("button", { name: "단계 이동" }).click()
+  await expect(page.getByText("Offered", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/결과 확정일 ·/)).toBeVisible()
+  await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
   await page.getByRole("button", { name: "지원 보관" }).click()
   await expect(page.getByText("보관됨")).toBeVisible()
   await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
@@ -347,7 +390,7 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.getByRole("button", { name: "단계 위로 이동: Recruiter screen" }).click()
   await expect(
     page.getByRole("button", { name: "단계 삭제: Recruiter screen" }).locator("..").locator("span")
-  ).toHaveText("3")
+  ).toHaveText("4")
   await page.getByRole("button", { name: "단계 삭제: Recruiter screen" }).click()
   await expect(page.getByRole("button", { name: "단계 삭제: Recruiter screen" })).toHaveCount(0)
   await page.getByRole("button", { name: "보관", exact: true }).click()
