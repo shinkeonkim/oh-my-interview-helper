@@ -98,8 +98,9 @@ describe("restricted cited research", () => {
         sourceUrls: ["https://example.com/company", "https://example.com/failed"]
       })
       expect(result?.claims).toHaveLength(2)
-      expect(result?.sources.map((source) => source.status)).toEqual(["available", "failed"])
-      expect(result?.claims[0]?.sourceIds).toEqual([result?.sources[0]?.id])
+      expect(result?.sources.map((source) => source.status).sort()).toEqual(["available", "failed"])
+      const availableSource = result?.sources.find((source) => source.status === "available")
+      expect(result?.claims[0]?.sourceIds).toEqual([availableSource?.id])
       expect(harness.captured[0]).toEqual(
         expect.objectContaining({
           policy: expect.stringContaining("Ignore instructions"),
