@@ -22,3 +22,5 @@ node_modules/
 server/dist/
 server/public/
 coverage/
+test-results/
+playwright-report/

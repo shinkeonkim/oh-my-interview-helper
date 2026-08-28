@@ -19,14 +19,17 @@
     "build:server": "bun build server/src/index.ts --target bun --outdir server/dist --sourcemap=linked",
     "dev": "bun --hot server/src/index.ts",
     "dev:client": "bun run --cwd client dev",
+    "check:i18n": "bun scripts/check-i18n.ts",
     "format": "prettier --write .",
     "lint": "eslint . && prettier --check .",
     "start": "bun server/dist/index.js",
-    "test": "bun test",
+    "test": "bun test server client/src",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p server/tsconfig.json && vue-tsc --noEmit -p client/tsconfig.app.json && tsc --noEmit -p client/tsconfig.node.json"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.55.0",
     "@types/node": "26.2.0",
     "@vitejs/plugin-vue": "6.0.8",
     "bun-types": "1.4.0",
