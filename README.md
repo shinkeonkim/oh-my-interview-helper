@@ -116,7 +116,7 @@ bun packages/runner/src/bin.ts run
 
 서버 포트가 다르면 두 명령 모두 `--endpoint ws://127.0.0.1:4173/api/runner/ws`를 추가합니다. 자격 증명 위치를 직접 관리하려면 두 명령에 같은 `--credentials /absolute/path/runner.json`을 지정합니다.
 
-설정 화면에서 runner의 등록 상태와 최근 접속을 확인할 수 있습니다. `연결 해제`를 누르면 저장된 권한뿐 아니라 현재 WebSocket과 진행 중인 runner 작업도 즉시 중단되며, 다시 사용하려면 새 코드로 페어링해야 합니다.
+설정 화면에서 runner의 등록 상태와 최근 접속을 확인할 수 있습니다. `연결 해제`를 누르면 저장된 권한뿐 아니라 현재 WebSocket과 진행 중인 runner 작업도 즉시 중단됩니다. 인증이 거부된 runner CLI는 무한 재접속하지 않고 종료되며, 다시 사용하려면 새 코드로 페어링해야 합니다.
 
 ## 안전 모델
 
