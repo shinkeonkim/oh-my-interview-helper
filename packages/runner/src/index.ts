@@ -1,4 +1,5 @@
 export * from "./commands"
+export * from "./credentials"
 export * from "./connection"
 export * from "./output-normalizer"
 export * from "./process-executor"

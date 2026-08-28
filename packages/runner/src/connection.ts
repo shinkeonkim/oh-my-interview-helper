@@ -143,12 +143,7 @@ export const connectOutboundRunner = (
   createSocket: OutboundWebSocketFactory = (url) =>
     new WebSocket(url) as unknown as OutboundWebSocket
 ): OutboundWebSocket => {
-  const url = new URL(endpoint)
-  if (
-    !["ws:", "wss:"].includes(url.protocol) ||
-    !["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname)
-  )
-    throw new RunnerConnectionError("endpoint_denied")
+  const url = validateRunnerEndpoint(endpoint)
   const socket = createSocket(url.toString())
   socket.binaryType = "blob"
   socket.onopen = () => connection.attach(socket)
@@ -157,6 +152,16 @@ export const connectOutboundRunner = (
   }
   socket.onerror = () => socket.close()
   return socket
+}
+
+export const validateRunnerEndpoint = (endpoint: string): URL => {
+  const url = new URL(endpoint)
+  if (
+    !["ws:", "wss:"].includes(url.protocol) ||
+    !["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname)
+  )
+    throw new RunnerConnectionError("endpoint_denied")
+  return url
 }
 
 const chunkOutput = (value: string): readonly string[] => {
