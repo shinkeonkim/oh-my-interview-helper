@@ -47,6 +47,29 @@ describe("job posting and hiring pipeline API", () => {
   test("ingests manual, file, and pinned URL postings with immutable versions", async () => {
     const { app, headers, persistence, transportRequestCount } = await setup()
     const jsonHeaders = { ...headers, "Content-Type": "application/json" }
+    const rejected = await app.request(`${base}/postings/manual`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        title: "Incomplete",
+        companyName: "Acme",
+        teamName: null,
+        text: "   "
+      })
+    })
+    expect(rejected.status).toBe(400)
+    expect(
+      ((await (await app.request(`${base}/postings`)).json()) as { postings: unknown[] }).postings
+    ).toHaveLength(0)
+    expect(
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count
+    ).toBe(0)
+    expect(
+      persistence.database
+        .query<{ count: number }, []>("SELECT count(*) count FROM job_post_versions")
+        .get()?.count
+    ).toBe(0)
     const manual = await app.request(`${base}/postings/manual`, {
       method: "POST",
       headers: jsonHeaders,
