@@ -1,24 +1,12 @@
 import { createRouter, createWebHistory } from "vue-router"
 
 import { NAVIGATION_ITEMS } from "./types/navigation"
-import HomeView from "./views/HomeView.vue"
-import SettingsView from "./views/SettingsView.vue"
-import NotFoundView from "./views/NotFoundView.vue"
-import DocumentsView from "./views/DocumentsView.vue"
-import ApplicationsView from "./views/ApplicationsView.vue"
-import ResearchView from "./views/ResearchView.vue"
-import JobWorkspaceView from "./views/JobWorkspaceView.vue"
-import PreparationView from "./views/PreparationView.vue"
-import StatsView from "./views/StatsView.vue"
-import SearchView from "./views/SearchView.vue"
-import JobSearchView from "./views/JobSearchView.vue"
-
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { name: "home", path: "/", component: HomeView },
-    { name: "search", path: "/search", component: SearchView },
-    { name: "jobs", path: "/jobs", component: ApplicationsView },
+    { name: "home", path: "/", component: () => import("./views/HomeView.vue") },
+    { name: "search", path: "/search", component: () => import("./views/SearchView.vue") },
+    { name: "jobs", path: "/jobs", component: () => import("./views/ApplicationsView.vue") },
     {
       name: "workspace",
       path: "/jobs/:postId",
@@ -37,16 +25,28 @@ export const router = createRouter({
     ).map(([area, name]) => ({
       name,
       path: `/jobs/:postId/${area}`,
-      component: JobWorkspaceView,
+      component: () => import("./views/JobWorkspaceView.vue"),
       props: { area }
     })),
-    { name: "preparation", path: "/jobs/:postId/prepare", component: PreparationView },
-    { name: "documents", path: "/documents", component: DocumentsView },
-    { name: "jobSearch", path: "/job-search", component: JobSearchView },
-    { name: "research", path: "/research", component: ResearchView },
-    { name: "stats", path: "/stats", component: StatsView },
-    { name: "settings", path: "/settings", component: SettingsView },
-    { name: "not-found", path: "/:pathMatch(.*)*", component: NotFoundView }
+    {
+      name: "preparation",
+      path: "/jobs/:postId/prepare",
+      component: () => import("./views/PreparationView.vue")
+    },
+    { name: "documents", path: "/documents", component: () => import("./views/DocumentsView.vue") },
+    {
+      name: "jobSearch",
+      path: "/job-search",
+      component: () => import("./views/JobSearchView.vue")
+    },
+    { name: "research", path: "/research", component: () => import("./views/ResearchView.vue") },
+    { name: "stats", path: "/stats", component: () => import("./views/StatsView.vue") },
+    { name: "settings", path: "/settings", component: () => import("./views/SettingsView.vue") },
+    {
+      name: "not-found",
+      path: "/:pathMatch(.*)*",
+      component: () => import("./views/NotFoundView.vue")
+    }
   ]
 })
 
