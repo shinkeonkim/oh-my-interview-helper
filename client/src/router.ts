@@ -11,6 +11,7 @@ import JobWorkspaceView from "./views/JobWorkspaceView.vue"
 import PreparationView from "./views/PreparationView.vue"
 import StatsView from "./views/StatsView.vue"
 import SearchView from "./views/SearchView.vue"
+import JobSearchView from "./views/JobSearchView.vue"
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -41,7 +42,8 @@ export const router = createRouter({
     })),
     { name: "preparation", path: "/jobs/:postId/prepare", component: PreparationView },
     { name: "documents", path: "/documents", component: DocumentsView },
-    { name: "jobSearch", path: "/job-search", component: ResearchView },
+    { name: "jobSearch", path: "/job-search", component: JobSearchView },
+    { name: "research", path: "/research", component: ResearchView },
     { name: "stats", path: "/stats", component: StatsView },
     { name: "settings", path: "/settings", component: SettingsView },
     { name: "not-found", path: "/:pathMatch(.*)*", component: NotFoundView }

@@ -61,7 +61,7 @@ const results = computed<Result[]>(() => {
         type: "research" as const,
         title: item.subjectName,
         description: item.subjectType,
-        to: "/job-search"
+        to: "/research"
       }))
   ]
 })

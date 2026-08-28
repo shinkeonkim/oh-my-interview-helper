@@ -293,6 +293,27 @@ export const en = {
       research: "Research"
     }
   },
+  jobSearch: {
+    overline: "PUBLIC JOB COLLECTION",
+    title: "Job search",
+    copy: "Inspect a known public job posting URL safely, then save it to your local preparation workspace.",
+    inspectTitle: "Inspect a public URL",
+    url: "Job posting URL",
+    urlPlaceholder: "https://company.example/jobs/role",
+    inspect: "Inspect content",
+    safety:
+      "Only public URLs without sign-in are fetched. Private addresses, oversized responses, and unsafe redirects are blocked.",
+    role: "Role title",
+    company: "Company",
+    team: "Team",
+    save: "Save posting",
+    saved: "Job posting saved.",
+    previewFailed: "The public job posting could not be inspected.",
+    saveFailed: "The job posting could not be saved.",
+    loadFailed: "Saved job postings could not be loaded.",
+    savedTitle: "Saved job postings",
+    empty: "No job postings have been saved yet."
+  },
   statistics: {
     overline: "LOCAL ACTIVITY STATS",
     title: "Stats",

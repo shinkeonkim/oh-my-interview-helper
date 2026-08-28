@@ -290,6 +290,27 @@ export const ko = {
       research: "리서치"
     }
   },
+  jobSearch: {
+    overline: "공개 채용공고 수집",
+    title: "채용 탐색",
+    copy: "알고 있는 공개 채용공고 URL을 안전하게 확인한 뒤 로컬 준비 공간에 저장합니다.",
+    inspectTitle: "공개 URL 확인",
+    url: "채용공고 URL",
+    urlPlaceholder: "https://company.example/jobs/role",
+    inspect: "내용 확인",
+    safety:
+      "로그인이 필요 없는 공개 URL만 가져오며 내부 주소, 과도한 응답과 위험한 리디렉션을 차단합니다.",
+    role: "직무명",
+    company: "회사",
+    team: "팀",
+    save: "공고로 저장",
+    saved: "채용공고를 저장했습니다.",
+    previewFailed: "공개 채용공고 내용을 확인하지 못했습니다.",
+    saveFailed: "채용공고를 저장하지 못했습니다.",
+    loadFailed: "저장된 채용공고를 불러오지 못했습니다.",
+    savedTitle: "저장된 채용공고",
+    empty: "아직 저장된 채용공고가 없습니다."
+  },
   statistics: {
     overline: "로컬 활동 통계",
     title: "통계",
