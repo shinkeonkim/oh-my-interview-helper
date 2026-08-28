@@ -45,7 +45,7 @@ test("creates a posting and moves an application through the local pipeline", as
     stageName: string
     appliedAt: string | null
     outcomeAt: string | null
-    archivedAt: null
+    archivedAt: string | null
   }> = []
   let versions = [
     {
@@ -142,6 +142,13 @@ test("creates a posting and moves an application through the local pipeline", as
     applications[0] = { ...current, stageId: interviewingStage.id, stageName: "Interviewing" }
     await route.fulfill({ json: applications[0] })
   })
+  await page.route("**/api/applications/*/archive", async (route) => {
+    const current = applications[0]
+    if (current === undefined) throw new Error("application missing")
+    expect(route.request().headers()["x-csrf-token"]).toBe("token")
+    applications[0] = { ...current, archivedAt: "2026-08-28T04:00:00.000Z" }
+    await route.fulfill({ status: 204 })
+  })
   await page.route("**/api/applications/*/history", (route) =>
     route.fulfill({
       json: {
@@ -221,4 +228,8 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByText("Technical interview", { exact: false })).toBeVisible()
   await expect(page.getByText("면접 장소 또는 링크 · https://meet.example.com/acme")).toBeVisible()
   await expect(page.getByText("Review distributed systems examples")).toBeVisible()
+  await page.getByRole("button", { name: "지원 보관" }).click()
+  await expect(page.getByText("보관됨")).toBeVisible()
+  await expect(page.getByRole("button", { name: "단계 이동" })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "지원 보관" })).toHaveCount(0)
 })
