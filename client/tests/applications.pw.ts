@@ -96,8 +96,10 @@ test("creates a posting and moves an application through the local pipeline", as
     route.fulfill({ json: { csrfToken: "token" } })
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings } }))
+  let stageCreateRequests = 0
   await page.route("**/api/pipeline/stages", async (route) => {
     if (route.request().method() === "POST") {
+      stageCreateRequests += 1
       const input = route.request().postDataJSON() as { key: string; name: string }
       stages = [
         ...stages,
@@ -110,6 +112,7 @@ test("creates a posting and moves an application through the local pipeline", as
           system: false
         }
       ]
+      await new Promise((resolve) => setTimeout(resolve, 100))
     }
     await route.fulfill({
       status: route.request().method() === "POST" ? 201 : 200,
@@ -416,10 +419,17 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByRole("button", { name: "지원 보관" })).toHaveCount(0)
   expect(transitionRequests).toBe(3)
   expect(archiveApplicationRequests).toBe(1)
-  await page.getByPlaceholder("새 단계 이름").fill("Phone screen")
-  await page.getByRole("button", { name: "단계 추가" }).click()
+  const newStageInput = page.getByPlaceholder("새 단계 이름")
+  const addStageButton = page.getByRole("button", { name: "단계 추가" })
+  await expect(addStageButton).toBeDisabled()
+  await newStageInput.fill("  Phone screen  ")
+  await expect(addStageButton).toBeEnabled()
+  await addStageButton.click()
+  await expect(addStageButton).toBeDisabled()
+  await expect(newStageInput).toBeDisabled()
   const customStage = page.getByRole("button", { name: "단계 삭제: Phone screen" }).locator("..")
   await expect(customStage).toBeVisible()
+  expect(stageCreateRequests).toBe(1)
   await customStage.getByRole("textbox").fill("Recruiter screen")
   await page.getByRole("button", { name: "단계 이름 저장: Phone screen" }).click()
   const renamedStage = page
