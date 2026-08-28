@@ -86,10 +86,11 @@ test("creates a posting and moves an application through the local pipeline", as
   await page.route("**/api/pipeline/stages/order", async (route) => {
     const { stageIds } = route.request().postDataJSON() as { stageIds: string[] }
     expect(route.request().method()).toBe("PUT")
-    stages = stageIds.map((id, index) => ({
-      ...stages.find((stage) => stage.id === id)!,
-      position: index + 1
-    }))
+    stages = stageIds.map((id, index) => {
+      const stage = stages.find((candidate) => candidate.id === id)
+      if (stage === undefined) throw new Error("stage missing")
+      return { ...stage, position: index + 1 }
+    })
     await route.fulfill({ status: 204 })
   })
   await page.route(/\/api\/pipeline\/stages\/[0-9a-f-]+$/, async (route) => {
