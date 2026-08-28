@@ -9,6 +9,9 @@ import {
   type PreparationWorkflowService
 } from "../workflows/service"
 import { safeErrorCode } from "../security/redaction"
+import { DisclosureError } from "../disclosures/contracts"
+import { DisclosureSourceError } from "../disclosures/sources"
+import { WorkflowSourceContentError } from "../workflows/source-content"
 import {
   ChatExecutorError,
   ChatWorkflowError,
@@ -27,7 +30,13 @@ export const createWorkflowRoutes = (
     try {
       return context.json(previewer.preview(await context.req.json()))
     } catch (error) {
-      if (error instanceof z.ZodError || error instanceof PreparationExecutorError)
+      if (
+        error instanceof z.ZodError ||
+        error instanceof PreparationExecutorError ||
+        error instanceof DisclosureError ||
+        error instanceof DisclosureSourceError ||
+        error instanceof WorkflowSourceContentError
+      )
         return context.json(safeErrorCode(error, "PREPARATION_REJECTED"), 422)
       throw error
     }
@@ -42,7 +51,9 @@ export const createWorkflowRoutes = (
         error instanceof z.ZodError ||
         error instanceof PreparationWorkflowError ||
         error instanceof DraftArtifactError ||
-        error instanceof CurrentGenerationContextError
+        error instanceof CurrentGenerationContextError ||
+        error instanceof DisclosureSourceError ||
+        error instanceof WorkflowSourceContentError
       )
         return context.json(safeErrorCode(error, "PREPARATION_REJECTED"), 422)
       throw error
