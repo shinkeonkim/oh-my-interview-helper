@@ -156,15 +156,19 @@ export class DocumentLibraryRepository {
 
   select(documentId: string, selected: boolean, selectedAt: string): void {
     const id = DocumentIdSchema.parse(documentId)
-    const document = this.get(id)
-    if (document === null || document.state !== "active")
-      throw new DocumentLibraryError("document_unavailable")
-    if (selected)
-      this.database.run(
-        "INSERT OR REPLACE INTO profile_document_selections (document_id,selected_at) VALUES (?,?)",
-        [id, TimestampSchema.parse(selectedAt)]
-      )
-    else this.database.run("DELETE FROM profile_document_selections WHERE document_id=?", [id])
+    this.database
+      .transaction(() => {
+        const document = this.get(id)
+        if (document === null || document.state !== "active")
+          throw new DocumentLibraryError("document_unavailable")
+        if (selected)
+          this.database.run(
+            "INSERT OR REPLACE INTO profile_document_selections (document_id,selected_at) VALUES (?,?)",
+            [id, TimestampSchema.parse(selectedAt)]
+          )
+        else this.database.run("DELETE FROM profile_document_selections WHERE document_id=?", [id])
+      })
+      .immediate()
   }
 
   transition(documentId: string, state: "archived" | "deleted", at: string): void {
