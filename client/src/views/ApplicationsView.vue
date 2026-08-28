@@ -40,6 +40,7 @@ type Posting = {
   versionNumber: number
   sourceKind: Source
   canonicalUrl: string | null
+  metadata?: { location?: unknown; employmentType?: unknown }
 }
 type PostingVersion = {
   id: string
@@ -82,6 +83,8 @@ const source = ref<Source>("manual")
 const title = ref("")
 const company = ref("")
 const team = ref("")
+const location = ref("")
+const employmentType = ref("")
 const body = ref("")
 const sourceUrl = ref("")
 const file = ref<File | null>(null)
@@ -178,6 +181,8 @@ const savePosting = async () => {
       form.set("title", title.value)
       form.set("companyName", company.value)
       form.set("teamName", team.value)
+      form.set("location", location.value)
+      form.set("employmentType", employmentType.value)
       form.set("file", file.value)
       await request("/api/postings/file", "POST", form)
     } else {
@@ -188,11 +193,14 @@ const savePosting = async () => {
           title: title.value,
           companyName: company.value,
           teamName: team.value || null,
+          location: location.value || null,
+          employmentType: employmentType.value || null,
           ...(source.value === "url" ? { url: sourceUrl.value } : { text: body.value })
         })
       )
     }
-    title.value = company.value = team.value = body.value = sourceUrl.value = ""
+    title.value = company.value = team.value = location.value = employmentType.value = ""
+    body.value = sourceUrl.value = ""
     file.value = null
     toast.success(copy("saved"))
     await load()
@@ -413,6 +421,14 @@ onBeforeUnmount(() => loadController.abort())
             <Label>{{ copy("team") }}</Label
             ><Input v-model="team" />
           </div>
+          <div class="grid gap-2">
+            <Label>{{ copy("location") }}</Label
+            ><Input v-model="location" />
+          </div>
+          <div class="grid gap-2">
+            <Label>{{ copy("employmentType") }}</Label
+            ><Input v-model="employmentType" />
+          </div>
         </div>
         <div class="grid gap-2">
           <Label>{{ copy("addPosting") }}</Label
@@ -459,6 +475,28 @@ onBeforeUnmount(() => loadController.abort())
               <CardTitle>{{ post.title }}</CardTitle>
               <p class="mt-2 text-sm text-muted-foreground">
                 {{ post.companyName }}<span v-if="post.teamName"> · {{ post.teamName }}</span>
+              </p>
+              <p
+                v-if="
+                  typeof post.metadata?.location === 'string' ||
+                  typeof post.metadata?.employmentType === 'string'
+                "
+                class="mt-1 text-sm text-muted-foreground"
+              >
+                <span v-if="typeof post.metadata?.location === 'string'">{{
+                  post.metadata?.location
+                }}</span>
+                <span
+                  v-if="
+                    typeof post.metadata?.location === 'string' &&
+                    typeof post.metadata?.employmentType === 'string'
+                  "
+                >
+                  ·
+                </span>
+                <span v-if="typeof post.metadata?.employmentType === 'string'">{{
+                  post.metadata?.employmentType
+                }}</span>
               </p>
             </div>
             <div class="flex flex-wrap gap-2">

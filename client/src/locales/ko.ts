@@ -100,6 +100,8 @@ export const ko = {
     roleTitle: "직무명",
     company: "회사",
     team: "팀",
+    location: "근무 위치",
+    employmentType: "고용 형태",
     body: "공고 내용",
     sourceUrl: "공고 URL",
     chooseFile: "공고 파일",

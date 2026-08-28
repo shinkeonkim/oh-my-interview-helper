@@ -103,6 +103,8 @@ export const en = {
     roleTitle: "Role title",
     company: "Company",
     team: "Team",
+    location: "Work location",
+    employmentType: "Employment type",
     body: "Posting content",
     sourceUrl: "Posting URL",
     chooseFile: "Posting file",
