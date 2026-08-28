@@ -91,6 +91,7 @@ const sourceUrl = ref("")
 const file = ref<File | null>(null)
 const savingPosting = ref(false)
 const selectedStages = ref<Record<string, string>>({})
+const pendingApplicationIds = ref<ReadonlySet<string>>(new Set())
 const note = ref("")
 const addingNote = ref(false)
 const interviewAt = ref("")
@@ -189,6 +190,12 @@ const request = async (path: string, method: string, value?: FormData | string) 
   if (!response.ok) throw new Error("request")
   return response
 }
+const setApplicationPending = (id: string, pending: boolean) => {
+  const next = new Set(pendingApplicationIds.value)
+  if (pending) next.add(id)
+  else next.delete(id)
+  pendingApplicationIds.value = next
+}
 const load = async () => {
   const [postResponse, applicationResponse, stageResponse] = await Promise.all([
     fetch("/api/postings", { signal: loadController.signal }),
@@ -264,6 +271,8 @@ const startApplication = async (post: Posting) => {
   }
 }
 const move = async (application: Application) => {
+  if (pendingApplicationIds.value.has(application.id)) return
+  setApplicationPending(application.id, true)
   try {
     await request(
       `/api/applications/${application.id}/transition`,
@@ -274,9 +283,13 @@ const move = async (application: Application) => {
   } catch {
     toast.error(copy("failed"))
     await load()
+  } finally {
+    setApplicationPending(application.id, false)
   }
 }
 const archiveApplication = async (application: Application) => {
+  if (pendingApplicationIds.value.has(application.id)) return
+  setApplicationPending(application.id, true)
   try {
     await request(`/api/applications/${application.id}/archive`, "POST")
     if (activeApplication.value === application.id) activeApplication.value = null
@@ -284,6 +297,8 @@ const archiveApplication = async (application: Application) => {
     toast.success(copy("applicationArchived"))
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    setApplicationPending(application.id, false)
   }
 }
 const addNote = async () => {
@@ -668,7 +683,10 @@ onBeforeUnmount(() => loadController.abort())
         {{ copy("emptyApplications") }}
       </p>
       <div class="mt-4 grid gap-4">
-        <Card v-for="application in applications" :key="application.id"
+        <Card
+          v-for="application in applications"
+          :key="application.id"
+          :aria-busy="pendingApplicationIds.has(application.id)"
           ><CardContent class="flex flex-col gap-4 py-5 lg:flex-row lg:items-center"
             ><div class="min-w-48 flex-1">
               <p class="font-semibold">{{ postingById.get(application.jobPostId)?.title }}</p>
@@ -689,7 +707,11 @@ onBeforeUnmount(() => loadController.abort())
             </div>
             <Select
               v-model="selectedStages[application.id]"
-              :disabled="application.archivedAt !== null || isTerminalApplication(application)"
+              :disabled="
+                application.archivedAt !== null ||
+                isTerminalApplication(application) ||
+                pendingApplicationIds.has(application.id)
+              "
               ><SelectTrigger class="w-48"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
@@ -701,6 +723,7 @@ onBeforeUnmount(() => loadController.abort())
               :disabled="
                 application.archivedAt !== null ||
                 isTerminalApplication(application) ||
+                pendingApplicationIds.has(application.id) ||
                 selectedStages[application.id] === application.stageId
               "
               @click="move(application)"
@@ -710,6 +733,7 @@ onBeforeUnmount(() => loadController.abort())
             ><Button
               v-if="application.archivedAt === null"
               variant="ghost"
+              :disabled="pendingApplicationIds.has(application.id)"
               @click="archiveApplication(application)"
               ><Archive />{{ copy("archiveApplication") }}</Button
             ></CardContent
