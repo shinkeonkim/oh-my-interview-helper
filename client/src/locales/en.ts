@@ -52,6 +52,33 @@ export const en = {
     noteCopy:
       "This shell does not hide an empty state. Once real material arrives, the next step will continue here."
   },
+  documents: {
+    overline: "SOURCE MATERIAL",
+    title: "Documents",
+    copy: "Keep resumes, portfolios, and supporting material locally, selecting only the versions you want to use.",
+    upload: "Add files",
+    uploadHelp: "Select multiple PDF, DOCX, Markdown, or TXT files.",
+    kind: "Document type",
+    resume: "Resume",
+    portfolio: "Portfolio",
+    coverLetter: "Cover letter",
+    supporting: "Supporting file",
+    empty: "No documents have been saved yet.",
+    selected: "Selected for profile",
+    select: "Use in profile",
+    unselect: "Remove selection",
+    preview: "Preview",
+    download: "Download original",
+    archive: "Archive",
+    remove: "Delete",
+    version: "Version",
+    newVersion: "New version",
+    history: "Version history",
+    usage: "Source usage",
+    saved: "Document saved.",
+    failed: "The document could not be processed.",
+    loading: "Loading documents."
+  },
   placeholder: {
     search: {
       overline: "DISCOVER",

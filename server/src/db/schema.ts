@@ -109,6 +109,17 @@ CREATE TRIGGER draft_artifact_revisions_active_series BEFORE INSERT ON draft_art
 CREATE TRIGGER draft_artifact_revisions_content_hash BEFORE INSERT ON draft_artifact_revisions WHEN NOT EXISTS (SELECT 1 FROM draft_artifact_content_hashes WHERE content_hash=NEW.content_hash AND content_json=NEW.content_json) BEGIN SELECT RAISE(ABORT,'draft artifact content hash invalid'); END;
 `
 
+const documentLibrarySql = `
+ALTER TABLE document_versions ADD COLUMN display_name TEXT;
+ALTER TABLE document_versions ADD COLUMN media_type TEXT;
+ALTER TABLE document_versions ADD COLUMN byte_size INTEGER CHECK(byte_size IS NULL OR byte_size>=0);
+ALTER TABLE document_versions ADD COLUMN extraction_status TEXT NOT NULL DEFAULT 'completed' CHECK(extraction_status IN ('completed','failed'));
+ALTER TABLE document_versions ADD COLUMN extraction_error TEXT CHECK(extraction_error IS NULL OR length(extraction_error)<=64);
+ALTER TABLE document_versions ADD COLUMN extracted_text TEXT;
+CREATE TABLE profile_document_selections (document_id TEXT PRIMARY KEY REFERENCES documents(id) ON DELETE RESTRICT, selected_at TEXT NOT NULL);
+CREATE INDEX profile_document_selections_selected_idx ON profile_document_selections(selected_at,document_id);
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
@@ -119,7 +130,8 @@ export const migrations: readonly Migration[] = [
   { id: "0007_job_execution_target", sql: jobExecutionTargetSql },
   { id: "0008_provider_run_transitions", sql: providerRunTransitionsSql },
   { id: "0009_consent_artifacts", sql: consentArtifactsSql },
-  { id: "0010_consent_artifact_integrity", sql: consentArtifactIntegritySql }
+  { id: "0010_consent_artifact_integrity", sql: consentArtifactIntegritySql },
+  { id: "0011_document_library", sql: documentLibrarySql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>

@@ -50,6 +50,33 @@ export const ko = {
     noteCopy:
       "이 셸은 현재 빈 상태를 숨기지 않습니다. 실제 자료가 들어오면 여기서 흐름이 이어집니다."
   },
+  documents: {
+    overline: "근거 자료",
+    title: "문서 보관함",
+    copy: "이력서, 포트폴리오와 지원 자료를 로컬에 보관하고 사용할 버전만 선택하세요.",
+    upload: "파일 추가",
+    uploadHelp: "PDF, DOCX, Markdown, TXT 파일을 여러 개 선택할 수 있습니다.",
+    kind: "문서 종류",
+    resume: "이력서",
+    portfolio: "포트폴리오",
+    coverLetter: "자기소개서",
+    supporting: "기타 자료",
+    empty: "아직 저장된 문서가 없습니다.",
+    selected: "프로필에 선택됨",
+    select: "프로필에 사용",
+    unselect: "선택 해제",
+    preview: "미리보기",
+    download: "원본 받기",
+    archive: "보관",
+    remove: "삭제",
+    version: "버전",
+    newVersion: "새 버전",
+    history: "버전 기록",
+    usage: "출처 사용",
+    saved: "문서를 저장했습니다.",
+    failed: "문서를 처리하지 못했습니다.",
+    loading: "문서를 불러오는 중입니다."
+  },
   placeholder: {
     search: {
       overline: "발견",
