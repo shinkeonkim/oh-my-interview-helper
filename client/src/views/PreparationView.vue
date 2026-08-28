@@ -62,6 +62,24 @@ type Revision = {
   providerId: string
   providerModel: string
 }
+type StaleReason =
+  | "source_content_changed"
+  | "source_current_version_changed"
+  | "source_unavailable"
+  | "provider_disabled"
+  | "provider_unavailable"
+  | "provider_changed"
+  | "model_changed"
+  | "mode_changed"
+  | "prompt_missing"
+  | "prompt_changed"
+type Provenance = Revision & {
+  providerMode: string
+  promptTemplateId: string
+  promptTemplateRevision: number
+  inputs: Array<{ hash: string; label: string; version: number | null }>
+  staleReasons: StaleReason[]
+}
 
 const props = withDefaults(
   defineProps<{
@@ -85,6 +103,7 @@ const practiceAnswer = ref("")
 const generationKey = ref(crypto.randomUUID())
 const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
 const revision = ref<Revision | null>(null)
+const provenance = ref<Provenance | null>(null)
 const running = ref(false)
 const posting = computed(() => postings.value.find((item) => item.id === route.params["postId"]))
 const inputs = computed(() => {
@@ -160,6 +179,7 @@ const generate = async () => {
       await post("/api/workflows/run", { ...requestBody(), disclosureId: confirmation.id })
     ).json()) as Revision
     preview.value = null
+    await loadProvenance()
   } catch {
     toast.error(copy("failed"))
   } finally {
@@ -181,13 +201,15 @@ const exportResult = () => {
     "noopener,noreferrer"
   )
 }
-const viewProvenance = () => {
+const loadProvenance = async () => {
   if (!revision.value) return
-  window.open(
-    `/api/artifacts/revisions/${revision.value.id}/provenance`,
-    "_blank",
-    "noopener,noreferrer"
-  )
+  try {
+    const response = await fetch(`/api/artifacts/revisions/${revision.value.id}/provenance`)
+    if (!response.ok) throw new Error("request")
+    provenance.value = (await response.json()) as Provenance
+  } catch {
+    toast.error(copy("provenanceFailed"))
+  }
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
 onBeforeUnmount(() => controller.abort())
@@ -273,12 +295,52 @@ onBeforeUnmount(() => controller.abort())
           <Button variant="outline" @click="copyResult"
             ><Clipboard />{{ copy("copyResult") }}</Button
           ><Button variant="outline" @click="exportResult"><Download />{{ copy("export") }}</Button
-          ><Button variant="outline" @click="viewProvenance"
-            ><ShieldCheck />{{ copy("provenance") }}</Button
+          ><Button variant="outline" @click="loadProvenance"
+            ><ShieldCheck />{{ copy("refreshProvenance") }}</Button
           ><Button variant="secondary" @click="review"><RotateCw />{{ copy("regenerate") }}</Button>
         </div></CardContent
       ></Card
     >
+    <Card v-if="provenance">
+      <CardHeader class="flex-row items-center justify-between">
+        <CardTitle>{{ copy("provenance") }}</CardTitle>
+        <Badge :variant="provenance.staleReasons.length === 0 ? 'secondary' : 'destructive'">
+          {{ provenance.staleReasons.length === 0 ? copy("current") : copy("staleStatus") }}
+        </Badge>
+      </CardHeader>
+      <CardContent class="grid gap-5 text-sm">
+        <div class="grid gap-1">
+          <p class="font-medium">{{ copy("providerContext") }}</p>
+          <p class="text-muted-foreground">
+            {{ provenance.providerId }} · {{ provenance.providerMode }} ·
+            {{ provenance.providerModel }}
+          </p>
+        </div>
+        <div class="grid gap-1">
+          <p class="font-medium">{{ copy("promptContext") }}</p>
+          <p class="text-muted-foreground">
+            {{ provenance.promptTemplateId }} · r{{ provenance.promptTemplateRevision }}
+          </p>
+        </div>
+        <div>
+          <p class="font-medium">{{ copy("inputs") }}</p>
+          <ul class="mt-2 grid gap-2">
+            <li v-for="input in provenance.inputs" :key="input.hash" class="rounded border p-3">
+              {{ input.label }} · v{{ input.version ?? "-" }}<br />
+              <code class="text-xs text-muted-foreground">{{ input.hash.slice(0, 12) }}…</code>
+            </li>
+          </ul>
+        </div>
+        <div v-if="provenance.staleReasons.length" class="grid gap-2">
+          <p class="font-medium text-destructive">{{ copy("staleReasons") }}</p>
+          <ul class="grid gap-1 text-destructive">
+            <li v-for="reason in provenance.staleReasons" :key="reason">
+              {{ copy(`stale.${reason}`) }}
+            </li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
     <Dialog
       :open="preview !== null"
       @update:open="
