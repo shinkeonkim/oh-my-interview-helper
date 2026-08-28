@@ -76,4 +76,5 @@ test("uploads, selects, previews, and exposes document source usage", async ({ p
   await expect(page.getByRole("button", { name: "보관" })).toHaveCount(0)
   await page.getByRole("button", { name: "삭제" }).click()
   await expect(page.getByText("아직 저장된 문서가 없습니다.")).toBeVisible()
+  await expect(page.getByText("Selected profile evidence")).toHaveCount(0)
 })
