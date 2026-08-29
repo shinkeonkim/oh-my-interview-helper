@@ -57,7 +57,13 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-개발 서버는 기본적으로 <http://127.0.0.1:3000>에서 실행됩니다. 클라이언트 HMR을 별도로 사용할 때는 다른 터미널에서 `bun run dev:client`를 실행합니다.
+`bun run dev`는 클라이언트를 먼저 빌드한 뒤 기본 주소 <http://127.0.0.1:3000>에서 서버를 실행합니다.
+
+클라이언트 HMR이 필요하면 서버를 실행한 상태에서 다른 터미널에서 아래 명령을 실행하고 <http://127.0.0.1:5173>을 여세요. Vite가 `/api`와 runner WebSocket 요청을 3000번 서버로 전달합니다.
+
+```bash
+bun run dev:client
+```
 
 프로덕션 빌드 실행:
 
@@ -135,10 +141,14 @@ bun packages/runner/src/bin.ts run
 bun run lint
 bun run typecheck
 bun run check:i18n
-bun test
+bun run test
 bun run test:e2e
 bun run build
 ```
+
+Pull Request CI는 위 검사와 Docker 이미지 빌드를 모두 실행합니다. E2E는 Playwright Chromium을 사용합니다.
+
+기여 절차는 [CONTRIBUTING.md](CONTRIBUTING.md), 취약점 제보와 지원 범위는 [SECURITY.md](SECURITY.md)를 참고하세요.
 
 ## 저장 데이터와 백업
 

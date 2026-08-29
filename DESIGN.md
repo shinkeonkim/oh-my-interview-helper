@@ -95,14 +95,11 @@ Micro interactions use 150ms ease-out; Sheets and dialogs use the generated Reka
 
 Depth strategy is tonal shift plus rules. Cards and sidebar use semantic background/border tokens. Popovers, dialogs, and Sheets may use the generated restrained shadow. No gradients, blobs, decorative metrics, or fake data.
 
-## 8. Accessibility Constraints & Accepted Debt
+## 8. Accessibility Constraints & Verification
 
 - WCAG 2.2 AA target: 4.5:1 body contrast, 3:1 large text/controls, visible focus on every interactive element.
 - Every route has a semantic heading, honest empty state, and keyboard-reachable navigation.
 - Locale updates `<html lang>`; invalid preferences recover to Korean/system; system theme follows live `matchMedia` changes.
 - CJK text must wrap safely at 320px; no horizontal overflow in the primary route canvas.
 
-| Item                                | Location                               | Why accepted                       | Exit                               |
-| ----------------------------------- | -------------------------------------- | ---------------------------------- | ---------------------------------- |
-| Feature routes are empty states     | `client/src/views/PlaceholderView.vue` | Domain flows belong to later todos | Replace when domain todo lands     |
-| Search contains route commands only | `client/src/components/AppShell.vue`   | No search persistence exists yet   | Connect local index in search todo |
+The earlier placeholder routes and route-only search have been replaced by persisted domain flows and local entity search. Playwright covers every route, keyboard navigation, focus restoration, mobile focus trapping, theme and locale persistence, and 320px overflow. Manual assistive-technology review remains part of release verification rather than an accepted product exception.
