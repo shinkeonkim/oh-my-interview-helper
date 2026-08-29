@@ -90,7 +90,6 @@ const main = (): void => {
       maxRequestBodySize: configuration.security.requestBytes
     })
 
-    console.info(`Server listening at ${server.url}`)
     const shutdown = (): void => {
       server.stop(true)
       void scheduler.stop().then(() => {
@@ -100,6 +99,7 @@ const main = (): void => {
     }
     process.once("SIGINT", shutdown)
     process.once("SIGTERM", shutdown)
+    console.info(`Server listening at ${server.url}`)
   } catch (error) {
     if (error instanceof StartupConfigurationError) {
       console.error(error.message)
