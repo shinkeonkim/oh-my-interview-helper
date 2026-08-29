@@ -197,10 +197,10 @@ test("keeps the latest application list after overlapping transitions", async ({
   })
 
   await page.goto("/jobs")
-  const stageSelects = page.getByRole("combobox")
-  await stageSelects.nth(1).click()
+  const stageSelects = page.getByRole("combobox", { name: /^현재 단계:/ })
+  await stageSelects.nth(0).click()
   await page.getByRole("option", { name: "Applied" }).click()
-  await stageSelects.nth(2).click()
+  await stageSelects.nth(1).click()
   await page.getByRole("option", { name: "Applied" }).click()
 
   const moveButtons = page.getByRole("button", { name: "단계 이동" })
@@ -209,6 +209,6 @@ test("keeps the latest application list after overlapping transitions", async ({
 
   await expect.poll(() => listRequests).toBe(3)
   await page.waitForTimeout(250)
+  await expect(stageSelects.nth(0)).toContainText("Applied")
   await expect(stageSelects.nth(1)).toContainText("Applied")
-  await expect(stageSelects.nth(2)).toContainText("Applied")
 })

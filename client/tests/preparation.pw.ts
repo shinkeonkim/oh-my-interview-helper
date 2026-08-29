@@ -149,13 +149,9 @@ test("reviews disclosure and generates a new cited preparation revision", async 
 
   await page.goto(`/jobs/${postId}/prepare`)
   await expect(page.getByRole("heading", { name: "맞춤형 면접 준비" })).toBeVisible()
-  await page.getByText("참고 문서").locator("..").getByRole("combobox").click()
+  await page.getByLabel("참고 문서").click()
   await page.getByRole("option", { name: /플랫폼 이력서/ }).click()
-  await page
-    .getByText("연습 답변 (선택)")
-    .locator("..")
-    .getByRole("textbox")
-    .fill("Reviewed answer")
+  await page.getByLabel("연습 답변 (선택)").fill("Reviewed answer")
   const reviewButton = page.getByRole("button", { name: "전송 내용 확인" })
   await reviewButton.click()
   await expect(reviewButton).toBeDisabled()
