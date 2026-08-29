@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { toast } from "vue-sonner"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -57,27 +57,35 @@ type Runner = {
 const providers = ref<Provider[]>([])
 const runners = ref<Runner[]>([])
 const pairing = ref<PairingCode | null>(null)
-const savingProvider = ref<string | null>(null)
+const pendingProviderIds = ref<ReadonlySet<string>>(new Set())
 const loadingProviders = ref(true)
-const revokingRunner = ref<string | null>(null)
+const pairingBusy = ref(false)
+const pendingRunnerNames = ref<ReadonlySet<string>>(new Set())
+let providerLoadRequestId = 0
+let runnerLoadRequestId = 0
+let pairingRequestId = 0
+let active = true
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const loadProviders = async () => {
+  const requestId = ++providerLoadRequestId
   loadingProviders.value = true
   try {
     const response = await fetch("/api/providers/status")
     if (!response.ok) throw new Error("request")
     const body = (await response.json()) as { providers?: unknown }
     if (!Array.isArray(body.providers)) throw new Error("response")
-    providers.value = body.providers as Provider[]
+    if (requestId === providerLoadRequestId && active)
+      providers.value = body.providers as Provider[]
   } catch {
-    toast.error(copy("settings.providersFailed"))
+    if (requestId === providerLoadRequestId && active) toast.error(copy("settings.providersFailed"))
   } finally {
-    loadingProviders.value = false
+    if (requestId === providerLoadRequestId && active) loadingProviders.value = false
   }
 }
 const setProvider = async (provider: Provider, enabled: boolean) => {
-  savingProvider.value = provider.id
+  if (pendingProviderIds.value.has(provider.id)) return
+  pendingProviderIds.value = new Set([...pendingProviderIds.value, provider.id])
   try {
     const response = await fetch(`/api/settings/providers/${provider.id}`, {
       method: "PUT",
@@ -90,38 +98,49 @@ const setProvider = async (provider: Provider, enabled: boolean) => {
     })
     if (!response.ok) throw new Error("request")
     await loadProviders()
-    toast.success(copy("settings.providerSaved"))
+    if (active) toast.success(copy("settings.providerSaved"))
   } catch {
-    toast.error(copy("settings.providersFailed"))
+    if (active) toast.error(copy("settings.providersFailed"))
   } finally {
-    savingProvider.value = null
+    const next = new Set(pendingProviderIds.value)
+    next.delete(provider.id)
+    pendingProviderIds.value = next
   }
 }
 const issuePairingCode = async () => {
+  if (pairingBusy.value) return
+  const requestId = ++pairingRequestId
+  pairingBusy.value = true
+  pairing.value = null
   try {
     const response = await fetch("/api/runners/pairing-code", {
       method: "POST",
       headers: { "X-CSRF-Token": await csrf() }
     })
     if (!response.ok) throw new Error("request")
-    pairing.value = (await response.json()) as PairingCode
+    const value = (await response.json()) as PairingCode
+    if (requestId === pairingRequestId && active) pairing.value = value
   } catch {
-    toast.error(copy("settings.pairingFailed"))
+    if (requestId === pairingRequestId && active) toast.error(copy("settings.pairingFailed"))
+  } finally {
+    if (requestId === pairingRequestId && active) pairingBusy.value = false
   }
 }
 const loadRunners = async () => {
+  const requestId = ++runnerLoadRequestId
   try {
     const response = await fetch("/api/runners")
     if (!response.ok) throw new Error("request")
     const body = (await response.json()) as { runners?: unknown }
     if (!Array.isArray(body.runners)) throw new Error("response")
-    runners.value = body.runners as Runner[]
+    if (requestId === runnerLoadRequestId && active) runners.value = body.runners as Runner[]
   } catch {
-    toast.error(copy("settings.runnersFailed"))
+    if (requestId === runnerLoadRequestId && active) toast.error(copy("settings.runnersFailed"))
   }
 }
 const revokeRunner = async (runner: Runner) => {
-  revokingRunner.value = runner.runnerName
+  if (pendingRunnerNames.value.has(runner.runnerName)) return
+  pendingRunnerNames.value = new Set([...pendingRunnerNames.value, runner.runnerName])
   try {
     const response = await fetch(`/api/runners/${encodeURIComponent(runner.runnerName)}`, {
       method: "DELETE",
@@ -129,16 +148,24 @@ const revokeRunner = async (runner: Runner) => {
     })
     if (!response.ok) throw new Error("request")
     await loadRunners()
-    toast.success(copy("settings.runnerRevoked"))
+    if (active) toast.success(copy("settings.runnerRevoked"))
   } catch {
-    toast.error(copy("settings.runnersFailed"))
+    if (active) toast.error(copy("settings.runnersFailed"))
   } finally {
-    revokingRunner.value = null
+    const next = new Set(pendingRunnerNames.value)
+    next.delete(runner.runnerName)
+    pendingRunnerNames.value = next
   }
 }
 onMounted(() => {
   void loadProviders()
   void loadRunners()
+})
+onBeforeUnmount(() => {
+  active = false
+  providerLoadRequestId += 1
+  runnerLoadRequestId += 1
+  pairingRequestId += 1
 })
 </script>
 
@@ -231,7 +258,7 @@ onMounted(() => {
             </div>
             <Button
               :variant="provider.configured ? 'outline' : 'default'"
-              :disabled="savingProvider === provider.id"
+              :disabled="pendingProviderIds.has(provider.id)"
               @click="setProvider(provider, !provider.configured)"
             >
               {{
@@ -287,7 +314,7 @@ onMounted(() => {
                 v-if="runner.status === 'active'"
                 size="sm"
                 variant="outline"
-                :disabled="revokingRunner === runner.runnerName"
+                :disabled="pendingRunnerNames.has(runner.runnerName)"
                 @click="revokeRunner(runner)"
                 >{{ copy("settings.revokeRunner") }}</Button
               >
@@ -295,7 +322,7 @@ onMounted(() => {
           </ul>
         </div>
         <Separator />
-        <Button class="w-fit" variant="outline" @click="issuePairingCode">
+        <Button class="w-fit" variant="outline" :disabled="pairingBusy" @click="issuePairingCode">
           {{ copy("settings.issuePairing") }}
         </Button>
         <div v-if="pairing" class="rounded-lg border p-4" aria-live="polite">
