@@ -918,7 +918,7 @@ onBeforeUnmount(() => {
             <Input
               v-model="stageNames[stage.id]"
               class="min-w-48 flex-1"
-              :aria-label="`${copy('stage')}: ${stage.name}`"
+              :aria-label="`${copy('saveStage')}: ${stage.name}`"
               :disabled="stagesBusy"
             />
             <Button
