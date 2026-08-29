@@ -276,36 +276,6 @@ export const ko = {
     empty: "아직 저장된 리서치가 없습니다.",
     failed: "리서치를 완료하지 못했습니다. 공개 URL과 대상 정보를 확인하세요."
   },
-  placeholder: {
-    search: {
-      overline: "발견",
-      title: "통합 검색",
-      copy: "문서, 공고, 준비 기록을 한 번에 찾는 공간입니다."
-    },
-    jobs: {
-      overline: "지원 관리",
-      title: "채용 공고",
-      copy: "관심 있는 역할과 지원 단계를 정리하는 공간입니다."
-    },
-    documents: {
-      overline: "근거 자료",
-      title: "문서 보관함",
-      copy: "이력서와 포트폴리오 버전을 안전하게 모아두는 공간입니다."
-    },
-    jobSearch: {
-      overline: "새로운 기회",
-      title: "채용 탐색",
-      copy: "공개된 채용 정보를 살펴보고 나중에 검토할 수 있는 공간입니다."
-    },
-    stats: {
-      overline: "리듬 보기",
-      title: "통계",
-      copy: "준비의 흐름을 과장 없이 돌아보는 공간입니다."
-    },
-    emptyTitle: "아직 보여드릴 기록이 없습니다",
-    emptyCopy:
-      "이 화면은 다음 단계의 기능이 연결될 자리입니다. 지금은 비어 있는 상태를 명확하게 보여줍니다."
-  },
   search: {
     overline: "로컬 통합 검색",
     title: "통합 검색",
@@ -426,8 +396,7 @@ export const ko = {
   states: {
     loading: "불러오는 중입니다",
     error: "문제가 생겼습니다",
-    empty: "비어 있음",
-    placeholder: "준비 중"
+    empty: "비어 있음"
   },
   footer: "로컬 우선 인터뷰 준비 도구"
 } as const

@@ -279,36 +279,6 @@ export const en = {
     empty: "No research has been saved yet.",
     failed: "Research could not be completed. Check the public URLs and subject details."
   },
-  placeholder: {
-    search: {
-      overline: "DISCOVER",
-      title: "Search",
-      copy: "Find documents, postings, and preparation notes in one place."
-    },
-    jobs: {
-      overline: "APPLICATIONS",
-      title: "Job postings",
-      copy: "Keep roles of interest and their application stages together."
-    },
-    documents: {
-      overline: "SOURCE MATERIAL",
-      title: "Documents",
-      copy: "Keep resume and portfolio versions ready for review."
-    },
-    jobSearch: {
-      overline: "NEW OPPORTUNITIES",
-      title: "Job search",
-      copy: "Explore public job information and save what deserves a closer look."
-    },
-    stats: {
-      overline: "YOUR RHYTHM",
-      title: "Stats",
-      copy: "Review your preparation rhythm without invented numbers."
-    },
-    emptyTitle: "There is nothing to show yet",
-    emptyCopy:
-      "This is the place for the next feature flow. For now, the empty state is explicit and safe."
-  },
   search: {
     overline: "LOCAL UNIFIED SEARCH",
     title: "Search",
@@ -430,8 +400,7 @@ export const en = {
   states: {
     loading: "Loading",
     error: "Something went wrong",
-    empty: "Empty",
-    placeholder: "In progress"
+    empty: "Empty"
   },
   footer: "A local-first interview preparation tool"
 } satisfies LocaleMessages

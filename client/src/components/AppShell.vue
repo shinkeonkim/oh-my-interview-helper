@@ -327,7 +327,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
           class="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 px-4 py-4 text-xs text-muted-foreground sm:px-6 lg:px-10"
         >
           <span>{{ copy("footer") }}</span>
-          <span class="font-mono">v0.1 / {{ copy("states.placeholder") }}</span>
+          <span class="font-mono">v0.1</span>
         </footer>
       </SidebarInset>
     </SidebarProvider>
