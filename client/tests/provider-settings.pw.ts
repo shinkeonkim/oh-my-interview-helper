@@ -145,13 +145,13 @@ test("keeps the latest provider list after overlapping setting changes", async (
       ...provider,
       configured: configured.get(provider.id) ?? false
     }))
-    if (providerListRequests === 2) await new Promise((resolve) => setTimeout(resolve, 200))
+    if (providerListRequests === 2) await new Promise((resolve) => setTimeout(resolve, 400))
     if (providerListRequests === 3) await new Promise((resolve) => setTimeout(resolve, 20))
     await route.fulfill({ json: { providers } })
   })
   await page.route("**/api/settings/providers/*", async (route) => {
     const id = route.request().url().split("/").at(-1) ?? ""
-    await new Promise((resolve) => setTimeout(resolve, id === "anthropic-api" ? 50 : 150))
+    await new Promise((resolve) => setTimeout(resolve, id === "anthropic-api" ? 300 : 500))
     configured.set(id, true)
     await route.fulfill({ json: { providerKind: id, enabled: true } })
   })
@@ -164,6 +164,6 @@ test("keeps the latest provider list after overlapping setting changes", async (
   await enableButtons.nth(1).click()
 
   await expect.poll(() => providerListRequests).toBe(3)
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(450)
   await expect(page.getByRole("button", { name: "사용 중지" })).toHaveCount(2)
 })
