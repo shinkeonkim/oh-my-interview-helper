@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { ExternalLink, Save, Search } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
@@ -32,6 +32,15 @@ const preview = ref<Preview | null>(null)
 const postings = ref<Posting[]>([])
 const previewing = ref(false)
 const saving = ref(false)
+let inspectRequestId = 0
+const hasPublicUrl = computed(() => {
+  try {
+    const parsed = new URL(url.value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+})
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const load = async () => {
@@ -42,34 +51,49 @@ const load = async () => {
   postings.value = body.postings as Posting[]
 }
 const inspect = async () => {
+  if (!hasPublicUrl.value || previewing.value || saving.value) return
+  const requestId = ++inspectRequestId
+  const requestedUrl = url.value.trim()
   previewing.value = true
   preview.value = null
   try {
     const response = await fetch("/api/preview/url", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
-      body: JSON.stringify({ url: url.value })
+      body: JSON.stringify({ url: requestedUrl })
     })
     if (!response.ok) throw new Error("request")
-    preview.value = (await response.json()) as Preview
+    const value = (await response.json()) as Preview
+    if (requestId === inspectRequestId && requestedUrl === url.value.trim()) preview.value = value
   } catch {
-    toast.error(copy("previewFailed"))
+    if (requestId === inspectRequestId) toast.error(copy("previewFailed"))
   } finally {
-    previewing.value = false
+    if (requestId === inspectRequestId) previewing.value = false
   }
 }
 const save = async () => {
-  if (preview.value === null) return
+  if (
+    preview.value === null ||
+    !title.value.trim() ||
+    !company.value.trim() ||
+    previewing.value ||
+    saving.value
+  )
+    return
+  const inspected = preview.value
+  const postingTitle = title.value.trim()
+  const companyName = company.value.trim()
+  const teamName = team.value.trim()
   saving.value = true
   try {
     const response = await fetch("/api/postings/url", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
       body: JSON.stringify({
-        url: preview.value.url,
-        title: title.value,
-        companyName: company.value,
-        teamName: team.value || null,
+        url: inspected.url,
+        title: postingTitle,
+        companyName,
+        teamName: teamName || null,
         location: null,
         employmentType: null
       })
@@ -85,8 +109,19 @@ const save = async () => {
     saving.value = false
   }
 }
+watch(url, () => {
+  inspectRequestId += 1
+  previewing.value = false
+  preview.value = null
+  title.value = ""
+  company.value = ""
+  team.value = ""
+})
 onMounted(() => void load().catch(() => toast.error(copy("loadFailed"))))
-onBeforeUnmount(() => controller.abort())
+onBeforeUnmount(() => {
+  inspectRequestId += 1
+  controller.abort()
+})
 </script>
 
 <template>
@@ -108,9 +143,10 @@ onBeforeUnmount(() => controller.abort())
               id="posting-url"
               v-model="url"
               type="url"
+              :disabled="saving"
               :placeholder="copy('urlPlaceholder')"
             />
-            <Button :disabled="previewing || !url.trim()" @click="inspect">
+            <Button :disabled="previewing || saving || !hasPublicUrl" @click="inspect">
               <Search />{{ copy("inspect") }}
             </Button>
           </div>
@@ -136,15 +172,15 @@ onBeforeUnmount(() => controller.abort())
           <div class="grid gap-4 md:grid-cols-3">
             <div class="grid gap-2">
               <Label>{{ copy("role") }}</Label
-              ><Input v-model="title" />
+              ><Input v-model="title" :disabled="saving" />
             </div>
             <div class="grid gap-2">
               <Label>{{ copy("company") }}</Label
-              ><Input v-model="company" />
+              ><Input v-model="company" :disabled="saving" />
             </div>
             <div class="grid gap-2">
               <Label>{{ copy("team") }}</Label
-              ><Input v-model="team" />
+              ><Input v-model="team" :disabled="saving" />
             </div>
           </div>
           <Button
