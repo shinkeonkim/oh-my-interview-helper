@@ -11,7 +11,7 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command: "bun run --cwd client dev -- --port 5187",
+    command: "bun run --cwd client dev -- --mode test --port 5187",
     url: "http://127.0.0.1:5187",
     reuseExistingServer: true,
     timeout: 15_000

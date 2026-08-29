@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import vue from "@vitejs/plugin-vue"
 import { defineConfig } from "vite"
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
@@ -12,16 +12,19 @@ export default defineConfig({
     }
   },
   server: {
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:3000",
-        changeOrigin: true,
-        ws: true
-      }
-    }
+    proxy:
+      mode === "test"
+        ? {}
+        : {
+            "/api": {
+              target: "http://127.0.0.1:3000",
+              changeOrigin: true,
+              ws: true
+            }
+          }
   },
   build: {
     emptyOutDir: true,
     outDir: fileURLToPath(new URL("../server/public", import.meta.url))
   }
-})
+}))
