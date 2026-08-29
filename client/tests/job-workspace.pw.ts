@@ -64,6 +64,12 @@ test("deep-links all seven job workspace areas while preserving job context", as
     ["토픽별 답안", "topics"],
     ["개요", "overview"]
   ] as const
+  const workflowByArea: Partial<Record<(typeof areas)[number][1], string>> = {
+    resume: "이력서 피드백",
+    interview: "면접 준비",
+    technical: "기술 면접 준비",
+    topics: "토픽별 답안"
+  }
   for (const [label, area] of areas) {
     await page
       .getByRole("navigation", { name: "채용공고 워크스페이스" })
@@ -71,6 +77,8 @@ test("deep-links all seven job workspace areas while preserving job context", as
       .click()
     await expect(page).toHaveURL(new RegExp(`/jobs/${postId}/${area}$`))
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()
+    if (workflowByArea[area] !== undefined)
+      await expect(page.getByRole("combobox").first()).toContainText(workflowByArea[area])
     await page.reload()
     await expect(page).toHaveURL(new RegExp(`/jobs/${postId}/${area}$`))
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()
