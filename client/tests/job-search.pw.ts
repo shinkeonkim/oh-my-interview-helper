@@ -11,33 +11,52 @@ test("inspects a public job URL before saving it to the local workspace", async 
   }
   let postings: (typeof posting)[] = []
   let savedBody: unknown = null
+  let previewRequests = 0
+  let saveRequests = 0
+  const oldUrl = "https://careers.example.com/old"
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "job-search-token" } })
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings } }))
   await page.route("**/api/preview/url", async (route) => {
+    previewRequests += 1
     expect(route.request().headers()["x-csrf-token"]).toBe("job-search-token")
-    expect(route.request().postDataJSON()).toEqual({ url: posting.canonicalUrl })
+    const input = route.request().postDataJSON() as { url: string }
+    const old = input.url === oldUrl
+    await new Promise((resolve) => setTimeout(resolve, old ? 200 : 20))
     await route.fulfill({
       json: {
-        url: posting.canonicalUrl,
+        url: input.url,
         contentType: "text/html",
-        text: "Build reliable platform services with our infrastructure team."
+        text: old
+          ? "Outdated role preview"
+          : "Build reliable platform services with our infrastructure team."
       }
     })
   })
   await page.route("**/api/postings/url", async (route) => {
+    saveRequests += 1
     expect(route.request().headers()["x-csrf-token"]).toBe("job-search-token")
     savedBody = route.request().postDataJSON()
     postings = [posting]
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 201, json: posting })
   })
 
   await page.goto("/job-search")
   await expect(page.getByRole("heading", { name: "채용 탐색" })).toBeVisible()
-  await page.getByLabel("채용공고 URL").fill(posting.canonicalUrl)
-  await page.getByRole("button", { name: "내용 확인" }).click()
+  const urlInput = page.getByLabel("채용공고 URL")
+  const inspectButton = page.getByRole("button", { name: "내용 확인" })
+  await urlInput.fill("ftp://careers.example.com/platform")
+  await expect(inspectButton).toBeDisabled()
+  await urlInput.fill(oldUrl)
+  await inspectButton.click()
+  await urlInput.fill(posting.canonicalUrl)
+  await inspectButton.click()
   await expect(page.getByText(/Build reliable platform services/)).toBeVisible()
+  await page.waitForTimeout(220)
+  await expect(page.getByText("Outdated role preview")).toHaveCount(0)
+  expect(previewRequests).toBe(2)
   await page.getByText("직무명").locator("..").getByRole("textbox").fill(posting.title)
   await page
     .getByText("회사", { exact: true })
@@ -49,7 +68,11 @@ test("inspects a public job URL before saving it to the local workspace", async 
     .locator("..")
     .getByRole("textbox")
     .fill(posting.teamName)
-  await page.getByRole("button", { name: "공고로 저장" }).click()
+  const saveButton = page.getByRole("button", { name: "공고로 저장" })
+  await saveButton.click()
+  await expect(saveButton).toBeDisabled()
+  await expect(urlInput).toBeDisabled()
+  await expect(inspectButton).toBeDisabled()
 
   await expect(page.getByRole("link", { name: /Platform Engineer/ })).toHaveAttribute(
     "href",
@@ -63,4 +86,5 @@ test("inspects a public job URL before saving it to the local workspace", async 
     location: null,
     employmentType: null
   })
+  expect(saveRequests).toBe(1)
 })
