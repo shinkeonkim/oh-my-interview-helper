@@ -82,6 +82,10 @@ export type ResearchAnalyzerInput = {
     readonly contentBoundary: "untrusted_public_web"
     readonly text: string
   }[]
+  readonly applicantEvidence: {
+    readonly jobPost: { readonly label: string; readonly text: string } | null
+    readonly documents: readonly { readonly label: string; readonly text: string }[]
+  }
 }
 export type ResearchAnalyzer = {
   readonly analyze: (input: ResearchAnalyzerInput) => Promise<unknown>
@@ -200,8 +204,16 @@ export const localEvidenceAnalyzer: ResearchAnalyzer = {
       roleTerms.filter((term) => sourceText.includes(term)),
       20
     )
+    const applicantText = [
+      input.applicantEvidence.jobPost?.text ?? "",
+      ...input.applicantEvidence.documents.map((document) => document.text)
+    ].join("\n")
+    const applicantStack = stack.filter((term) => mentionsStackTerm(applicantText, term))
     const strengths = [
       ...(stack.length === 0 ? [] : [`Publicly evidenced stack: ${stack.join(", ")}`]),
+      ...(applicantStack.length === 0
+        ? []
+        : [`Applicant evidence overlap: ${applicantStack.join(", ")}`]),
       ...(matchingRoleTerms.length === 0
         ? []
         : [`Role-hint overlap: ${matchingRoleTerms.join(", ")}`])
@@ -211,6 +223,11 @@ export const localEvidenceAnalyzer: ResearchAnalyzer = {
       ...(stack.length === 0
         ? ["No technology evidence was extracted from the supplied sources."]
         : []),
+      ...(input.applicantEvidence.documents.length === 0
+        ? ["No selected applicant document was available for comparison."]
+        : applicantStack.length === 0
+          ? ["No evidenced technology overlap was found in the selected applicant documents."]
+          : []),
       "Applicant fit cannot be decided from public evidence alone."
     ]
     return {
