@@ -171,16 +171,16 @@ onBeforeUnmount(() => {
           </p>
           <div class="grid gap-4 md:grid-cols-3">
             <div class="grid gap-2">
-              <Label>{{ copy("role") }}</Label
-              ><Input v-model="title" :disabled="saving" />
+              <Label for="job-search-role">{{ copy("role") }}</Label
+              ><Input id="job-search-role" v-model="title" :disabled="saving" />
             </div>
             <div class="grid gap-2">
-              <Label>{{ copy("company") }}</Label
-              ><Input v-model="company" :disabled="saving" />
+              <Label for="job-search-company">{{ copy("company") }}</Label
+              ><Input id="job-search-company" v-model="company" :disabled="saving" />
             </div>
             <div class="grid gap-2">
-              <Label>{{ copy("team") }}</Label
-              ><Input v-model="team" :disabled="saving" />
+              <Label for="job-search-team">{{ copy("team") }}</Label
+              ><Input id="job-search-team" v-model="team" :disabled="saving" />
             </div>
           </div>
           <Button

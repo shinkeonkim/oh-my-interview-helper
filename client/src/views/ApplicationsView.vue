@@ -563,30 +563,30 @@ onBeforeUnmount(() => {
       ><CardContent class="grid gap-4">
         <div class="grid gap-4 md:grid-cols-3">
           <div class="grid gap-2">
-            <Label>{{ copy("roleTitle") }}</Label
-            ><Input v-model="title" />
+            <Label for="posting-title">{{ copy("roleTitle") }}</Label
+            ><Input id="posting-title" v-model="title" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("company") }}</Label
-            ><Input v-model="company" />
+            <Label for="posting-company">{{ copy("company") }}</Label
+            ><Input id="posting-company" v-model="company" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("team") }}</Label
-            ><Input v-model="team" />
+            <Label for="posting-team">{{ copy("team") }}</Label
+            ><Input id="posting-team" v-model="team" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("location") }}</Label
-            ><Input v-model="location" />
+            <Label for="posting-location">{{ copy("location") }}</Label
+            ><Input id="posting-location" v-model="location" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("employmentType") }}</Label
-            ><Input v-model="employmentType" />
+            <Label for="posting-employment-type">{{ copy("employmentType") }}</Label
+            ><Input id="posting-employment-type" v-model="employmentType" />
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("addPosting") }}</Label
+          <Label for="posting-source">{{ copy("addPosting") }}</Label
           ><Select v-model="source"
-            ><SelectTrigger class="w-44"><SelectValue /></SelectTrigger
+            ><SelectTrigger id="posting-source" class="w-44"><SelectValue /></SelectTrigger
             ><SelectContent
               ><SelectItem value="manual">{{ copy("manual") }}</SelectItem
               ><SelectItem value="file">{{ copy("file") }}</SelectItem
@@ -598,6 +598,7 @@ onBeforeUnmount(() => {
           v-if="source === 'manual'"
           v-model="body"
           class="min-h-32 rounded-lg border bg-background p-3"
+          :aria-label="copy('body')"
           :placeholder="copy('body')"
         />
         <Input
@@ -708,9 +709,9 @@ onBeforeUnmount(() => {
       </CardHeader>
       <CardContent class="grid gap-5 lg:grid-cols-2">
         <div class="grid gap-3">
-          <Label>{{ copy("versionSource") }}</Label>
+          <Label for="posting-version-source">{{ copy("versionSource") }}</Label>
           <Select v-model="versionSource" :disabled="activePost.state !== 'active' || updatingPost">
-            <SelectTrigger class="w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="posting-version-source" class="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="manual">{{ copy("manual") }}</SelectItem>
               <SelectItem value="file">{{ copy("file") }}</SelectItem>
@@ -729,6 +730,7 @@ onBeforeUnmount(() => {
             v-model="versionBody"
             class="min-h-28 rounded-lg border bg-background p-3"
             :disabled="activePost.state !== 'active' || updatingPost"
+            :aria-label="copy('body')"
             :placeholder="copy('body')"
           />
           <Input
@@ -801,7 +803,10 @@ onBeforeUnmount(() => {
                 isTerminalApplication(application) ||
                 pendingApplicationIds.has(application.id)
               "
-              ><SelectTrigger class="w-48"><SelectValue /></SelectTrigger
+              ><SelectTrigger
+                class="w-48"
+                :aria-label="`${copy('stage')}: ${application.stageName}`"
+                ><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
                   stage.name
@@ -837,19 +842,32 @@ onBeforeUnmount(() => {
       ><CardContent class="grid gap-6 lg:grid-cols-2"
         ><div class="grid gap-3">
           <div class="flex gap-2">
-            <Input v-model="note" :placeholder="copy('notes')" /><Button
+            <Input v-model="note" :aria-label="copy('notes')" :placeholder="copy('notes')" /><Button
               :disabled="!noteReady || addingNote"
               @click="addNote"
               >{{ addingNote ? copy("saving") : copy("addNote") }}</Button
             >
           </div>
           <div class="grid gap-2 sm:grid-cols-2">
-            <Input v-model="interviewAt" type="datetime-local" /><Input
+            <Input
+              v-model="interviewAt"
+              type="datetime-local"
+              :aria-label="copy('interviewAt')"
+            /><Input
               v-model="interviewKind"
+              :aria-label="copy('interviewKind')"
               :placeholder="copy('interviewKind')"
             />
-            <Input v-model="interviewLocation" :placeholder="copy('interviewLocation')" />
-            <Input v-model="interviewNotes" :placeholder="copy('interviewNotes')" />
+            <Input
+              v-model="interviewLocation"
+              :aria-label="copy('interviewLocation')"
+              :placeholder="copy('interviewLocation')"
+            />
+            <Input
+              v-model="interviewNotes"
+              :aria-label="copy('interviewNotes')"
+              :placeholder="copy('interviewNotes')"
+            />
             <Button
               class="w-fit"
               :disabled="!interviewReady || schedulingInterview"
@@ -897,7 +915,12 @@ onBeforeUnmount(() => {
             class="flex flex-wrap items-center gap-2 rounded-lg border p-2"
           >
             <span class="w-6 text-center text-sm text-muted-foreground">{{ stage.position }}</span>
-            <Input v-model="stageNames[stage.id]" class="min-w-48 flex-1" :disabled="stagesBusy" />
+            <Input
+              v-model="stageNames[stage.id]"
+              class="min-w-48 flex-1"
+              :aria-label="`${copy('stage')}: ${stage.name}`"
+              :disabled="stagesBusy"
+            />
             <Button
               size="icon"
               variant="ghost"
@@ -936,11 +959,14 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="mt-4 flex max-w-md gap-2">
-          <Input v-model="newStage" :disabled="stagesBusy" :placeholder="copy('newStage')" /><Button
-            :disabled="stagesBusy || !newStageReady"
-            @click="addStage"
-            >{{ copy("addStage") }}</Button
-          >
+          <Input
+            v-model="newStage"
+            :disabled="stagesBusy"
+            :aria-label="copy('newStage')"
+            :placeholder="copy('newStage')"
+          /><Button :disabled="stagesBusy || !newStageReady" @click="addStage">{{
+            copy("addStage")
+          }}</Button>
         </div></CardContent
       ></Card
     >

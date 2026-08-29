@@ -229,9 +229,9 @@ onBeforeUnmount(() => {
       ><CardContent class="grid gap-4 py-6"
         ><div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div class="grid gap-2">
-            <Label>{{ copy("subjectType") }}</Label
+            <Label for="research-subject-type">{{ copy("subjectType") }}</Label
             ><Select v-model="subjectType" :disabled="running"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="research-subject-type"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem value="company">{{ copy("company") }}</SelectItem
                 ><SelectItem value="executive">{{ copy("executive") }}</SelectItem
@@ -243,21 +243,22 @@ onBeforeUnmount(() => {
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("subjectName") }}</Label
-            ><Input v-model="subjectName" :disabled="running" />
+            <Label for="research-subject-name">{{ copy("subjectName") }}</Label
+            ><Input id="research-subject-name" v-model="subjectName" :disabled="running" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("organization") }}</Label
-            ><Input v-model="organization" :disabled="running" />
+            <Label for="research-organization">{{ copy("organization") }}</Label
+            ><Input id="research-organization" v-model="organization" :disabled="running" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("roleHint") }}</Label
-            ><Input v-model="roleHint" :disabled="running" />
+            <Label for="research-role-hint">{{ copy("roleHint") }}</Label
+            ><Input id="research-role-hint" v-model="roleHint" :disabled="running" />
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("sourceUrls") }}</Label
+          <Label for="research-source-urls">{{ copy("sourceUrls") }}</Label
           ><textarea
+            id="research-source-urls"
             v-model="urls"
             class="min-h-28 rounded-lg border bg-background p-3"
             :disabled="running"

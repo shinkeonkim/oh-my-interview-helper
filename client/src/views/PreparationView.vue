@@ -310,9 +310,9 @@ onBeforeUnmount(() => {
         </p>
         <div class="grid gap-4 md:grid-cols-3">
           <div class="grid gap-2">
-            <Label>{{ copy("workflow") }}</Label
+            <Label for="preparation-workflow">{{ copy("workflow") }}</Label
             ><Select v-model="workflow"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-workflow"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="[value, label] in workflowLabels" :key="value" :value="value">{{
                   copy(label)
@@ -321,9 +321,9 @@ onBeforeUnmount(() => {
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("provider") }}</Label
+            <Label for="preparation-provider">{{ copy("provider") }}</Label
             ><Select v-model="providerId"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-provider"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="provider in providers" :key="provider.id" :value="provider.id"
                   >{{ provider.id }} · {{ provider.model.displayName }}</SelectItem
@@ -332,9 +332,9 @@ onBeforeUnmount(() => {
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("document") }}</Label
+            <Label for="preparation-document">{{ copy("document") }}</Label
             ><Select v-model="documentVersionId"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-document"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem value="none">{{ copy("noDocument") }}</SelectItem
                 ><SelectItem
@@ -348,8 +348,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("practiceAnswer") }}</Label
+          <Label for="preparation-practice-answer">{{ copy("practiceAnswer") }}</Label
           ><textarea
+            id="preparation-practice-answer"
             v-model="practiceAnswer"
             class="min-h-24 rounded-lg border bg-background p-3"
           />
