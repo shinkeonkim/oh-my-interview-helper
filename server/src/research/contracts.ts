@@ -6,6 +6,21 @@ export const ResearchSubjectTypeSchema = z.enum([
   "team_lead",
   "team_member"
 ])
+export const ResearchSourceUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const url = new URL(value)
+      return (
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        url.username === "" &&
+        url.password === ""
+      )
+    } catch {
+      return false
+    }
+  }, "Research sources must use public HTTP(S) URLs without credentials")
 export const ResearchRequestSchema = z
   .object({
     subjectType: ResearchSubjectTypeSchema,
@@ -13,7 +28,7 @@ export const ResearchRequestSchema = z
     organization: z.string().trim().min(1).max(200).nullable().default(null),
     roleHint: z.string().trim().min(1).max(200).nullable().default(null),
     jobPostId: z.string().uuid().nullable().default(null),
-    sourceUrls: z.array(z.string().url()).min(1).max(8),
+    sourceUrls: z.array(ResearchSourceUrlSchema).min(1).max(8),
     parentRecordId: z.string().uuid().nullable().default(null)
   })
   .strict()
