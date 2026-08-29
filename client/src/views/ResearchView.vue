@@ -43,6 +43,7 @@ type RecordSummary = {
 }
 type ResearchRecord = RecordSummary & {
   analysis: {
+    summary: { career: string[]; stack: string[]; projects: string[] }
     fitAssessment: { label: "advisory"; summary: string; strengths: string[]; risks: string[] }
   }
   identityCandidates: Array<{
@@ -286,6 +287,24 @@ onBeforeUnmount(() => {
           </div></CardContent
         ></Card
       >
+      <div class="grid gap-5 md:grid-cols-3">
+        <Card v-for="section in ['career', 'stack', 'projects'] as const" :key="section">
+          <CardHeader
+            ><CardTitle>{{ copy(section) }}</CardTitle></CardHeader
+          >
+          <CardContent>
+            <p
+              v-if="current.analysis.summary[section].length === 0"
+              class="text-sm text-muted-foreground"
+            >
+              {{ copy("noEvidence") }}
+            </p>
+            <ul v-else class="grid list-disc gap-2 pl-5 text-sm leading-6">
+              <li v-for="item in current.analysis.summary[section]" :key="item">{{ item }}</li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
       <div class="grid gap-5 lg:grid-cols-2">
         <Card
           ><CardHeader
@@ -317,7 +336,23 @@ onBeforeUnmount(() => {
             <p class="mt-3 text-sm font-medium">{{ copy("advisoryNotice") }}</p>
             <p class="mt-3 text-sm leading-6 text-muted-foreground">
               {{ current.analysis.fitAssessment.summary }}
-            </p></CardContent
+            </p>
+            <div v-if="current.analysis.fitAssessment.strengths.length" class="mt-4">
+              <p class="text-sm font-medium">{{ copy("strengths") }}</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li v-for="item in current.analysis.fitAssessment.strengths" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div v-if="current.analysis.fitAssessment.risks.length" class="mt-4">
+              <p class="text-sm font-medium">{{ copy("risks") }}</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li v-for="item in current.analysis.fitAssessment.risks" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div></CardContent
           ></Card
         >
       </div>
