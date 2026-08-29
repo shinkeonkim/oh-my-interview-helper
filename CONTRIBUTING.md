@@ -31,6 +31,7 @@ HMR을 사용할 때는 서버를 유지한 채 다른 터미널에서 `bun run 
 ## 제출 전 검사
 
 ```bash
+bun audit
 bun run lint
 bun run typecheck
 bun run check:i18n

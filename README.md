@@ -144,6 +144,7 @@ bunx playwright install chromium
 ```
 
 ```bash
+bun audit
 bun run lint
 bun run typecheck
 bun run check:i18n
