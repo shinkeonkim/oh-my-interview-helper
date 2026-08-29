@@ -66,6 +66,20 @@ describe("cited research API", () => {
       ).status
     ).toBe(403)
 
+    for (const sourceUrl of [
+      "ftp://example.com/profile",
+      "https://user:secret@example.com/profile"
+    ])
+      expect(
+        (
+          await app.request(`${base}/research`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ ...request, sourceUrls: [sourceUrl] })
+          })
+        ).status
+      ).toBe(400)
+
     const createdResponse = await app.request(`${base}/research`, {
       method: "POST",
       headers,
@@ -96,5 +110,14 @@ describe("cited research API", () => {
     expect(((await refreshedResponse.json()) as { parentRecordId: string }).parentRecordId).toBe(
       created.id
     )
+    expect(
+      (
+        await app.request(`${base}/research/${created.id}/refresh`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ sourceUrls: ["ftp://example.com/profile"] })
+        })
+      ).status
+    ).toBe(400)
   })
 })

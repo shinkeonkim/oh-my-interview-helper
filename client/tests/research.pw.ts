@@ -8,6 +8,8 @@ test("creates cited research, distinguishes judgments, and refreshes its history
   const refreshedId = "33333333-3333-4333-8333-333333333333"
   const createdAt = "2026-08-28T00:00:00.000Z"
   let records: Array<Record<string, unknown>> = []
+  let runRequests = 0
+  let refreshRequests = 0
   const record = (id: string, parentRecordId: string | null) => ({
     id,
     jobPostId: null,
@@ -57,31 +59,41 @@ test("creates cited research, distinguishes judgments, and refreshes its history
     route.fulfill({ json: { csrfToken: "token" } })
   )
   await page.route("**/api/research", async (route) => {
-    if (route.request().method() === "POST") records = [record(firstId, null)]
+    if (route.request().method() === "POST") {
+      runRequests += 1
+      records = [record(firstId, null)]
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
     await route.fulfill({
       status: route.request().method() === "POST" ? 201 : 200,
       json: route.request().method() === "POST" ? records[0] : { records }
     })
   })
   await page.route("**/api/research/*/refresh", async (route) => {
+    refreshRequests += 1
     const refreshed = record(refreshedId, firstId)
     records = [refreshed, ...records]
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await route.fulfill({ status: 201, json: refreshed })
   })
   await page.route("**/api/research/*", (route) => route.fulfill({ json: records[0] }))
 
   await page.goto("/research")
+  const runButton = page.getByRole("button", { name: "리서치 시작" })
+  await expect(runButton).toBeDisabled()
   await page.getByRole("combobox").click()
   await page.getByRole("option", { name: "팀 리드" }).click()
   await page.getByText("이름 또는 회사명").locator("..").getByRole("textbox").fill("Kim")
   await page.getByText("소속 회사").locator("..").getByRole("textbox").fill("Acme")
   await page.getByText("역할 단서").locator("..").getByRole("textbox").fill("Platform")
-  await page
-    .getByText("공개 출처 URL")
-    .locator("..")
-    .getByRole("textbox")
-    .fill("https://example.com/profile")
-  await page.getByRole("button", { name: "리서치 시작" }).click()
+  const sourceInput = page.getByText("공개 출처 URL").locator("..").getByRole("textbox")
+  await sourceInput.fill("ftp://example.com/profile")
+  await expect(runButton).toBeDisabled()
+  await sourceInput.fill("https://example.com/profile")
+  await expect(runButton).toBeEnabled()
+  await runButton.click()
+  await expect(runButton).toBeDisabled()
+  await expect(sourceInput).toBeDisabled()
 
   await expect(page.getByText("동명이인 가능성").first()).toBeVisible()
   await expect(page.getByText("사실", { exact: true })).toBeVisible()
@@ -91,7 +103,66 @@ test("creates cited research, distinguishes judgments, and refreshes its history
     "href",
     "https://example.com/profile"
   )
+  expect(runRequests).toBe(1)
 
-  await page.getByRole("button", { name: "새 출처로 갱신" }).click()
+  const refreshButton = page.getByRole("button", { name: "새 출처로 갱신" })
+  await refreshButton.click()
+  await expect(refreshButton).toBeDisabled()
   await expect(page.getByText("Kim · 동명이인 가능성")).toHaveCount(2)
+  expect(refreshRequests).toBe(1)
+})
+
+test("keeps the latest research record selection", async ({ page }) => {
+  const summaries = [
+    {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      subjectType: "company",
+      subjectName: "First subject",
+      parentRecordId: null,
+      identityStatus: "confirmed",
+      createdAt: "2026-08-29T00:00:00.000Z"
+    },
+    {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      subjectType: "company",
+      subjectName: "Second subject",
+      parentRecordId: null,
+      identityStatus: "confirmed",
+      createdAt: "2026-08-29T01:00:00.000Z"
+    }
+  ]
+  await page.route("**/api/research", (route) => route.fulfill({ json: { records: summaries } }))
+  await page.route(/\/api\/research\/[^/]+$/, async (route) => {
+    const first = route
+      .request()
+      .url()
+      .includes(summaries[0]?.id ?? "")
+    await new Promise((resolve) => setTimeout(resolve, first ? 200 : 20))
+    const summary = first ? summaries[0] : summaries[1]
+    if (summary === undefined) throw new Error("fixture missing")
+    await route.fulfill({
+      json: {
+        ...summary,
+        identityCandidates: [],
+        analysis: {
+          fitAssessment: {
+            label: "advisory",
+            summary: first ? "First assessment" : "Second assessment",
+            strengths: [],
+            risks: []
+          }
+        },
+        claims: [],
+        sources: []
+      }
+    })
+  })
+
+  await page.goto("/research")
+  await page.getByRole("button", { name: /First subject/ }).click()
+  await page.getByRole("button", { name: /Second subject/ }).click()
+  await expect(page.getByText("Second assessment")).toBeVisible()
+  await page.waitForTimeout(250)
+  await expect(page.getByText("Second assessment")).toBeVisible()
+  await expect(page.getByText("First assessment")).toHaveCount(0)
 })
