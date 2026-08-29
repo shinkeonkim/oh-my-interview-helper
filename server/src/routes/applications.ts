@@ -6,6 +6,7 @@ import { ApplicationServiceError, type ApplicationService } from "../application
 import { IngestionError } from "../ingest/file-preview"
 import { FetchBoundaryError } from "../ingest/safe-fetcher"
 import { safeErrorCode } from "../security/redaction"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 const Id = z.string().uuid()
 const Metadata = z
@@ -18,7 +19,7 @@ const Metadata = z
   })
   .strict()
 const ManualPost = Metadata.extend({ text: z.string().min(1).max(1_000_000) }).strict()
-const UrlPost = Metadata.extend({ url: z.string().url() }).strict()
+const UrlPost = Metadata.extend({ url: PublicHttpUrlSchema }).strict()
 
 const failure = (context: Context, error: unknown) => {
   if (error instanceof IngestionError)
@@ -101,7 +102,7 @@ export const createApplicationRoutes = (service: ApplicationService): Hono => {
   routes.post("/postings/:id/versions/url", async (context) => {
     try {
       const body = z
-        .object({ url: z.string().url() })
+        .object({ url: PublicHttpUrlSchema })
         .strict()
         .parse(await context.req.json())
       return context.json(await service.addUrlVersion(context.req.param("id"), body.url), 201)

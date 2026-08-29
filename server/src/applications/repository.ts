@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { z } from "zod"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 const Id = z.string().uuid()
 const Timestamp = z.string().datetime()
@@ -182,7 +183,7 @@ export class ApplicationRepository {
         z.string().trim().min(1).max(200).parse(input.title),
         z.string().trim().min(1).max(200).parse(input.companyName),
         z.string().trim().min(1).max(200).nullable().parse(input.teamName),
-        z.string().url().nullable().parse(input.canonicalUrl),
+        PublicHttpUrlSchema.nullable().parse(input.canonicalUrl),
         JSON.stringify(JsonObject.parse(input.metadata)),
         Timestamp.parse(input.createdAt)
       ]

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 export const ResearchSubjectTypeSchema = z.enum([
   "company",
@@ -6,21 +7,7 @@ export const ResearchSubjectTypeSchema = z.enum([
   "team_lead",
   "team_member"
 ])
-export const ResearchSourceUrlSchema = z
-  .string()
-  .url()
-  .refine((value) => {
-    try {
-      const url = new URL(value)
-      return (
-        (url.protocol === "http:" || url.protocol === "https:") &&
-        url.username === "" &&
-        url.password === ""
-      )
-    } catch {
-      return false
-    }
-  }, "Research sources must use public HTTP(S) URLs without credentials")
+export const ResearchSourceUrlSchema = PublicHttpUrlSchema
 export const ResearchRequestSchema = z
   .object({
     subjectType: ResearchSubjectTypeSchema,

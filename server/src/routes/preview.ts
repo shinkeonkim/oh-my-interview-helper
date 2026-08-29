@@ -9,6 +9,7 @@ import {
   type Resolver
 } from "../ingest/safe-fetcher"
 import { safeErrorCode } from "../security/redaction"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 export type PreviewRouteDependencies = {
   readonly dataDirectory: string
@@ -30,7 +31,7 @@ const readUrl = async (request: Request): Promise<string | undefined> => {
       typeof payload.url !== "string"
     )
       return undefined
-    return payload.url
+    return PublicHttpUrlSchema.safeParse(payload.url).data
   } catch {
     return undefined
   }

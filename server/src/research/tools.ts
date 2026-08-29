@@ -4,6 +4,7 @@ import { z } from "zod"
 import { ToolIdSchema, type ServerTool } from "../agents"
 import { fetchPublicText, type PinnedTransport, type Resolver } from "../ingest/safe-fetcher"
 import type { LocalSecuritySettings } from "../security/config"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 export type PublicSearchResult = {
   readonly url: string
@@ -23,7 +24,7 @@ const SearchSchema = z
     limit: z.number().int().min(1).max(8).default(5)
   })
   .strict()
-const FetchSchema = z.object({ url: z.string().url() }).strict()
+const FetchSchema = z.object({ url: PublicHttpUrlSchema }).strict()
 
 export const createPublicResearchTools = (input: {
   readonly limits: LocalSecuritySettings
@@ -42,7 +43,7 @@ export const createPublicResearchTools = (input: {
         .array(
           z
             .object({
-              url: z.string().url(),
+              url: PublicHttpUrlSchema,
               title: z.string().trim().min(1).max(300),
               excerpt: z.string().max(1000)
             })
