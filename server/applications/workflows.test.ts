@@ -70,6 +70,22 @@ describe("job posting and hiring pipeline API", () => {
         .query<{ count: number }, []>("SELECT count(*) count FROM job_post_versions")
         .get()?.count
     ).toBe(0)
+    for (const url of ["ftp://jobs.example/role", "https://user:secret@jobs.example/role"])
+      expect(
+        (
+          await app.request(`${base}/postings/url`, {
+            method: "POST",
+            headers: jsonHeaders,
+            body: JSON.stringify({
+              title: "Denied",
+              companyName: "Acme",
+              teamName: null,
+              url
+            })
+          })
+        ).status
+      ).toBe(400)
+    expect(transportRequestCount()).toBe(0)
     const manual = await app.request(`${base}/postings/manual`, {
       method: "POST",
       headers: jsonHeaders,
@@ -82,6 +98,17 @@ describe("job posting and hiring pipeline API", () => {
     })
     expect(manual.status).toBe(201)
     const manualPost = (await manual.json()) as { id: string }
+    for (const url of ["ftp://jobs.example/role", "https://user:secret@jobs.example/role"])
+      expect(
+        (
+          await app.request(`${base}/postings/${manualPost.id}/versions/url`, {
+            method: "POST",
+            headers: jsonHeaders,
+            body: JSON.stringify({ url })
+          })
+        ).status
+      ).toBe(400)
+    expect(transportRequestCount()).toBe(0)
     const file = new FormData()
     file.set("title", "Frontend")
     file.set("companyName", "Beta")

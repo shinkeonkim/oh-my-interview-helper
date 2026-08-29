@@ -185,6 +185,12 @@ describe("restricted cited research", () => {
       tools[1]?.execute({ url: "http://127.0.0.1/private" }, { signal })
     ).rejects.toThrow("UNSAFE_ADDRESS")
     await expect(
+      tools[1]?.execute({ url: "ftp://example.com/profile" }, { signal })
+    ).rejects.toThrow()
+    await expect(
+      tools[1]?.execute({ url: "https://user:secret@example.com/profile" }, { signal })
+    ).rejects.toThrow()
+    await expect(
       tools[0]?.execute({ query: "Acme", executable: "curl" }, { signal })
     ).rejects.toThrow()
   })
