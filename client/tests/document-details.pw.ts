@@ -118,14 +118,14 @@ test("keeps the latest document list after overlapping changes", async ({ page }
   await page.route("**/api/documents", async (route) => {
     listRequests += 1
     const snapshot = structuredClone(documents)
-    if (listRequests === 2) await new Promise((resolve) => setTimeout(resolve, 200))
+    if (listRequests === 2) await new Promise((resolve) => setTimeout(resolve, 400))
     if (listRequests === 3) await new Promise((resolve) => setTimeout(resolve, 20))
     await route.fulfill({ json: { documents: snapshot } })
   })
   await page.route("**/api/documents/*/selection", async (route) => {
     const id = route.request().url().split("/").at(-2)
     const first = id === documents[0]?.id
-    await new Promise((resolve) => setTimeout(resolve, first ? 50 : 150))
+    await new Promise((resolve) => setTimeout(resolve, first ? 300 : 500))
     documents = documents.map((document) =>
       document.id === id ? { ...document, selected: true } : document
     )
@@ -138,6 +138,6 @@ test("keeps the latest document list after overlapping changes", async ({ page }
   await selectButtons.nth(1).click()
 
   await expect.poll(() => listRequests).toBe(3)
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(450)
   await expect(page.getByRole("button", { name: "선택 해제" })).toHaveCount(2)
 })
