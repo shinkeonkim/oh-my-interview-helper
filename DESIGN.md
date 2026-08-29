@@ -74,18 +74,18 @@ Breakpoints: mobile below 768px uses a Sheet; desktop uses Sidebar. At 320px the
 - **States**: default, hover, active, focus-visible, disabled, loading, empty, error.
 - **Rule**: compose these primitives before adding a new bespoke control.
 
-### Future feature mappings
+### Product feature compositions
 
 - `AppShell`: Sidebar + Sheet + CommandDialog + DropdownMenu + Tooltip.
 - `HeaderSearch`: CommandDialog with local entity groups and honest empty/loading/error states.
-- `JobIndicator`: Badge + Progress + Tooltip, linking to Job postings.
-- `AgentProgress`: Progress + Skeleton + Alert, never fake completion.
-- Job card/create dialog: Card + Badge + Dialog + Input + Select + AlertDialog for destructive confirmation.
-- Detail header/tabs: Card header + Button + Tabs with emerald underline and route-backed active tab.
-- Chat panel/query composer: ScrollArea + Card + Textarea/Input + Button, with mobile Sheet.
-- Recommendations/application tracker: Card + Badge + Progress + Select, sourced only from real data.
-- Document import: Dialog + Input + Alert + Skeleton, with explicit local parsing status.
-- Setting section: Card + Label + Select + Separator + Sonner.
+- `JobIndicator`: Badge + Progress + Tooltip linked to saved job postings.
+- `AgentProgress`: Progress + Skeleton + Alert driven by persisted job state, never fake completion.
+- Job cards and forms: Card + Badge + Dialog + Input + Select, with explicit destructive confirmation.
+- Detail navigation: route-backed workspace links with an emerald active state and preserved job context.
+- Chat and preparation composers: Card + Textarea/Input + Button with disclosure review dialogs.
+- Application tracker: Card + Badge + Progress + Select sourced only from persisted pipeline data.
+- Document import: Dialog + Input + Alert + Skeleton with explicit local parsing status.
+- Settings: Card + Label + Select + Separator + Sonner for Provider, runner, locale, and theme state.
 
 ## 6. Motion & Interaction
 
