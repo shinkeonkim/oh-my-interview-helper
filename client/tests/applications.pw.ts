@@ -460,7 +460,7 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(archivePostButton).toBeDisabled()
   await expect(startApplicationButton).toBeDisabled()
   await expect(page.getByText("보관됨").first()).toBeVisible()
-  expect(archivePostRequests).toBe(1)
+  await expect.poll(() => archivePostRequests).toBe(1)
   await expect(page.getByRole("button", { name: "지원 시작" })).toBeDisabled()
   await expect(page.getByRole("button", { name: "보관", exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "버전 기록" }).click()
