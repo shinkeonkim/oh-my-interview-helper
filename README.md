@@ -137,6 +137,12 @@ bun packages/runner/src/bin.ts run
 
 ## 검사
 
+브라우저 E2E를 처음 실행하기 전에 Playwright가 고정한 Chromium을 설치합니다.
+
+```bash
+bunx playwright install chromium
+```
+
 ```bash
 bun run lint
 bun run typecheck

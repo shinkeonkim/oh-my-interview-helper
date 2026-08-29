@@ -6,13 +6,14 @@ Oh My Interview Helper에 기여해 주셔서 감사합니다. 이 프로젝트�
 
 - Bun 1.3.10
 - Node.js 22.14.0
-- 브라우저 E2E를 실행할 수 있는 Chromium 또는 Chrome
+- Playwright Chromium
 
 ```bash
 git clone <repository-url>
 cd oh-my-interview-helper
 cp .env.example .env
 bun install --frozen-lockfile
+bunx playwright install chromium
 bun run dev
 ```
 
