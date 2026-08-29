@@ -49,6 +49,32 @@ const setup = async () => {
 describe("cited research API", () => {
   test("requires CSRF and preserves citations across create, read, list, and refresh", async () => {
     const { app, headers } = await setup()
+    const documents = new FormData()
+    documents.set("kind", "resume")
+    documents.set(
+      "files",
+      new File(["Built TypeScript platform services"], "resume.txt", { type: "text/plain" })
+    )
+    const uploaded = (await (
+      await app.request(`${base}/documents/upload`, {
+        method: "POST",
+        headers: {
+          Cookie: headers.Cookie,
+          "X-CSRF-Token": headers["X-CSRF-Token"]
+        },
+        body: documents
+      })
+    ).json()) as { documents: Array<{ id: string }> }
+    const selectedDocumentId = uploaded.documents[0]?.id
+    if (selectedDocumentId === undefined) throw new Error("uploaded document missing")
+    expect(
+      (
+        await app.request(`${base}/documents/${selectedDocumentId}/selection`, {
+          method: "PUT",
+          headers
+        })
+      ).status
+    ).toBe(204)
     const request = {
       subjectType: "team_lead",
       subjectName: "Kim",
@@ -112,6 +138,9 @@ describe("cited research API", () => {
     ).toBe(true)
     expect(created.analysis.fitAssessment.strengths).toContain(
       "Publicly evidenced stack: TypeScript"
+    )
+    expect(created.analysis.fitAssessment.strengths).toContain(
+      "Applicant evidence overlap: TypeScript"
     )
     expect(created.claims[0]?.sourceIds).toEqual([created.sources[0]?.id])
 

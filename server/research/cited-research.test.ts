@@ -110,7 +110,11 @@ describe("restricted cited research", () => {
             "Kim launched the Atlas migration project."
           ].join("\n")
         }
-      ]
+      ],
+      applicantEvidence: {
+        jobPost: { label: "Platform role", text: "TypeScript platform services" },
+        documents: [{ label: "Resume", text: "Built TypeScript services" }]
+      }
     })
     expect(analysis).toEqual(
       expect.objectContaining({
@@ -119,6 +123,7 @@ describe("restricted cited research", () => {
           label: "advisory",
           strengths: expect.arrayContaining([
             "Publicly evidenced stack: TypeScript",
+            "Applicant evidence overlap: TypeScript",
             "Role-hint overlap: typescript, platform"
           ])
         })
