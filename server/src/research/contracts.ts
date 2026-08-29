@@ -127,6 +127,11 @@ const evidenceLines = (text: string, pattern: RegExp) =>
     )
 const unique = (values: readonly string[], maximum: number) =>
   [...new Set(values)].slice(0, maximum)
+const mentionsStackTerm = (text: string, term: (typeof stackTerms)[number]) =>
+  new RegExp(
+    `(^|[^\\p{L}\\p{N}])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^\\p{L}\\p{N}])`,
+    "iu"
+  ).test(text)
 
 export const localEvidenceAnalyzer: ResearchAnalyzer = {
   analyze: async (input) => {
@@ -157,16 +162,14 @@ export const localEvidenceAnalyzer: ResearchAnalyzer = {
       20
     )
     const stack = stackTerms.filter((term) =>
-      input.sources.some((source) =>
-        source.text.toLocaleLowerCase().includes(term.toLocaleLowerCase())
-      )
+      input.sources.some((source) => mentionsStackTerm(source.text, term))
     )
     const claims = [
       ...stack.map((term) => ({
         statement: `Public evidence mentions ${term}.`,
         classification: "fact" as const,
         sourceIds: input.sources
-          .filter((source) => source.text.toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+          .filter((source) => mentionsStackTerm(source.text, term))
           .map((source) => source.id),
         confidence: "high" as const
       })),
