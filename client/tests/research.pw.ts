@@ -21,11 +21,16 @@ test("creates cited research, distinguishes judgments, and refreshes its history
       { name: "Kim", role: "Platform", organization: "Acme", sourceIds: [sourceId] }
     ],
     analysis: {
+      summary: {
+        career: ["Platform engineering experience"],
+        stack: ["TypeScript"],
+        projects: ["Atlas migration"]
+      },
       fitAssessment: {
         label: "advisory",
         summary: "공개 근거를 검토한 뒤 판단하세요.",
-        strengths: [],
-        risks: []
+        strengths: ["TypeScript overlap"],
+        risks: ["신원을 직접 확인해야 합니다."]
       }
     },
     claims: [
@@ -98,6 +103,14 @@ test("creates cited research, distinguishes judgments, and refreshes its history
   await expect(page.getByText("동명이인 가능성").first()).toBeVisible()
   await expect(page.getByText("사실", { exact: true })).toBeVisible()
   await expect(page.getByText("추론", { exact: true })).toBeVisible()
+  await expect(page.getByText("경력 근거", { exact: true })).toBeVisible()
+  await expect(page.getByText("Platform engineering experience")).toBeVisible()
+  await expect(page.getByText("기술 스택", { exact: true })).toBeVisible()
+  await expect(page.getByText("TypeScript", { exact: true })).toBeVisible()
+  await expect(page.getByText("프로젝트 경험", { exact: true })).toBeVisible()
+  await expect(page.getByText("Atlas migration")).toBeVisible()
+  await expect(page.getByText("TypeScript overlap")).toBeVisible()
+  await expect(page.getByText("신원을 직접 확인해야 합니다.")).toBeVisible()
   await expect(page.getByText("참고용 조언", { exact: false })).toBeVisible()
   await expect(page.getByRole("link", { name: /Acme public profile/ }).first()).toHaveAttribute(
     "href",
@@ -145,6 +158,7 @@ test("keeps the latest research record selection", async ({ page }) => {
         ...summary,
         identityCandidates: [],
         analysis: {
+          summary: { career: [], stack: [], projects: [] },
           fitAssessment: {
             label: "advisory",
             summary: first ? "First assessment" : "Second assessment",

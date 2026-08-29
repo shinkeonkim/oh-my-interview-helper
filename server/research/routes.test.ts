@@ -27,7 +27,9 @@ const setup = async () => {
       status: 200,
       headers: new Headers({ "content-type": "text/html" }),
       body: (async function* () {
-        yield new TextEncoder().encode("<h1>Acme Engineering</h1><p>Public profile</p>")
+        yield new TextEncoder().encode(
+          "<h1>Acme Engineering</h1><p>Kim worked as a TypeScript engineer.</p><p>Kim launched the Atlas migration project.</p>"
+        )
       })()
     })
   }
@@ -89,10 +91,28 @@ describe("cited research API", () => {
     const created = (await createdResponse.json()) as {
       id: string
       identityStatus: string
+      analysis: {
+        summary: { career: string[]; stack: string[]; projects: string[] }
+        fitAssessment: { strengths: string[] }
+      }
       sources: Array<{ id: string }>
       claims: Array<{ sourceIds: string[] }>
     }
     expect(created.identityStatus).toBe("ambiguous")
+    expect(created.analysis.summary.stack).toEqual(["TypeScript"])
+    expect(
+      created.analysis.summary.career.some((item) =>
+        item.includes("Kim worked as a TypeScript engineer.")
+      )
+    ).toBe(true)
+    expect(
+      created.analysis.summary.projects.some((item) =>
+        item.includes("Kim launched the Atlas migration project.")
+      )
+    ).toBe(true)
+    expect(created.analysis.fitAssessment.strengths).toContain(
+      "Publicly evidenced stack: TypeScript"
+    )
     expect(created.claims[0]?.sourceIds).toEqual([created.sources[0]?.id])
 
     const listed = (await (await app.request(`${base}/research`)).json()) as {
