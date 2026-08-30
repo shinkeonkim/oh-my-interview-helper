@@ -123,7 +123,7 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
           kind: "structured",
           schema: PreparationOutputSchemas[input.workflow] as z.ZodType
         },
-        timeoutMilliseconds: 120_000
+        timeoutMilliseconds: 300_000
       }
     }
   }

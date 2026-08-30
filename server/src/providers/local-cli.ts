@@ -7,6 +7,8 @@ import { normalizeCliOutputLine } from "@interview-helper/runner"
 import type { CliProviderId, CliRunnerTransport, CliTransportEvent } from "./cli-runner"
 
 export class LocalCliTransport implements CliRunnerTransport {
+  constructor(private readonly timeoutMilliseconds = 300_000) {}
+
   connected(provider: CliProviderId): boolean {
     return Bun.which(executable(provider)) !== null
   }
@@ -30,7 +32,7 @@ export class LocalCliTransport implements CliRunnerTransport {
       })
       child.stdin.write(input.prompt)
       child.stdin.end()
-      const timeout = AbortSignal.timeout(120_000)
+      const timeout = AbortSignal.timeout(this.timeoutMilliseconds)
       const signal = input.signal === undefined ? timeout : AbortSignal.any([input.signal, timeout])
       const terminate = (): void => terminateProcessGroup(child)
       signal.addEventListener("abort", terminate, { once: true })

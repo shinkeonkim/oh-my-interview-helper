@@ -10,7 +10,7 @@ import {
   collectProviderStream,
   type ProviderRegistration
 } from "../src/agents"
-import { FakeModel } from "./fake-model"
+import { FakeModel, FakeModelProbe } from "./fake-model"
 import { parseStructuredText } from "../src/agents/kernel"
 
 const registration = (
@@ -41,6 +41,38 @@ describe("provider-neutral Strands kernel", () => {
       answer: "ready"
     })
     expect(parseStructuredText('{"answer":7}', schema)).toBeNull()
+  })
+
+  test("accepts runner JSON in one turn without requesting a structured-output tool", async () => {
+    const probe = new FakeModelProbe()
+    const provider: ProviderRegistration = {
+      ...registration([]),
+      descriptor: { ...registration([]).descriptor, mode: "runner" },
+      createModel: () =>
+        new FakeModel({
+          modelId: "fake-model",
+          probe,
+          steps: [{ kind: "text", chunks: ['{"answer":"ready"}'] }]
+        })
+    }
+    const kernel = new ProviderKernel({
+      providers: new ProviderRegistry([provider]),
+      tools: new ToolRegistry([])
+    })
+
+    const completed = await collectProviderStream(
+      kernel.stream({
+        ...textRequest,
+        output: { kind: "structured", schema: z.object({ answer: z.string() }).strict() }
+      })
+    )
+
+    expect(completed.result).toMatchObject({
+      kind: "completed",
+      structured: { answer: "ready" }
+    })
+    expect(probe.callCount).toBe(1)
+    expect(probe.records[0]?.forcedTool).toBeNull()
   })
 
   test("streams normalized text and preserves nullable usage", async () => {

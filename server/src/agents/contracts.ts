@@ -60,7 +60,7 @@ export const InvocationShapeSchema = z
     providerId: ProviderIdSchema,
     messages: z.array(NeutralMessageSchema).min(1),
     toolIds: z.array(ToolIdSchema).max(16),
-    timeoutMilliseconds: z.number().int().positive().max(120_000).optional()
+    timeoutMilliseconds: z.number().int().positive().max(300_000).optional()
   })
   .strict()
 

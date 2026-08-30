@@ -109,25 +109,32 @@ export class ProviderKernel {
       let usage: ProviderUsage | null = null
       const toolUses = new Map<string, ReturnType<typeof ToolIdSchema.safeParse>["data"]>()
       try {
-        const result = yield* consume(agent, messages, input.output, signal, (event) => {
-          if (
-            event.type === "beforeToolCallEvent" &&
-            event.toolUse.name === "strands_structured_output"
-          )
-            structuredToolUses.add(event.toolUse.toolUseId)
-          if (
-            event.type === "toolResultEvent" &&
-            structuredToolUses.has(event.result.toolUseId) &&
-            event.result.status === "error"
-          ) {
-            structuredFailures += 1
-            if (structuredFailures > 1) throw new StructuredRepairLimitError()
+        const result = yield* consume(
+          agent,
+          messages,
+          input.output,
+          provider.descriptor.mode !== "runner",
+          signal,
+          (event) => {
+            if (
+              event.type === "beforeToolCallEvent" &&
+              event.toolUse.name === "strands_structured_output"
+            )
+              structuredToolUses.add(event.toolUse.toolUseId)
+            if (
+              event.type === "toolResultEvent" &&
+              structuredToolUses.has(event.result.toolUseId) &&
+              event.result.status === "error"
+            ) {
+              structuredFailures += 1
+              if (structuredFailures > 1) throw new StructuredRepairLimitError()
+            }
+            const normalized = normalize(event, toolUses)
+            if (normalized?.kind === "text_delta") text += normalized.text
+            if (normalized?.kind === "usage") usage = normalized.usage
+            return normalized
           }
-          const normalized = normalize(event, toolUses)
-          if (normalized?.kind === "text_delta") text += normalized.text
-          if (normalized?.kind === "usage") usage = normalized.usage
-          return normalized
-        })
+        )
         if (signal.aborted || result.stopReason === "cancelled") {
           if (timeout.signal.aborted) return yield* terminalFailure("timeout", true, usage)
           const event = { kind: "cancelled", usage, cost: null } as const
@@ -166,6 +173,7 @@ const consume = async function* (
   agent: Agent,
   messages: readonly Message[],
   output: ProviderInvocation["output"],
+  nativeStructuredOutput: boolean,
   signal: AbortSignal,
   map: (event: AgentStreamEvent) => ProviderEvent | null
 ): AsyncGenerator<ProviderEvent, AgentResult, undefined> {
@@ -173,10 +181,12 @@ const consume = async function* (
     cancelSignal: signal,
     limits: {
       turns: output.kind === "structured" ? 3 : 4,
-      outputTokens: 4096,
-      totalTokens: 16_384
+      outputTokens: 8_192,
+      totalTokens: 65_536
     },
-    ...(output.kind === "structured" ? { structuredOutputSchema: output.schema } : {})
+    ...(output.kind === "structured" && nativeStructuredOutput
+      ? { structuredOutputSchema: output.schema }
+      : {})
   }
   const stream = agent.stream([...messages], options)
   let next = await stream.next()
