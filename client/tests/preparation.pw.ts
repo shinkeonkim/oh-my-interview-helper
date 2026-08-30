@@ -11,6 +11,7 @@ test("reviews disclosure and generates a new cited preparation revision", async 
   let provenanceRequests = 0
   let previewRequests = 0
   let runRequests = 0
+  let taskRevision: Record<string, unknown> = {}
   const requestBodies: unknown[] = []
 
   await page.route("**/api/security/csrf", (route) =>
@@ -92,6 +93,42 @@ test("reviews disclosure and generates a new cited preparation revision", async 
   })
   await page.route("**/api/disclosures/confirm", (route) =>
     route.fulfill({ status: 201, json: { id: "55555555-5555-4555-8555-555555555555" } })
+  )
+  const taskId = "99999999-9999-4999-8999-999999999999"
+  await page.route("**/api/jobs", async (route) => {
+    runRequests += 1
+    requestBodies.push(
+      (route.request().postDataJSON() as { input: { request: unknown } }).input.request
+    )
+    revisionNumber += 1
+    taskRevision = {
+      id: crypto.randomUUID(),
+      seriesId,
+      number: revisionNumber,
+      providerId: "anthropic-api",
+      providerModel: "claude",
+      content: {
+        workflow: "cover_letter",
+        title: "지원 동기",
+        summary: "근거 기반 초안",
+        sections: [
+          {
+            heading: "경험",
+            body: "플랫폼 경험",
+            citations: [{ sourceId: postVersionId, note: "공고" }]
+          }
+        ]
+      }
+    }
+    await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })
+  })
+  await page.route(`**/api/jobs/${taskId}`, (route) =>
+    route.fulfill({ json: { id: taskId, state: "succeeded" } })
+  )
+  await page.route(`**/api/jobs/${taskId}/events?transport=poll`, (route) =>
+    route.fulfill({
+      json: { events: [{ kind: "progress", payload: { phase: "result", revision: taskRevision } }] }
+    })
   )
   await page.route("**/api/workflows/run", async (route) => {
     runRequests += 1

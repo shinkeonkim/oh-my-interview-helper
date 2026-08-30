@@ -63,6 +63,29 @@ test("creates cited research, distinguishes judgments, and refreshes its history
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "token" } })
   )
+  const taskId = "44444444-4444-4444-8444-444444444444"
+  let taskResultId = firstId
+  await page.route("**/api/jobs", async (route) => {
+    const payload = route.request().postDataJSON() as { input: { action: string } }
+    if (payload.input.action === "refresh") {
+      refreshRequests += 1
+      taskResultId = refreshedId
+      records = [record(refreshedId, firstId), ...records]
+    } else {
+      runRequests += 1
+      taskResultId = firstId
+      records = [record(firstId, null)]
+    }
+    await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })
+  })
+  await page.route(`**/api/jobs/${taskId}`, (route) =>
+    route.fulfill({ json: { id: taskId, state: "succeeded" } })
+  )
+  await page.route(`**/api/jobs/${taskId}/events?transport=poll`, (route) =>
+    route.fulfill({
+      json: { events: [{ kind: "progress", payload: { phase: "result", recordId: taskResultId } }] }
+    })
+  )
   await page.route("**/api/research", async (route) => {
     if (route.request().method() === "POST") {
       runRequests += 1

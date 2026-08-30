@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
+import { runBackgroundTask } from "../lib/background-task"
 
 type Platform = "wanted" | "saramin" | "jobkorea" | "remember" | "greeting" | "inthiswork"
 type Document = {
@@ -58,6 +59,7 @@ const platforms = ref<Platform[]>([
 const recommendations = ref<Recommendation[]>([])
 const savedUrls = ref(new Set<string>())
 const running = ref(false)
+const taskPhase = ref<string | null>(null)
 const savingUrl = ref<string | null>(null)
 const platformOptions: Array<[Platform, string]> = [
   ["wanted", "원티드"],
@@ -110,28 +112,30 @@ const discover = async () => {
   running.value = true
   recommendations.value = []
   try {
-    const response = await fetch("/api/job-search/discover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
-      body: JSON.stringify({
-        roles: values(roles.value),
-        skills: values(skills.value),
-        industries: values(industries.value),
-        companySizes: values(companySizes.value),
-        locations: values(locations.value),
-        experience: experience.value.trim(),
-        platforms: platforms.value,
-        documentVersionIds: selectedDocumentVersionIds.value
-      })
-    })
-    if (!response.ok) throw new Error("request")
-    recommendations.value = (
-      (await response.json()) as { recommendations: Recommendation[] }
-    ).recommendations
+    const result = await runBackgroundTask(
+      "ui.job_discovery",
+      {
+        request: {
+          roles: values(roles.value),
+          skills: values(skills.value),
+          industries: values(industries.value),
+          companySizes: values(companySizes.value),
+          locations: values(locations.value),
+          experience: experience.value.trim(),
+          platforms: platforms.value,
+          documentVersionIds: selectedDocumentVersionIds.value
+        }
+      },
+      await csrf(),
+      (_state, phase) => (taskPhase.value = phase),
+      controller.signal
+    )
+    recommendations.value = result["recommendations"] as Recommendation[]
   } catch {
     toast.error(copy("discoverFailed"))
   } finally {
     running.value = false
+    taskPhase.value = null
   }
 }
 const save = async (item: Recommendation) => {
@@ -254,6 +258,14 @@ onBeforeUnmount(() => controller.abort())
         <Button size="lg" class="w-fit" :disabled="!ready || running" @click="discover"
           ><Sparkles />{{ running ? copy("discovering") : copy("discover") }}</Button
         >
+        <div
+          v-if="running"
+          class="flex items-center gap-3 text-sm text-muted-foreground"
+          role="status"
+        >
+          <span class="size-2 animate-pulse rounded-full bg-primary" />
+          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+        </div>
       </CardContent>
     </Card>
     <section v-if="recommendations.length" class="grid gap-5">

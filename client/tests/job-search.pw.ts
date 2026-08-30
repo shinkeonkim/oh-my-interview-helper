@@ -41,11 +41,24 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
     })
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: [] } }))
-  await page.route("**/api/job-search/discover", async (route) => {
+  const taskId = "33333333-3333-4333-8333-333333333333"
+  await page.route("**/api/jobs", async (route) => {
     discoveryBody = route.request().postDataJSON()
     expect(route.request().headers()["x-csrf-token"]).toBe("job-search-token")
-    await route.fulfill({ json: { recommendations: [recommendation] } })
+    await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })
   })
+  await page.route(`**/api/jobs/${taskId}`, (route) =>
+    route.fulfill({ json: { id: taskId, state: "succeeded" } })
+  )
+  await page.route(`**/api/jobs/${taskId}/events?transport=poll`, (route) =>
+    route.fulfill({
+      json: {
+        events: [
+          { kind: "progress", payload: { phase: "result", recommendations: [recommendation] } }
+        ]
+      }
+    })
+  )
   await page.route("**/api/postings/url", async (route) => {
     savedBody = route.request().postDataJSON()
     await route.fulfill({ status: 201, json: { id: "post-1" } })
@@ -60,9 +73,14 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
   await expect(page.getByText("91")).toBeVisible()
   await expect(page.getByText("TypeScript")).toBeVisible()
   expect(discoveryBody).toMatchObject({
-    roles: ["플랫폼 엔지니어"],
-    skills: ["TypeScript", "Kubernetes"],
-    documentVersionIds: [documentVersionId]
+    kind: "ui.job_discovery",
+    input: {
+      request: {
+        roles: ["플랫폼 엔지니어"],
+        skills: ["TypeScript", "Kubernetes"],
+        documentVersionIds: [documentVersionId]
+      }
+    }
   })
 
   await page.getByRole("button", { name: "공고로 저장" }).click()

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
+import { runBackgroundTask } from "../lib/background-task"
 
 type SubjectType = "company" | "executive" | "team_lead" | "team_member"
 const props = withDefaults(
@@ -72,6 +73,7 @@ const urls = ref("")
 const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
 const running = ref(false)
+const taskPhase = ref<string | null>(null)
 const openingRecordId = ref<string | null>(null)
 const loadController = new AbortController()
 let contextId = 0
@@ -143,8 +145,6 @@ const submit = async (parentRecordId: string | null = null) => {
   const selectedSourceUrls = parsedSourceUrls.value
   running.value = true
   try {
-    const path =
-      parentRecordId === null ? "/api/research" : `/api/research/${parentRecordId}/refresh`
     const body =
       parentRecordId === null
         ? {
@@ -157,24 +157,30 @@ const submit = async (parentRecordId: string | null = null) => {
             parentRecordId: null
           }
         : { sourceUrls: selectedSourceUrls }
-    const response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
-      body: JSON.stringify(body)
-    })
-    if (!response.ok) throw new Error("research")
-    const value = (await response.json()) as ResearchRecord
+    const result = await runBackgroundTask(
+      "ui.research",
+      {
+        action: parentRecordId === null ? "create" : "refresh",
+        recordId: parentRecordId,
+        request: body
+      },
+      await csrf(),
+      (_state, phase) => (taskPhase.value = phase),
+      loadController.signal
+    )
     if (operationContext !== contextId) return
-    current.value = value
     await load()
+    if (typeof result["recordId"] === "string") await openRecord(result["recordId"])
   } catch {
     if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    if (operationContext === contextId) running.value = false
+    if (operationContext === contextId) {
+      running.value = false
+      taskPhase.value = null
+    }
   }
 }
 const openRecord = async (id: string) => {
-  if (running.value) return
   const requestId = ++recordRequestId
   const operationContext = contextId
   openingRecordId.value = id
@@ -271,7 +277,15 @@ onBeforeUnmount(() => {
         </div>
         <Button class="w-fit" :disabled="running || !researchReady" @click="submit(null)"
           ><Search />{{ copy("run") }}</Button
-        ></CardContent
+        >
+        <p
+          v-if="running"
+          class="flex items-center gap-3 text-sm text-muted-foreground"
+          role="status"
+        >
+          <span class="size-2 animate-pulse rounded-full bg-primary" />
+          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+        </p></CardContent
       ></Card
     >
     <section v-if="current" class="grid gap-5">

@@ -183,6 +183,7 @@ export const ko = {
     destination: "전송 대상",
     inputs: "전송 입력",
     confirm: "확인하고 생성",
+    backgroundRunning: "백그라운드에서 초안을 생성하고 있습니다",
     cancel: "취소",
     generate: "전송 내용 확인",
     regenerate: "새 버전 생성",
@@ -268,6 +269,7 @@ export const ko = {
     sourceHelp:
       "입력하지 않아도 에이전트가 회사명·인물명과 공고 맥락으로 공개 자료를 직접 찾습니다. 보강할 자료가 있다면 한 줄에 하나씩 최대 8개를 입력하세요.",
     run: "리서치 시작",
+    backgroundRunning: "백그라운드 리서치가 진행 중입니다",
     refresh: "새 출처로 갱신",
     identity: "신원 확인",
     confirmed: "확인됨",
@@ -325,6 +327,7 @@ export const ko = {
     platforms: "탐색할 채용 사이트",
     profileDocuments: "매칭에 사용할 대표 문서",
     discover: "에이전트로 채용공고 탐색",
+    backgroundRunning: "백그라운드에서 채용공고를 탐색하고 있습니다",
     discovering: "여러 사이트를 탐색하고 있습니다…",
     recommendations: "프로필 맞춤 추천",
     discoverFailed: "채용공고 탐색을 완료하지 못했습니다. 로컬 AI 연결과 검색 조건을 확인하세요.",

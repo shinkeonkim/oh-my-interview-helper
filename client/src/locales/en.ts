@@ -186,6 +186,7 @@ export const en = {
     destination: "Destination",
     inputs: "Inputs sent",
     confirm: "Confirm and generate",
+    backgroundRunning: "The draft is being generated in the background",
     cancel: "Cancel",
     generate: "Review what is sent",
     regenerate: "Generate new version",
@@ -270,6 +271,7 @@ export const en = {
     sourceHelp:
       "Leave this empty and the agent will find public evidence from the company or person details and posting context. Add up to eight URLs, one per line, when you have extra sources.",
     run: "Start research",
+    backgroundRunning: "Research is running in the background",
     refresh: "Refresh with sources",
     identity: "Identity resolution",
     confirmed: "Confirmed",
@@ -327,6 +329,7 @@ export const en = {
     platforms: "Job sites to search",
     profileDocuments: "Representative profile documents",
     discover: "Discover jobs with agent",
+    backgroundRunning: "Job discovery is running in the background",
     discovering: "Searching multiple job sites…",
     recommendations: "Profile-matched recommendations",
     discoverFailed: "Job discovery could not finish. Check the local AI connection and criteria.",
