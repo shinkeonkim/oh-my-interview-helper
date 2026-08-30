@@ -174,6 +174,10 @@ export const ko = {
     automaticAgent: "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
     document: "참고 문서",
     noDocument: "공고만 사용",
+    postingIncluded:
+      "현재 채용공고는 항상 기본 자료로 포함됩니다. 제출 문서는 여러 개 선택할 수 있습니다.",
+    noDocuments: "선택할 수 있는 제출 문서가 없습니다.",
+    topic: "답변 토픽",
     practiceAnswer: "연습 답변 (선택)",
     review: "전송 내용 검토",
     destination: "전송 대상",

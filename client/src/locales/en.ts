@@ -177,6 +177,10 @@ export const en = {
     automaticAgent: "The app automatically uses an available local Claude Code or Codex agent.",
     document: "Reference document",
     noDocument: "Use posting only",
+    postingIncluded:
+      "The current job posting is always included. You may select multiple submitted documents.",
+    noDocuments: "No submitted documents are available.",
+    topic: "Answer topic",
     practiceAnswer: "Practice answer (optional)",
     review: "Review disclosure",
     destination: "Destination",

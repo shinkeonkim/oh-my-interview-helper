@@ -60,7 +60,14 @@ type WorkflowRequest = {
   seriesId: string | null
   inputs: Array<Record<string, string>>
   practiceAnswer: string | null
+  topic: Topic | null
   generationKey: string
+}
+type Topic = {
+  id: string
+  label: string
+  description: string
+  promptHint: string
 }
 type Revision = {
   id: string
@@ -106,8 +113,9 @@ const documents = ref<Document[]>([])
 const providers = ref<Provider[]>([])
 const workflow = ref<Workflow>(props.workflowPreset)
 const providerId = ref("")
-const documentVersionId = ref("none")
+const selectedDocumentVersionIds = ref<string[]>([])
 const practiceAnswer = ref("")
+const selectedTopicId = ref("self-intro")
 const generationKey = ref(crypto.randomUUID())
 const preview = ref<{
   manifest: Manifest
@@ -127,10 +135,68 @@ const inputs = computed(() => {
   const values: Array<Record<string, string>> = []
   if (posting.value?.currentVersionId)
     values.push({ kind: "job_post_version", jobPostVersionId: posting.value.currentVersionId })
-  if (documentVersionId.value !== "none")
-    values.push({ kind: "document_version", documentVersionId: documentVersionId.value })
+  for (const documentVersionId of selectedDocumentVersionIds.value)
+    values.push({ kind: "document_version", documentVersionId })
   return values
 })
+const topics: readonly Topic[] = [
+  {
+    id: "self-intro",
+    label: "자기소개",
+    description: "경력 요약과 강점을 명확히 전달하는 자기소개",
+    promptHint: "30초, 1분, 3분 길이로 만들고 지원 동기와 연결합니다."
+  },
+  {
+    id: "work-experience",
+    label: "직무수행 경험",
+    description: "대표 프로젝트와 업무 성과 사례",
+    promptHint: "실제 경험 2~3건을 STAR 구조와 구체적인 수치로 설명합니다."
+  },
+  {
+    id: "collaboration",
+    label: "협업경험",
+    description: "팀 협업, 갈등 조정, 의사소통 사례",
+    promptHint: "의견 충돌 상황과 합의 과정, 직군 간 협업 사례를 우선합니다."
+  },
+  {
+    id: "work-style",
+    label: "업무방식",
+    description: "문제 접근 방법, 일하는 리듬, 도구 활용",
+    promptHint: "실제로 사용한 방법론과 도구, 반복 가능한 업무 관행을 인용합니다."
+  },
+  {
+    id: "values",
+    label: "가치관",
+    description: "왜 일하는지, 어떤 일에 시간을 쓰는지",
+    promptHint: "추상적인 단어 대신 가치관을 행동으로 보여준 사례를 사용합니다."
+  },
+  {
+    id: "failure-growth",
+    label: "실패와 성장",
+    description: "실패에서 배운 것과 이후의 변화",
+    promptHint: "실패 사실, 즉시 대응, 장기적인 업무 방식 변화를 순서대로 설명합니다."
+  },
+  {
+    id: "tech-decisions",
+    label: "기술 선택과 판단",
+    description: "기술 도입·포기 의사결정과 트레이드오프",
+    promptHint: "대안 비교, 선택 이유, 결과 회고를 근거와 함께 설명합니다."
+  },
+  {
+    id: "why-this-company",
+    label: "지원 동기 / 회사 적합도",
+    description: "왜 이 회사와 직무에 지원했는지",
+    promptHint: "공고, 회사, 기술 스택과 본인 경험이 맞는 지점 세 가지를 연결합니다."
+  }
+]
+const selectedTopic = computed(
+  () => topics.find((topic) => topic.id === selectedTopicId.value) ?? topics[0]!
+)
+const toggleDocument = (versionId: string) => {
+  selectedDocumentVersionIds.value = selectedDocumentVersionIds.value.includes(versionId)
+    ? selectedDocumentVersionIds.value.filter((id) => id !== versionId)
+    : [...selectedDocumentVersionIds.value, versionId]
+}
 const workflowLabels: Array<[Workflow, string]> = [
   ["cover_letter", "coverLetter"],
   ["resume_feedback", "resumeFeedback"],
@@ -156,6 +222,7 @@ const requestBody = (): WorkflowRequest => ({
   seriesId: revision.value?.seriesId ?? null,
   inputs: inputs.value,
   practiceAnswer: practiceAnswer.value.trim() || null,
+  topic: workflow.value === "topic_answers" ? selectedTopic.value : null,
   generationKey: generationKey.value
 })
 const load = async () => {
@@ -271,8 +338,9 @@ watch(
     provenanceRequestId += 1
     workflow.value = props.workflowPreset
     providerId.value = ""
-    documentVersionId.value = "none"
+    selectedDocumentVersionIds.value = []
     practiceAnswer.value = ""
+    selectedTopicId.value = "self-intro"
     generationKey.value = crypto.randomUUID()
     preview.value = null
     revision.value = null
@@ -321,19 +389,45 @@ onBeforeUnmount(() => {
             >
           </div>
           <div class="grid gap-2">
-            <Label for="preparation-document">{{ copy("document") }}</Label
-            ><Select v-model="documentVersionId"
-              ><SelectTrigger id="preparation-document"><SelectValue /></SelectTrigger
-              ><SelectContent
-                ><SelectItem value="none">{{ copy("noDocument") }}</SelectItem
-                ><SelectItem
-                  v-for="document in documents"
-                  :key="document.id"
-                  :value="document.currentVersionId!"
-                  >{{ document.title }} · v{{ document.versionNumber }}</SelectItem
-                ></SelectContent
-              ></Select
+            <Label>{{ copy("document") }}</Label>
+            <p class="text-sm text-muted-foreground">{{ copy("postingIncluded") }}</p>
+            <div class="grid max-h-48 gap-2 overflow-auto rounded-xl border p-3">
+              <label
+                v-for="document in documents"
+                :key="document.id"
+                class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted"
+              >
+                <input
+                  type="checkbox"
+                  :checked="selectedDocumentVersionIds.includes(document.currentVersionId!)"
+                  @change="toggleDocument(document.currentVersionId!)"
+                />
+                <span>{{ document.title }} · v{{ document.versionNumber }}</span>
+              </label>
+              <p v-if="documents.length === 0" class="text-sm text-muted-foreground">
+                {{ copy("noDocuments") }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div v-if="workflow === 'topic_answers'" class="grid gap-3">
+          <Label>{{ copy("topic") }}</Label>
+          <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <button
+              v-for="topic in topics"
+              :key="topic.id"
+              type="button"
+              class="rounded-xl border p-4 text-left transition-colors"
+              :class="
+                selectedTopicId === topic.id ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+              "
+              @click="selectedTopicId = topic.id"
             >
+              <span class="font-medium">{{ topic.label }}</span>
+              <span class="mt-1 block text-xs leading-5 text-muted-foreground">{{
+                topic.description
+              }}</span>
+            </button>
           </div>
         </div>
         <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>

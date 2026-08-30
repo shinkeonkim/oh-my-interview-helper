@@ -119,6 +119,8 @@ const load = async () => {
     const value = (await response.json()) as { records: RecordSummary[] }
     if (requestId !== loadRequestId || requestedPostId !== jobPostId.value) return
     records.value = value.records
+    const latest = value.records[0]
+    if (current.value === null && latest !== undefined) void openRecord(latest.id)
   } catch (error) {
     if (requestId === loadRequestId) throw error
   }

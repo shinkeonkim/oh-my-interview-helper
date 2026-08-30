@@ -98,6 +98,7 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
     readonly providerId: string
     readonly inputs: Parameters<PreparationExecutor["execute"]>[0]["inputs"]
     readonly practiceAnswer: string | null
+    readonly topic: Parameters<PreparationExecutor["execute"]>[0]["topic"]
     readonly generationKey: string
   }): {
     readonly invocation: ProviderInvocation
@@ -116,6 +117,7 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
           input.workflow,
           sources,
           input.practiceAnswer,
+          input.topic,
           input.generationKey
         ),
         toolIds: [],
@@ -133,6 +135,7 @@ const workflowMessages = (
   workflow: PreparationWorkflowKind,
   sources: readonly WorkflowSourceContent[],
   practiceAnswer: string | null,
+  topic: Parameters<PreparationExecutor["execute"]>[0]["topic"],
   generationKey: string
 ): ProviderInvocation["messages"] => [
   {
@@ -147,7 +150,7 @@ const workflowMessages = (
           `Workflow: ${workflow}`,
           `Generation key: ${generationKey}`,
           `Return only JSON matching this schema: ${JSON.stringify(z.toJSONSchema(PreparationOutputSchemas[workflow]))}`,
-          JSON.stringify({ sources, practiceAnswer })
+          JSON.stringify({ sources, practiceAnswer, topic })
         ].join("\n")
       }
     ]

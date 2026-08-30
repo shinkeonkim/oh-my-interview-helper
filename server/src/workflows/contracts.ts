@@ -61,7 +61,17 @@ export const PreparationRequestSchema = z
     generationKey: z.string().uuid(),
     seriesId: z.string().uuid().nullable().default(null),
     inputs: z.array(DisclosureInputRefSchema).min(1).max(30),
-    practiceAnswer: z.string().trim().min(1).max(20_000).nullable().default(null)
+    practiceAnswer: z.string().trim().min(1).max(20_000).nullable().default(null),
+    topic: z
+      .object({
+        id: z.string().trim().min(1).max(64),
+        label: z.string().trim().min(1).max(100),
+        description: z.string().trim().min(1).max(500),
+        promptHint: z.string().trim().min(1).max(1_000)
+      })
+      .strict()
+      .nullable()
+      .default(null)
   })
   .strict()
 export const PreparationDisclosureRequestSchema = PreparationRequestSchema.omit({

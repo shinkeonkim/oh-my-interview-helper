@@ -88,6 +88,7 @@ describe("Strands preparation executor", () => {
       seriesId: null,
       inputs: [{ kind: "job_post_version" as const, jobPostVersionId: version.id }],
       practiceAnswer: null,
+      topic: null,
       generationKey: crypto.randomUUID()
     }
     const preview = executor.preview(request)

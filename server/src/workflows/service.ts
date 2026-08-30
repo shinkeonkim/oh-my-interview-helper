@@ -25,6 +25,12 @@ export type PreparationExecutor = {
     readonly generationKey: string
     readonly inputs: readonly DisclosureInputRef[]
     readonly practiceAnswer: string | null
+    readonly topic: {
+      readonly id: string
+      readonly label: string
+      readonly description: string
+      readonly promptHint: string
+    } | null
     readonly signal: AbortSignal
   }) => Promise<PreparationExecution>
 }
@@ -60,6 +66,7 @@ export class PreparationWorkflowService {
       generationKey: request.generationKey,
       inputs: request.inputs,
       practiceAnswer: request.practiceAnswer,
+      topic: request.topic,
       signal
     })
     if (signal.aborted) throw new PreparationWorkflowError("cancelled")
