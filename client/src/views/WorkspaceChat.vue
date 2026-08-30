@@ -26,7 +26,7 @@ type Document = {
   currentVersionId: string | null
   versionNumber: number | null
 }
-type Provider = { id: string; model: { displayName: string }; configured: boolean }
+type Provider = { id: string; configured: boolean }
 type Conversation = { id: string; title: string }
 type Message = {
   id: string
@@ -242,36 +242,23 @@ onBeforeUnmount(() => {
         </article>
       </div>
       <p v-else class="text-sm text-muted-foreground">{{ copy("empty") }}</p>
-      <div class="grid gap-4 md:grid-cols-2">
-        <div class="grid gap-2">
-          <Label for="chat-provider">{{ copy("provider") }}</Label
-          ><select
-            id="chat-provider"
-            v-model="providerId"
-            class="h-9 rounded-md border bg-background px-3 text-sm"
+      <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>
+      <div class="grid gap-2">
+        <Label for="chat-document">{{ copy("document") }}</Label
+        ><select
+          id="chat-document"
+          v-model="documentVersionId"
+          class="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="none">{{ copy("noDocument") }}</option>
+          <option
+            v-for="document in documents"
+            :key="document.id"
+            :value="document.currentVersionId!"
           >
-            <option v-for="provider in providers" :key="provider.id" :value="provider.id">
-              {{ provider.id }} · {{ provider.model.displayName }}
-            </option>
-          </select>
-        </div>
-        <div class="grid gap-2">
-          <Label for="chat-document">{{ copy("document") }}</Label
-          ><select
-            id="chat-document"
-            v-model="documentVersionId"
-            class="h-9 rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="none">{{ copy("noDocument") }}</option>
-            <option
-              v-for="document in documents"
-              :key="document.id"
-              :value="document.currentVersionId!"
-            >
-              {{ document.title }} · v{{ document.versionNumber }}
-            </option>
-          </select>
-        </div>
+            {{ document.title }} · v{{ document.versionNumber }}
+          </option>
+        </select>
       </div>
       <div class="grid gap-2">
         <Label for="chat-message">{{ copy("message") }}</Label

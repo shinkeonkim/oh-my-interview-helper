@@ -171,6 +171,7 @@ export const ko = {
     topicAnswers: "토픽별 답안",
     companyQuestions: "회사에 물어볼 질문",
     provider: "Provider",
+    automaticAgent: "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
     document: "참고 문서",
     noDocument: "공고만 사용",
     practiceAnswer: "연습 답변 (선택)",
@@ -190,7 +191,7 @@ export const ko = {
     provenanceFailed: "생성 근거를 불러오지 못했습니다.",
     current: "최신 상태",
     staleStatus: "변경 감지",
-    providerContext: "Provider 실행 정보",
+    providerContext: "AI 실행 정보",
     promptContext: "프롬프트 정보",
     staleReasons: "다시 생성이 필요한 이유",
     stale: {
@@ -207,7 +208,8 @@ export const ko = {
     },
     copied: "클립보드에 복사했습니다.",
     failed: "생성 요청을 처리하지 못했습니다.",
-    unavailable: "사용 가능한 Provider 또는 공고 버전이 없습니다."
+    unavailable:
+      "사용 가능한 로컬 AI 실행 환경 또는 공고 버전이 없습니다. 설정에서 연결 상태를 확인하세요."
   },
   workspace: {
     overline: "채용공고 워크스페이스",
@@ -230,14 +232,15 @@ export const ko = {
       you: "나",
       assistant: "AI 답변",
       citation: "근거",
-      provider: "Provider",
+      automaticAgent:
+        "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
       document: "참고 문서",
       noDocument: "공고만 사용",
       message: "질문",
       placeholder: "이 역할에 맞춰 어떤 경험을 강조해야 할까요?",
       review: "전송 내용 확인",
       disclosureTitle: "외부 전송 내용 확인",
-      disclosureCopy: "선택한 Provider로 전송할 정확한 버전의 자료를 확인하세요.",
+      disclosureCopy: "AI 실행 환경으로 전송할 정확한 버전의 자료를 확인하세요.",
       cancel: "취소",
       send: "확인하고 전송",
       sending: "전송 중",

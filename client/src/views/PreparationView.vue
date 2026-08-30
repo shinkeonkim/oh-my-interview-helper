@@ -308,7 +308,7 @@ onBeforeUnmount(() => {
         >
           {{ copy("unavailable") }}
         </p>
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2">
           <div class="grid gap-2">
             <Label for="preparation-workflow">{{ copy("workflow") }}</Label
             ><Select v-model="workflow"
@@ -317,17 +317,6 @@ onBeforeUnmount(() => {
                 ><SelectItem v-for="[value, label] in workflowLabels" :key="value" :value="value">{{
                   copy(label)
                 }}</SelectItem></SelectContent
-              ></Select
-            >
-          </div>
-          <div class="grid gap-2">
-            <Label for="preparation-provider">{{ copy("provider") }}</Label
-            ><Select v-model="providerId"
-              ><SelectTrigger id="preparation-provider"><SelectValue /></SelectTrigger
-              ><SelectContent
-                ><SelectItem v-for="provider in providers" :key="provider.id" :value="provider.id"
-                  >{{ provider.id }} · {{ provider.model.displayName }}</SelectItem
-                ></SelectContent
               ></Select
             >
           </div>
@@ -347,6 +336,7 @@ onBeforeUnmount(() => {
             >
           </div>
         </div>
+        <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>
         <div class="grid gap-2">
           <Label for="preparation-practice-answer">{{ copy("practiceAnswer") }}</Label
           ><textarea

@@ -174,6 +174,7 @@ export const en = {
     topicAnswers: "Topic answers",
     companyQuestions: "Questions for the company",
     provider: "Provider",
+    automaticAgent: "The app automatically uses an available local Claude Code or Codex agent.",
     document: "Reference document",
     noDocument: "Use posting only",
     practiceAnswer: "Practice answer (optional)",
@@ -193,7 +194,7 @@ export const en = {
     provenanceFailed: "Generation provenance could not be loaded.",
     current: "Current",
     staleStatus: "Change detected",
-    providerContext: "Provider execution",
+    providerContext: "AI execution",
     promptContext: "Prompt",
     staleReasons: "Reasons to regenerate",
     stale: {
@@ -210,7 +211,8 @@ export const en = {
     },
     copied: "Copied to clipboard.",
     failed: "The generation request could not be completed.",
-    unavailable: "No configured provider or posting version is available."
+    unavailable:
+      "No local AI agent or posting version is available. Check the connection in Settings."
   },
   workspace: {
     overline: "JOB WORKSPACE",
@@ -233,14 +235,14 @@ export const en = {
       you: "You",
       assistant: "AI answer",
       citation: "Evidence",
-      provider: "Provider",
+      automaticAgent: "The app automatically uses an available local Claude Code or Codex agent.",
       document: "Reference document",
       noDocument: "Posting only",
       message: "Question",
       placeholder: "Which experience should I emphasize for this role?",
       review: "Review disclosure",
       disclosureTitle: "Review external disclosure",
-      disclosureCopy: "Confirm the exact source versions sent to the selected provider.",
+      disclosureCopy: "Confirm the exact source versions sent to the AI execution environment.",
       cancel: "Cancel",
       send: "Confirm and send",
       sending: "Sending",
