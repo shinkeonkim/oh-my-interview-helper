@@ -1,5 +1,6 @@
 .omo/evidence/
 .omo/
+DESIGN_PROMPT.md
 client/dist/
 node_modules/
 server/dist/

@@ -135,7 +135,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
             :aria-label="copy('actions.homeLabel')"
           >
             <span
-              class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
+              class="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-[#4d7cff] text-sm font-bold text-primary-foreground shadow-[0_8px_24px_rgb(0_82_255/0.35)]"
             >
               IH
             </span>
@@ -197,7 +197,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
 
       <SidebarInset class="min-w-0 bg-background">
         <header
-          class="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border/80 bg-background/95 px-4 backdrop-blur sm:px-6"
+          class="sticky top-0 z-20 flex min-h-18 items-center justify-between gap-3 border-b border-border/70 bg-background/80 px-4 backdrop-blur-xl sm:px-6"
         >
           <div class="flex min-w-0 items-center gap-2">
             <SidebarTrigger
@@ -321,7 +321,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
         <div
           id="main-content"
           tabindex="-1"
-          class="min-h-[calc(100svh-4rem)] min-w-0 px-4 py-8 sm:px-6 sm:py-10 lg:px-10"
+          class="min-h-[calc(100svh-4.5rem)] min-w-0 px-4 py-10 sm:px-8 sm:py-14 lg:px-12 lg:py-16"
         >
           <div class="mx-auto w-full max-w-6xl">
             <slot />

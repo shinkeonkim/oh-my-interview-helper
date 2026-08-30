@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 REQUEST.md
+DESIGN_PROMPT.md
 .omo/evidence/
 
 # Runtime state and credentials
