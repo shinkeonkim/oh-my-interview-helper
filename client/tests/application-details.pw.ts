@@ -48,7 +48,7 @@ test("keeps the latest posting version and application history selection", async
 
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: posts } }))
   await page.route("**/api/applications", (route) => route.fulfill({ json: { applications } }))
-  await page.route("**/api/pipeline/stages", (route) =>
+  await page.route(/\/api\/postings\/[^/]+\/pipeline\/stages$/, (route) =>
     route.fulfill({ json: { stages: [stage] } })
   )
   await page.route(/\/api\/postings\/[^/]+\/versions$/, async (route) => {
@@ -171,7 +171,9 @@ test("keeps the latest application list after overlapping transitions", async ({
     route.fulfill({ json: { csrfToken: "token" } })
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: posts } }))
-  await page.route("**/api/pipeline/stages", (route) => route.fulfill({ json: { stages } }))
+  await page.route(/\/api\/postings\/[^/]+\/pipeline\/stages$/, (route) =>
+    route.fulfill({ json: { stages } })
+  )
   await page.route("**/api/applications", async (route) => {
     listRequests += 1
     const snapshot = structuredClone(applications)

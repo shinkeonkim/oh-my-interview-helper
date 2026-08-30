@@ -422,4 +422,54 @@ describe("job posting and hiring pipeline API", () => {
       ).status
     ).toBe(400)
   })
+
+  test("keeps hiring stages independently configurable for each posting", async () => {
+    const { app, headers } = await setup()
+    const jsonHeaders = { ...headers, "Content-Type": "application/json" }
+    const createPost = async (title: string) =>
+      (await (
+        await app.request(`${base}/postings/manual`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ title, companyName: "Acme", teamName: null, text: "Body" })
+        })
+      ).json()) as { id: string }
+    const first = await createPost("Backend")
+    const second = await createPost("Frontend")
+    const created = await app.request(`${base}/postings/${first.id}/pipeline/stages`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ name: "Culture interview" })
+    })
+    expect(created.status).toBe(201)
+    const custom = (await created.json()) as { id: string }
+    const firstStages = (
+      (await (await app.request(`${base}/postings/${first.id}/pipeline/stages`)).json()) as {
+        stages: Array<{ id: string; name: string }>
+      }
+    ).stages
+    const secondStages = (
+      (await (await app.request(`${base}/postings/${second.id}/pipeline/stages`)).json()) as {
+        stages: Array<{ id: string; name: string }>
+      }
+    ).stages
+    expect(firstStages.some((stage) => stage.id === custom.id)).toBe(true)
+    expect(secondStages.some((stage) => stage.id === custom.id)).toBe(false)
+    expect(
+      (
+        await app.request(`${base}/postings/${first.id}/pipeline/stages/${custom.id}`, {
+          method: "PATCH",
+          headers: jsonHeaders,
+          body: JSON.stringify({ name: "Values interview" })
+        })
+      ).status
+    ).toBe(204)
+    expect(
+      (
+        (await (await app.request(`${base}/postings/${first.id}/pipeline/stages`)).json()) as {
+          stages: Array<{ id: string; name: string }>
+        }
+      ).stages.find((stage) => stage.id === custom.id)?.name
+    ).toBe("Values interview")
+  })
 })

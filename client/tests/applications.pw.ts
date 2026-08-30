@@ -97,6 +97,49 @@ test("creates a posting and moves an application through the local pipeline", as
   )
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings } }))
   let stageCreateRequests = 0
+  await page.route(`**/api/postings/${post.id}/pipeline/stages`, async (route) => {
+    if (route.request().method() === "POST") {
+      stageCreateRequests += 1
+      const input = route.request().postDataJSON() as { name: string }
+      stages = [
+        ...stages,
+        {
+          id: "99999999-9999-4999-8999-999999999999",
+          key: "post_custom",
+          name: input.name,
+          position: stages.length + 1,
+          outcome: null,
+          system: false
+        }
+      ]
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    await route.fulfill({
+      status: route.request().method() === "POST" ? 201 : 200,
+      json: { stages }
+    })
+  })
+  await page.route(`**/api/postings/${post.id}/pipeline/stages/order`, async (route) => {
+    const { stageIds } = route.request().postDataJSON() as { stageIds: string[] }
+    stages = stageIds.map((id, index) => {
+      const stage = stages.find((candidate) => candidate.id === id)
+      if (stage === undefined) throw new Error("stage missing")
+      return { ...stage, position: index + 1 }
+    })
+    await route.fulfill({ status: 204 })
+  })
+  await page.route(/\/api\/postings\/[^/]+\/pipeline\/stages\/[0-9a-f-]+$/, async (route) => {
+    const id = route.request().url().split("/").at(-1)
+    if (route.request().method() === "PATCH") {
+      const { name } = route.request().postDataJSON() as { name: string }
+      stages = stages.map((stage) => (stage.id === id ? { ...stage, name } : stage))
+    } else {
+      stages = stages
+        .filter((stage) => stage.id !== id)
+        .map((stage, index) => ({ ...stage, position: index + 1 }))
+    }
+    await route.fulfill({ status: 204 })
+  })
   await page.route("**/api/pipeline/stages", async (route) => {
     if (route.request().method() === "POST") {
       stageCreateRequests += 1
@@ -419,6 +462,7 @@ test("creates a posting and moves an application through the local pipeline", as
   await expect(page.getByRole("button", { name: "지원 보관" })).toHaveCount(0)
   expect(transitionRequests).toBe(3)
   expect(archiveApplicationRequests).toBe(1)
+  await page.getByRole("button", { name: "단계 설정" }).click()
   const newStageInput = page.getByPlaceholder("새 단계 이름")
   const addStageButton = page.getByRole("button", { name: "단계 추가" })
   await expect(addStageButton).toBeDisabled()

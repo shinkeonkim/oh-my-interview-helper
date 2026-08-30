@@ -80,6 +80,7 @@ const applications = ref<Application[]>([])
 const startingPostIds = ref<ReadonlySet<string>>(new Set())
 const pendingPostIds = ref<ReadonlySet<string>>(new Set())
 const stages = ref<Stage[]>([])
+const stagesByPost = ref<Record<string, Stage[]>>({})
 const stageNames = ref<Record<string, string>>({})
 const source = ref<Source>("manual")
 const title = ref("")
@@ -114,6 +115,7 @@ const interviews = ref<
 const newStage = ref("")
 const stagesBusy = ref(false)
 const activePost = ref<Posting | null>(null)
+const activeStagePost = ref<Posting | null>(null)
 const postingVersions = ref<PostingVersion[]>([])
 const versionSource = ref<Source>("url")
 const updateUrl = ref("")
@@ -126,6 +128,9 @@ let historyRequestId = 0
 let versionsRequestId = 0
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
 const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
+const editableStages = computed(() =>
+  activeStagePost.value === null ? [] : (stagesByPost.value[activeStagePost.value.id] ?? [])
+)
 const activeApplicationPostIds = computed(
   () =>
     new Set(
@@ -225,21 +230,33 @@ const setPostPending = (id: string, pending: boolean) => {
 const load = async () => {
   const requestId = ++loadRequestId
   try {
-    const [postResponse, applicationResponse, stageResponse] = await Promise.all([
+    const [postResponse, applicationResponse] = await Promise.all([
       fetch("/api/postings", { signal: loadController.signal }),
-      fetch("/api/applications", { signal: loadController.signal }),
-      fetch("/api/pipeline/stages", { signal: loadController.signal })
+      fetch("/api/applications", { signal: loadController.signal })
     ])
-    if (!postResponse.ok || !applicationResponse.ok || !stageResponse.ok) throw new Error("request")
-    const [postValue, applicationValue, stageValue] = await Promise.all([
+    if (!postResponse.ok || !applicationResponse.ok) throw new Error("request")
+    const [postValue, applicationValue] = await Promise.all([
       postResponse.json() as Promise<{ postings: Posting[] }>,
-      applicationResponse.json() as Promise<{ applications: Application[] }>,
-      stageResponse.json() as Promise<{ stages: Stage[] }>
+      applicationResponse.json() as Promise<{ applications: Application[] }>
     ])
+    const stageEntries = await Promise.all(
+      postValue.postings.map(async (post) => {
+        const response = await fetch(`/api/postings/${post.id}/pipeline/stages`, {
+          signal: loadController.signal
+        })
+        if (!response.ok) throw new Error("request")
+        return [post.id, ((await response.json()) as { stages: Stage[] }).stages] as const
+      })
+    )
     if (requestId !== loadRequestId) return
     postings.value = postValue.postings
     applications.value = applicationValue.applications
-    stages.value = stageValue.stages
+    stagesByPost.value = Object.fromEntries(stageEntries)
+    stages.value = [
+      ...new Map(
+        stageEntries.flatMap(([, value]) => value.map((stage) => [stage.id, stage]))
+      ).values()
+    ]
     stageNames.value = Object.fromEntries(stages.value.map((stage) => [stage.id, stage.name]))
     selectedStages.value = Object.fromEntries(
       applications.value.map((item) => [item.id, item.stageId])
@@ -475,15 +492,19 @@ const addPostingVersion = async () => {
     updatingPost.value = false
   }
 }
+const editStages = (post: Posting) => {
+  activeStagePost.value = post
+  const postStages = stagesByPost.value[post.id] ?? []
+  stageNames.value = Object.fromEntries(postStages.map((stage) => [stage.id, stage.name]))
+}
 const addStage = async () => {
-  if (!newStageReady.value || stagesBusy.value) return
+  if (!newStageReady.value || stagesBusy.value || activeStagePost.value === null) return
   stagesBusy.value = true
   try {
-    const key = `custom_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`
     await request(
-      "/api/pipeline/stages",
+      `/api/postings/${activeStagePost.value.id}/pipeline/stages`,
       "POST",
-      JSON.stringify({ key, name: newStage.value.trim() })
+      JSON.stringify({ name: newStage.value.trim() })
     )
     newStage.value = ""
     await load()
@@ -495,10 +516,14 @@ const addStage = async () => {
 }
 const renameStage = async (stage: Stage) => {
   const name = stageNames.value[stage.id]?.trim()
-  if (stagesBusy.value || !name || name === stage.name) return
+  if (stagesBusy.value || activeStagePost.value === null || !name || name === stage.name) return
   stagesBusy.value = true
   try {
-    await request(`/api/pipeline/stages/${stage.id}`, "PATCH", JSON.stringify({ name }))
+    await request(
+      `/api/postings/${activeStagePost.value.id}/pipeline/stages/${stage.id}`,
+      "PATCH",
+      JSON.stringify({ name })
+    )
     await load()
     toast.success(copy("stageSaved"))
   } catch {
@@ -508,8 +533,8 @@ const renameStage = async (stage: Stage) => {
   }
 }
 const moveStage = async (stage: Stage, offset: -1 | 1) => {
-  if (stagesBusy.value) return
-  const ordered = [...stages.value].sort((left, right) => left.position - right.position)
+  if (stagesBusy.value || activeStagePost.value === null) return
+  const ordered = [...editableStages.value].sort((left, right) => left.position - right.position)
   const index = ordered.findIndex((item) => item.id === stage.id)
   const target = index + offset
   if (index < 0 || target < 0 || target >= ordered.length) return
@@ -517,7 +542,7 @@ const moveStage = async (stage: Stage, offset: -1 | 1) => {
   stagesBusy.value = true
   try {
     await request(
-      "/api/pipeline/stages/order",
+      `/api/postings/${activeStagePost.value.id}/pipeline/stages/order`,
       "PUT",
       JSON.stringify({ stageIds: ordered.map((item) => item.id) })
     )
@@ -529,10 +554,10 @@ const moveStage = async (stage: Stage, offset: -1 | 1) => {
   }
 }
 const deleteStage = async (stage: Stage) => {
-  if (stagesBusy.value) return
+  if (stagesBusy.value || activeStagePost.value === null) return
   stagesBusy.value = true
   try {
-    await request(`/api/pipeline/stages/${stage.id}`, "DELETE")
+    await request(`/api/postings/${activeStagePost.value.id}/pipeline/stages/${stage.id}`, "DELETE")
     await load()
     toast.success(copy("stageDeleted"))
   } catch {
@@ -687,6 +712,8 @@ onBeforeUnmount(() => {
               }}</Button
             ><Button variant="outline" :disabled="updatingPost" @click="showVersions(post)"
               ><History />{{ copy("versionHistory") }}</Button
+            ><Button variant="outline" @click="editStages(post)"
+              ><Save />{{ copy("stages") }}</Button
             ><Button
               v-if="post.state === 'active'"
               variant="ghost"
@@ -808,9 +835,12 @@ onBeforeUnmount(() => {
                 :aria-label="`${copy('stage')}: ${application.stageName}`"
                 ><SelectValue /></SelectTrigger
               ><SelectContent
-                ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
-                  stage.name
-                }}</SelectItem></SelectContent
+                ><SelectItem
+                  v-for="stage in stagesByPost[application.jobPostId] ?? []"
+                  :key="stage.id"
+                  :value="stage.id"
+                  >{{ stage.name }}</SelectItem
+                ></SelectContent
               ></Select
             ><Button
               variant="secondary"
@@ -904,13 +934,13 @@ onBeforeUnmount(() => {
       ></Card
     >
 
-    <Card :aria-busy="stagesBusy"
+    <Card v-if="activeStagePost" :aria-busy="stagesBusy"
       ><CardHeader
-        ><CardTitle>{{ copy("stages") }}</CardTitle></CardHeader
+        ><CardTitle>{{ activeStagePost.title }} · {{ copy("stages") }}</CardTitle></CardHeader
       ><CardContent
         ><div class="grid gap-2">
           <div
-            v-for="(stage, index) in stages"
+            v-for="(stage, index) in editableStages"
             :key="stage.id"
             class="grid grid-cols-[auto_minmax(0,1fr)_repeat(3,auto)] items-center gap-2 rounded-lg border p-2 sm:grid-cols-[auto_minmax(0,1fr)_repeat(4,auto)]"
           >
@@ -936,7 +966,7 @@ onBeforeUnmount(() => {
               size="icon"
               variant="ghost"
               :aria-label="`${copy('moveStageDown')}: ${stage.name}`"
-              :disabled="stagesBusy || index === stages.length - 1"
+              :disabled="stagesBusy || index === editableStages.length - 1"
               @click="moveStage(stage, 1)"
               ><ArrowDown
             /></Button>
@@ -951,7 +981,6 @@ onBeforeUnmount(() => {
               ><Save
             /></Button>
             <Button
-              v-if="!stage.system"
               size="icon"
               variant="ghost"
               :aria-label="`${copy('deleteStage')}: ${stage.name}`"

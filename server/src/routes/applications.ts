@@ -81,6 +81,64 @@ export const createApplicationRoutes = (service: ApplicationService): Hono => {
       return failure(context, error)
     }
   })
+  routes.get("/postings/:id/pipeline/stages", (context) => {
+    try {
+      return context.json({ stages: repository.postStages(context.req.param("id")) })
+    } catch (error) {
+      return failure(context, error)
+    }
+  })
+  routes.post("/postings/:id/pipeline/stages", async (context) => {
+    try {
+      const body = z
+        .object({ name: z.string().trim().min(1).max(80) })
+        .strict()
+        .parse(await context.req.json())
+      return context.json(
+        repository.createPostStage({
+          postId: context.req.param("id"),
+          id: crypto.randomUUID(),
+          name: body.name,
+          createdAt: new Date().toISOString()
+        }),
+        201
+      )
+    } catch (error) {
+      return failure(context, error)
+    }
+  })
+  routes.patch("/postings/:id/pipeline/stages/:stageId", async (context) => {
+    try {
+      const body = z
+        .object({ name: z.string().trim().min(1).max(80) })
+        .strict()
+        .parse(await context.req.json())
+      repository.renamePostStage(context.req.param("id"), context.req.param("stageId"), body.name)
+      return context.body(null, 204)
+    } catch (error) {
+      return failure(context, error)
+    }
+  })
+  routes.put("/postings/:id/pipeline/stages/order", async (context) => {
+    try {
+      const body = z
+        .object({ stageIds: z.array(Id).min(1) })
+        .strict()
+        .parse(await context.req.json())
+      repository.reorderPostStages(context.req.param("id"), body.stageIds)
+      return context.body(null, 204)
+    } catch (error) {
+      return failure(context, error)
+    }
+  })
+  routes.delete("/postings/:id/pipeline/stages/:stageId", (context) => {
+    try {
+      repository.deletePostStage(context.req.param("id"), context.req.param("stageId"))
+      return context.body(null, 204)
+    } catch (error) {
+      return failure(context, error)
+    }
+  })
   routes.get("/postings/:id/versions", (context) => {
     try {
       return context.json({ versions: repository.versions(context.req.param("id")) })

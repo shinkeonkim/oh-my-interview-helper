@@ -160,6 +160,20 @@ CREATE TRIGGER research_claims_immutable_delete BEFORE DELETE ON research_claims
 CREATE TRIGGER research_records_analysis_immutable BEFORE UPDATE OF subject_type,subject_name,parent_record_id,identity_status,identity_candidates_json,analysis_json ON research_records BEGIN SELECT RAISE(ABORT,'research analysis is immutable'); END;
 `
 
+const perPostingPipelineSql = `
+CREATE TABLE job_post_pipeline_stages (
+  job_post_id TEXT NOT NULL REFERENCES job_posts(id) ON DELETE RESTRICT,
+  stage_id TEXT NOT NULL REFERENCES pipeline_stages(id) ON DELETE RESTRICT,
+  name TEXT NOT NULL CHECK(length(trim(name))>0),
+  position INTEGER NOT NULL CHECK(position>0),
+  PRIMARY KEY(job_post_id,stage_id),
+  UNIQUE(job_post_id,position)
+);
+INSERT INTO job_post_pipeline_stages (job_post_id,stage_id,name,position)
+SELECT p.id,s.id,s.name,s.position FROM job_posts p CROSS JOIN pipeline_stages s;
+CREATE INDEX job_post_pipeline_stages_post_idx ON job_post_pipeline_stages(job_post_id,position);
+`
+
 export const migrations: readonly Migration[] = [
   { id: "0001_core", sql: schemaSql },
   { id: "0002_provenance", sql: provenanceSql },
@@ -173,7 +187,8 @@ export const migrations: readonly Migration[] = [
   { id: "0010_consent_artifact_integrity", sql: consentArtifactIntegritySql },
   { id: "0011_document_library", sql: documentLibrarySql },
   { id: "0012_application_pipeline", sql: applicationPipelineSql },
-  { id: "0013_cited_research", sql: citedResearchSql }
+  { id: "0013_cited_research", sql: citedResearchSql },
+  { id: "0014_per_posting_pipeline", sql: perPostingPipelineSql }
 ]
 
 export const migrationChecksum = (migration: Migration): string =>
