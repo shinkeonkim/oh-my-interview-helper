@@ -21,13 +21,14 @@ const environment = {
 }
 
 const processes = [
-  Bun.spawn(["bun", "--hot", "server/src/index.ts"], {
+  Bun.spawn(["bun", "server/src/index.ts"], {
     env: environment,
     stdout: "inherit",
     stderr: "inherit",
     stdin: "inherit"
   }),
-  Bun.spawn(["bun", "run", "--cwd", "client", "dev"], {
+  Bun.spawn(["node", "../node_modules/vite/bin/vite.js", "--host", "127.0.0.1"], {
+    cwd: "client",
     env: environment,
     stdout: "inherit",
     stderr: "inherit",
