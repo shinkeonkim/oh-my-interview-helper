@@ -584,7 +584,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="grid gap-2">
-          <Label for="posting-source">{{ copy("addPosting") }}</Label
+          <Label for="posting-source">{{ copy("inputMethod") }}</Label
           ><Select v-model="source"
             ><SelectTrigger id="posting-source" class="w-44"><SelectValue /></SelectTrigger
             ><SelectContent
@@ -912,16 +912,19 @@ onBeforeUnmount(() => {
           <div
             v-for="(stage, index) in stages"
             :key="stage.id"
-            class="flex flex-wrap items-center gap-2 rounded-lg border p-2"
+            class="grid grid-cols-[auto_minmax(0,1fr)_repeat(3,auto)] items-center gap-2 rounded-lg border p-2 sm:grid-cols-[auto_minmax(0,1fr)_repeat(4,auto)]"
           >
             <span class="w-6 text-center text-sm text-muted-foreground">{{ stage.position }}</span>
             <Input
               v-model="stageNames[stage.id]"
-              class="min-w-48 flex-1"
+              class="col-span-4 min-w-0 sm:col-span-1"
               :aria-label="`${copy('saveStage')}: ${stage.name}`"
               :disabled="stagesBusy"
             />
             <Button
+              :class="
+                stage.system ? 'col-start-3 sm:col-start-auto' : 'col-start-2 sm:col-start-auto'
+              "
               size="icon"
               variant="ghost"
               :aria-label="`${copy('moveStageUp')}: ${stage.name}`"
