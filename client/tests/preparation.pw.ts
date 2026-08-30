@@ -96,6 +96,7 @@ test("reviews disclosure and generates a new cited preparation revision", async 
   )
   const taskId = "99999999-9999-4999-8999-999999999999"
   await page.route("**/api/jobs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] })
     runRequests += 1
     requestBodies.push(
       (route.request().postDataJSON() as { input: { request: unknown } }).input.request

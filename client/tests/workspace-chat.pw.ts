@@ -96,6 +96,7 @@ test("reviews exact sources and keeps a cited application conversation", async (
     ]
   }
   await page.route("**/api/jobs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] })
     bodies.push((route.request().postDataJSON() as { input: { request: unknown } }).input.request)
     await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })
   })

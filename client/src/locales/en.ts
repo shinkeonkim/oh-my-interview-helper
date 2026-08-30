@@ -37,6 +37,7 @@ export const en = {
     searchEmpty: "No matching screens",
     themeLabel: "Choose theme",
     sidebarToggle: "Toggle sidebar",
+    backgroundTasks: "Background tasks in progress",
     homeLabel: "Interview Helper home"
   },
   home: {

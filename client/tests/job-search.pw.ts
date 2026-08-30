@@ -43,6 +43,7 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
   await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: [] } }))
   const taskId = "33333333-3333-4333-8333-333333333333"
   await page.route("**/api/jobs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] })
     discoveryBody = route.request().postDataJSON()
     expect(route.request().headers()["x-csrf-token"]).toBe("job-search-token")
     await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })

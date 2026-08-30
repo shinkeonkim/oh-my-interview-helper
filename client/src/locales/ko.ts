@@ -35,6 +35,7 @@ export const ko = {
     searchEmpty: "일치하는 화면이 없습니다",
     themeLabel: "테마 선택",
     sidebarToggle: "사이드바 전환",
+    backgroundTasks: "진행 중인 백그라운드 작업",
     homeLabel: "Interview Helper 홈"
   },
   home: {

@@ -66,6 +66,7 @@ test("creates cited research, distinguishes judgments, and refreshes its history
   const taskId = "44444444-4444-4444-8444-444444444444"
   let taskResultId = firstId
   await page.route("**/api/jobs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] })
     const payload = route.request().postDataJSON() as { input: { action: string } }
     if (payload.input.action === "refresh") {
       refreshRequests += 1

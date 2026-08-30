@@ -12,7 +12,8 @@ import {
   Moon,
   Search,
   Settings2,
-  Sun
+  Sun,
+  Workflow
 } from "lucide-vue-next"
 import type { Component } from "vue"
 
@@ -67,6 +68,8 @@ const route = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
 const searchOpen = ref(false)
+const activeTaskCount = ref(0)
+let taskTimer: number | null = null
 
 const navIcons = {
   home: House,
@@ -113,8 +116,28 @@ const onGlobalKeydown = (event: KeyboardEvent): void => {
   }
 }
 
-onMounted(() => window.addEventListener("keydown", onGlobalKeydown))
-onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
+const refreshTasks = async () => {
+  try {
+    const response = await fetch("/api/jobs")
+    if (!response.ok) return
+    const jobs = (await response.json()) as Array<{ kind: string; state: string }>
+    activeTaskCount.value = jobs.filter(
+      (job) =>
+        job.kind.startsWith("ui.") && !["succeeded", "failed", "cancelled"].includes(job.state)
+    ).length
+  } catch {
+    // The shell remains usable while the local server is starting.
+  }
+}
+onMounted(() => {
+  window.addEventListener("keydown", onGlobalKeydown)
+  void refreshTasks()
+  taskTimer = window.setInterval(() => void refreshTasks(), 2_000)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onGlobalKeydown)
+  if (taskTimer !== null) window.clearInterval(taskTimer)
+})
 </script>
 
 <template>
@@ -254,6 +277,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
           </div>
 
           <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+            <Button v-if="activeTaskCount" as-child variant="outline" size="sm" class="gap-2">
+              <RouterLink to="/stats" :aria-label="copy('actions.backgroundTasks')">
+                <Workflow class="animate-pulse text-primary" />
+                <span>{{ activeTaskCount }}</span>
+              </RouterLink>
+            </Button>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger as-child>
