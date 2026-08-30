@@ -47,9 +47,14 @@ export class JobRuntime {
 
   constructor(
     readonly repository: JobsRepository,
-    readonly registry: ReadonlyMap<string, JobDefinition>
+    readonly registry: Map<string, JobDefinition>
   ) {
     this.repository.onEventCommitted((id) => this.publish(id))
+  }
+
+  register(definition: JobDefinition): void {
+    if (this.registry.has(definition.kind)) return
+    this.registry.set(definition.kind, definition)
   }
 
   enqueue(input: {

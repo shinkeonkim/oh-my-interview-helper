@@ -49,7 +49,7 @@ export class JobScheduler {
     this.leaseMilliseconds = options.leaseMilliseconds ?? 30_000
     this.heartbeatMilliseconds =
       options.heartbeatMilliseconds ?? Math.max(1, Math.floor(this.leaseMilliseconds / 3))
-    this.handlerTimeoutMilliseconds = options.handlerTimeoutMilliseconds ?? 60_000
+    this.handlerTimeoutMilliseconds = options.handlerTimeoutMilliseconds ?? 300_000
     this.shutdownGraceMilliseconds = options.shutdownGraceMilliseconds ?? 5_000
     this.owner = options.owner ?? crypto.randomUUID()
   }

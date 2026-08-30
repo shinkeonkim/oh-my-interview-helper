@@ -52,6 +52,11 @@ import { StrandsChatExecutor } from "./workflows/strands-chat-executor"
 import { createStatsRoutes } from "./routes/stats"
 import { createJobSearchRoutes } from "./routes/job-search"
 import { JobDiscoveryService } from "./job-search/service"
+import {
+  jobDiscoveryTaskDefinition,
+  preparationTaskDefinition,
+  researchTaskDefinition
+} from "./jobs/ui-task-definitions"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -138,23 +143,22 @@ export const createApp = ({
       new ApplicationService(persistence, dataDirectory, security, resolver, transport)
     )
   )
-  app.route(
-    "/api/research",
-    createResearchRoutes(
-      new ResearchService(
-        persistence,
-        security,
-        researchAnalyzer,
-        resolver,
-        transport,
-        undefined,
-        researchSourceDiscoverer
-      )
-    )
+  const researchService = new ResearchService(
+    persistence,
+    security,
+    researchAnalyzer,
+    resolver,
+    transport,
+    undefined,
+    researchSourceDiscoverer
   )
+  jobs.register(researchTaskDefinition(researchService, persistence.repositories.jobs))
+  app.route("/api/research", createResearchRoutes(researchService))
   app.route("/api/jobs", createJobsRoutes(jobs))
   app.route("/api/stats", createStatsRoutes(persistence.database))
-  app.route("/api/job-search", createJobSearchRoutes(new JobDiscoveryService(persistence.database)))
+  const jobDiscoveryService = new JobDiscoveryService(persistence.database)
+  jobs.register(jobDiscoveryTaskDefinition(jobDiscoveryService, persistence.repositories.jobs))
+  app.route("/api/job-search", createJobSearchRoutes(jobDiscoveryService))
   app.route(
     "/api/settings",
     createSettingsRoutes({
@@ -206,10 +210,12 @@ export const createApp = ({
     sources: new WorkflowSourceContentResolver(persistence.database)
   })
   const activePreparationExecutor = preparationExecutor ?? strandsPreparationExecutor
+  const preparationService = new PreparationWorkflowService(artifacts, activePreparationExecutor)
+  jobs.register(preparationTaskDefinition(preparationService, persistence.repositories.jobs))
   app.route(
     "/api/workflows",
     createWorkflowRoutes(
-      new PreparationWorkflowService(artifacts, activePreparationExecutor),
+      preparationService,
       preparationExecutor === undefined ? strandsPreparationExecutor : undefined
     )
   )
