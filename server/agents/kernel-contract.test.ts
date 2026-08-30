@@ -11,6 +11,7 @@ import {
   type ProviderRegistration
 } from "../src/agents"
 import { FakeModel } from "./fake-model"
+import { parseStructuredText } from "../src/agents/kernel"
 
 const registration = (
   steps: ConstructorParameters<typeof FakeModel>[0]["steps"]
@@ -34,6 +35,14 @@ const textRequest = {
 }
 
 describe("provider-neutral Strands kernel", () => {
+  test("validates structured JSON returned as plain CLI text", () => {
+    const schema = z.object({ answer: z.string() }).strict()
+    expect(parseStructuredText('```json\n{"answer":"ready"}\n```', schema)).toEqual({
+      answer: "ready"
+    })
+    expect(parseStructuredText('{"answer":7}', schema)).toBeNull()
+  })
+
   test("streams normalized text and preserves nullable usage", async () => {
     // Given
     const kernel = new ProviderKernel({

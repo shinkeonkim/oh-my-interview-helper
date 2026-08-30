@@ -5,6 +5,7 @@ import {
   StartupConfigurationError
 } from "./config"
 import { createPersistence } from "./db"
+import { ProviderKindSchema } from "./db/operations-repositories"
 import { JobScheduler } from "./jobs/scheduler"
 import { createJobRegistry, JobRuntime } from "./jobs/runtime"
 import {
@@ -14,7 +15,12 @@ import {
   unavailableProviderRequestSource
 } from "./agents"
 import { ProviderRegistry } from "./agents"
-import { createCliProvider, createDirectApiProviderRegistry } from "./providers"
+import {
+  LocalCliTransport,
+  PreferredCliTransport,
+  createCliProvider,
+  createDirectApiProviderRegistry
+} from "./providers"
 import { RunnerPairingService } from "./runner/pairing"
 import { RunnerWebSocketHub, type HubSocket, type HubSocketData } from "./runner/websocket-hub"
 
@@ -25,12 +31,36 @@ const main = (): void => {
     const persistence = createPersistence({ dataDirectory: configuration.dataDirectory })
     const pairing = new RunnerPairingService(persistence.database)
     const runnerHub = new RunnerWebSocketHub(pairing)
+    const localCli = new LocalCliTransport()
+    const cliTransport = new PreferredCliTransport(runnerHub, localCli)
     const directProviders = createDirectApiProviderRegistry(process.env)
     const providers = new ProviderRegistry([
       ...directProviders.list(),
-      createCliProvider({ id: "claude-cli", model: "sonnet", transport: runnerHub }),
-      createCliProvider({ id: "codex-cli", model: "gpt-5.4", transport: runnerHub })
+      createCliProvider({ id: "claude-cli", model: "sonnet", transport: cliTransport }),
+      createCliProvider({ id: "codex-cli", model: "gpt-5.4", transport: cliTransport })
     ])
+    if (persistence.repositories.operations.listProviderSettings().length === 0) {
+      const automatic = [
+        "claude-cli",
+        "codex-cli",
+        ...directProviders.list().map((item) => item.descriptor.id)
+      ]
+        .map((id) => providers.get(id))
+        .find(
+          (provider) =>
+            provider !== null &&
+            (provider.descriptor.mode !== "runner" ||
+              localCli.connected(provider.descriptor.id as "claude-cli" | "codex-cli"))
+        )
+      if (automatic !== undefined && automatic !== null)
+        persistence.repositories.operations.upsertProviderSettings({
+          providerKind: ProviderKindSchema.parse(automatic.descriptor.id),
+          selectedModel: automatic.descriptor.model.id,
+          enabled: true,
+          capabilities: automatic.descriptor.capabilities,
+          updatedAt: new Date().toISOString()
+        })
+    }
     const jobs = new JobRuntime(
       persistence.repositories.jobs,
       createJobRegistry([

@@ -9,6 +9,7 @@ import {
   type AgentResult,
   type AgentStreamEvent
 } from "@strands-agents/sdk"
+import type { ZodType } from "zod"
 
 import {
   InvocationShapeSchema,
@@ -133,11 +134,14 @@ export class ProviderKernel {
           yield event
           return { kind: "cancelled", usage, cost: null }
         }
-        if (input.output.kind === "structured" && result.structuredOutput === undefined)
+        const structured =
+          input.output.kind === "structured"
+            ? (result.structuredOutput ?? parseStructuredText(text, input.output.schema))
+            : null
+        if (input.output.kind === "structured" && structured === null)
           return yield* terminalFailure("invalid_output", false, usage)
         if (isLimitStopReason(result.stopReason))
           return yield* terminalFailure("limit_exceeded", false, usage)
-        const structured = input.output.kind === "structured" ? result.structuredOutput : null
         yield { kind: "completed", usage, cost: null }
         return { kind: "completed", text, structured, usage, cost: null }
       } catch (error) {
@@ -244,4 +248,22 @@ class StructuredRepairLimitError extends Error {
   constructor() {
     super("STRUCTURED_REPAIR_LIMIT")
   }
+}
+
+export const parseStructuredText = (text: string, schema: ZodType): unknown | null => {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
+  const candidate = (fenced ?? text).trim()
+  const values = [candidate]
+  const start = candidate.indexOf("{")
+  const end = candidate.lastIndexOf("}")
+  if (start >= 0 && end > start) values.push(candidate.slice(start, end + 1))
+  for (const value of values) {
+    try {
+      const parsed = schema.safeParse(JSON.parse(value))
+      if (parsed.success) return parsed.data
+    } catch {
+      continue
+    }
+  }
+  return null
 }

@@ -92,7 +92,7 @@ export const createCliProvider = (input: {
     id: ProviderIdSchema.parse(input.id),
     mode: "runner",
     model: { id: input.model, displayName: input.model, maxOutputTokens: 8_192 },
-    capabilities: { generation: true, structuredOutput: false, citedResearch: false }
+    capabilities: { generation: true, structuredOutput: true, citedResearch: false }
   },
   enabled: true,
   createModel: () => new CliRunnerModel(input.id, input.model, input.transport),

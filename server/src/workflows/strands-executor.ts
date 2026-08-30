@@ -1,4 +1,4 @@
-import type { z } from "zod"
+import { z } from "zod"
 
 import {
   providerInvocationHash,
@@ -123,7 +123,7 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
           kind: "structured",
           schema: PreparationOutputSchemas[input.workflow] as z.ZodType
         },
-        timeoutMilliseconds: 60_000
+        timeoutMilliseconds: 120_000
       }
     }
   }
@@ -146,6 +146,7 @@ const workflowMessages = (
           "Do not invent citations. Citation sourceId values must exactly match supplied source IDs.",
           `Workflow: ${workflow}`,
           `Generation key: ${generationKey}`,
+          `Return only JSON matching this schema: ${JSON.stringify(z.toJSONSchema(PreparationOutputSchemas[workflow]))}`,
           JSON.stringify({ sources, practiceAnswer })
         ].join("\n")
       }
