@@ -15,8 +15,54 @@ export type OutboundWebSocket = RunnerSocket & {
   onopen: (() => void) | null
   onmessage: ((event: { readonly data: string }) => void) | null
   onerror: (() => void) | null
+  onclose: ((event: { readonly code: number; readonly reason: string }) => void) | null
   binaryType: string
 }
+
+export type RunnerSupervisorOptions = {
+  readonly endpoint: string
+  readonly connection: RunnerConnection
+  readonly signal: AbortSignal
+  readonly reconnectMilliseconds?: number
+  readonly createSocket?: OutboundWebSocketFactory
+}
+
+export const superviseOutboundRunner = async (options: RunnerSupervisorOptions): Promise<void> => {
+  const reconnectMilliseconds = options.reconnectMilliseconds ?? 1_000
+  while (!options.signal.aborted) {
+    const closed = await new Promise<{ readonly code: number; readonly reason: string }>(
+      (resolve) => {
+        const socket = connectOutboundRunner(
+          options.endpoint,
+          options.connection,
+          options.createSocket
+        )
+        const stop = (): void => {
+          socket.close()
+          resolve({ code: 1000, reason: "aborted" })
+        }
+        socket.onclose = (event) => {
+          options.signal.removeEventListener("abort", stop)
+          resolve(event)
+        }
+        options.signal.addEventListener("abort", stop, { once: true })
+      }
+    )
+    if (closed.code === 1008) throw new RunnerConnectionError("authentication_rejected")
+    if (!options.signal.aborted) await abortableDelay(reconnectMilliseconds, options.signal)
+  }
+}
+
+const abortableDelay = async (milliseconds: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(done, milliseconds)
+    function done(): void {
+      clearTimeout(timer)
+      signal.removeEventListener("abort", done)
+      resolve()
+    }
+    signal.addEventListener("abort", done, { once: true })
+  })
 export type OutboundWebSocketFactory = (url: string) => OutboundWebSocket
 
 type ActiveRun = { readonly leaseId: string; readonly controller: AbortController }
@@ -143,12 +189,7 @@ export const connectOutboundRunner = (
   createSocket: OutboundWebSocketFactory = (url) =>
     new WebSocket(url) as unknown as OutboundWebSocket
 ): OutboundWebSocket => {
-  const url = new URL(endpoint)
-  if (
-    !["ws:", "wss:"].includes(url.protocol) ||
-    !["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname)
-  )
-    throw new RunnerConnectionError("endpoint_denied")
+  const url = validateRunnerEndpoint(endpoint)
   const socket = createSocket(url.toString())
   socket.binaryType = "blob"
   socket.onopen = () => connection.attach(socket)
@@ -157,6 +198,16 @@ export const connectOutboundRunner = (
   }
   socket.onerror = () => socket.close()
   return socket
+}
+
+export const validateRunnerEndpoint = (endpoint: string): URL => {
+  const url = new URL(endpoint)
+  if (
+    !["ws:", "wss:"].includes(url.protocol) ||
+    !["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname)
+  )
+    throw new RunnerConnectionError("endpoint_denied")
+  return url
 }
 
 const chunkOutput = (value: string): readonly string[] => {
@@ -168,7 +219,10 @@ const chunkOutput = (value: string): readonly string[] => {
 
 export class RunnerConnectionError extends Error {
   override readonly name = "RunnerConnectionError"
-  constructor(readonly code: "endpoint_denied" | "lease_conflict" | "not_connected") {
+  constructor(
+    readonly code:
+      "authentication_rejected" | "endpoint_denied" | "lease_conflict" | "not_connected"
+  ) {
     super(`RUNNER_CONNECTION_${code.toUpperCase()}`)
   }
 }

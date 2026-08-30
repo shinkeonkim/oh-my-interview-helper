@@ -6,12 +6,13 @@ import {
   type ResearchAnalysis,
   type ResearchRequest
 } from "./contracts"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 const Id = z.string().uuid()
 const Timestamp = z.string().datetime()
 const SourceInput = z.object({
   id: Id,
-  url: z.string().url(),
+  url: PublicHttpUrlSchema,
   title: z.string().min(1),
   contentHash: z.string().regex(/^[a-f0-9]{64}$/),
   excerpt: z.string(),
@@ -153,7 +154,7 @@ const mapSource = (row: unknown) =>
   z
     .object({
       id: Id,
-      url: z.string().url(),
+      url: PublicHttpUrlSchema,
       title: z.string(),
       contentHash: z.string(),
       excerpt: z.string(),

@@ -1,0 +1,17 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+.omo
+data
+node_modules
+server/dist
+server/public
+test-results
+playwright-report
+coverage
+REQUEST.md
+*.db*
+secrets
+.secrets

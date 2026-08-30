@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { ExternalLink, RefreshCw, Search } from "lucide-vue-next"
 import { toast } from "vue-sonner"
@@ -43,6 +43,7 @@ type RecordSummary = {
 }
 type ResearchRecord = RecordSummary & {
   analysis: {
+    summary: { career: string[]; stack: string[]; projects: string[] }
     fitAssessment: { label: "advisory"; summary: string; strengths: string[]; risks: string[] }
   }
   identityCandidates: Array<{
@@ -71,24 +72,55 @@ const urls = ref("")
 const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
 const running = ref(false)
+const openingRecordId = ref<string | null>(null)
 const loadController = new AbortController()
+let contextId = 0
+let loadRequestId = 0
+let recordRequestId = 0
 const jobPostId = computed(() => {
   const value = route.params["postId"]
   return typeof value === "string" ? value : null
 })
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
-const sourceUrls = () =>
-  urls.value
+const parsedSourceUrls = computed(() => {
+  const values = urls.value
     .split("\n")
     .map((url) => url.trim())
     .filter(Boolean)
-    .slice(0, 8)
+  if (values.length === 0 || values.length > 8) return null
+  try {
+    const parsed = values.map((value) => new URL(value))
+    if (
+      parsed.some(
+        (url) =>
+          (url.protocol !== "http:" && url.protocol !== "https:") ||
+          url.username !== "" ||
+          url.password !== ""
+      )
+    )
+      return null
+    return parsed.map((url) => url.toString())
+  } catch {
+    return null
+  }
+})
+const researchReady = computed(
+  () => subjectName.value.trim().length > 0 && parsedSourceUrls.value !== null
+)
 const load = async () => {
-  const query = jobPostId.value === null ? "" : `?jobPostId=${encodeURIComponent(jobPostId.value)}`
-  const response = await fetch(`/api/research${query}`, { signal: loadController.signal })
-  if (!response.ok) return
-  records.value = ((await response.json()) as { records: RecordSummary[] }).records
+  const requestId = ++loadRequestId
+  const requestedPostId = jobPostId.value
+  const query = requestedPostId === null ? "" : `?jobPostId=${encodeURIComponent(requestedPostId)}`
+  try {
+    const response = await fetch(`/api/research${query}`, { signal: loadController.signal })
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as { records: RecordSummary[] }
+    if (requestId !== loadRequestId || requestedPostId !== jobPostId.value) return
+    records.value = value.records
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
+  }
 }
 watch(
   () => [props.subjectNamePreset, props.organizationPreset] as const,
@@ -98,6 +130,14 @@ watch(
   }
 )
 const submit = async (parentRecordId: string | null = null) => {
+  if (
+    running.value ||
+    parsedSourceUrls.value === null ||
+    (parentRecordId === null && !researchReady.value)
+  )
+    return
+  const operationContext = contextId
+  const selectedSourceUrls = parsedSourceUrls.value
   running.value = true
   try {
     const path =
@@ -110,32 +150,72 @@ const submit = async (parentRecordId: string | null = null) => {
             organization: organization.value || null,
             roleHint: roleHint.value || null,
             jobPostId: jobPostId.value,
-            sourceUrls: sourceUrls(),
+            sourceUrls: selectedSourceUrls,
             parentRecordId: null
           }
-        : { sourceUrls: sourceUrls() }
+        : { sourceUrls: selectedSourceUrls }
     const response = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
       body: JSON.stringify(body)
     })
     if (!response.ok) throw new Error("research")
-    current.value = (await response.json()) as ResearchRecord
+    const value = (await response.json()) as ResearchRecord
+    if (operationContext !== contextId) return
+    current.value = value
     await load()
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    running.value = false
+    if (operationContext === contextId) running.value = false
   }
 }
 const openRecord = async (id: string) => {
-  const response = await fetch(`/api/research/${id}`)
-  if (response.ok) current.value = (await response.json()) as ResearchRecord
+  if (running.value) return
+  const requestId = ++recordRequestId
+  const operationContext = contextId
+  openingRecordId.value = id
+  try {
+    const response = await fetch(`/api/research/${id}`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as ResearchRecord
+    if (requestId === recordRequestId && operationContext === contextId) current.value = value
+  } catch {
+    if (requestId === recordRequestId && operationContext === contextId) toast.error(copy("failed"))
+  } finally {
+    if (requestId === recordRequestId && operationContext === contextId)
+      openingRecordId.value = null
+  }
 }
 const identityLabel = (status: ResearchRecord["identityStatus"]) =>
   copy(status === "not_found" ? "notFound" : status)
-onMounted(load)
-onBeforeUnmount(() => loadController.abort())
+watch(
+  () => [jobPostId.value, props.subjectTypePreset] as const,
+  () => {
+    contextId += 1
+    loadRequestId += 1
+    recordRequestId += 1
+    records.value = []
+    current.value = null
+    running.value = false
+    openingRecordId.value = null
+    subjectType.value = props.subjectTypePreset
+    if (props.embedded) {
+      subjectName.value = props.subjectNamePreset
+      organization.value = props.organizationPreset
+      roleHint.value = ""
+      urls.value = ""
+    }
+    void load().catch(() => toast.error(copy("failed")))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  contextId += 1
+  loadRequestId += 1
+  recordRequestId += 1
+  loadController.abort()
+})
 </script>
 
 <template>
@@ -149,9 +229,9 @@ onBeforeUnmount(() => loadController.abort())
       ><CardContent class="grid gap-4 py-6"
         ><div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div class="grid gap-2">
-            <Label>{{ copy("subjectType") }}</Label
-            ><Select v-model="subjectType"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+            <Label for="research-subject-type">{{ copy("subjectType") }}</Label
+            ><Select v-model="subjectType" :disabled="running"
+              ><SelectTrigger id="research-subject-type"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem value="company">{{ copy("company") }}</SelectItem
                 ><SelectItem value="executive">{{ copy("executive") }}</SelectItem
@@ -163,28 +243,30 @@ onBeforeUnmount(() => loadController.abort())
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("subjectName") }}</Label
-            ><Input v-model="subjectName" />
+            <Label for="research-subject-name">{{ copy("subjectName") }}</Label
+            ><Input id="research-subject-name" v-model="subjectName" :disabled="running" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("organization") }}</Label
-            ><Input v-model="organization" />
+            <Label for="research-organization">{{ copy("organization") }}</Label
+            ><Input id="research-organization" v-model="organization" :disabled="running" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("roleHint") }}</Label
-            ><Input v-model="roleHint" />
+            <Label for="research-role-hint">{{ copy("roleHint") }}</Label
+            ><Input id="research-role-hint" v-model="roleHint" :disabled="running" />
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("sourceUrls") }}</Label
+          <Label for="research-source-urls">{{ copy("sourceUrls") }}</Label
           ><textarea
+            id="research-source-urls"
             v-model="urls"
             class="min-h-28 rounded-lg border bg-background p-3"
+            :disabled="running"
             placeholder="https://company.example/about&#10;https://professional.example/profile"
           />
           <p class="text-sm text-muted-foreground">{{ copy("sourceHelp") }}</p>
         </div>
-        <Button class="w-fit" :disabled="running" @click="submit(null)"
+        <Button class="w-fit" :disabled="running || !researchReady" @click="submit(null)"
           ><Search />{{ copy("run") }}</Button
         ></CardContent
       ></Card
@@ -206,6 +288,24 @@ onBeforeUnmount(() => loadController.abort())
           </div></CardContent
         ></Card
       >
+      <div class="grid gap-5 md:grid-cols-3">
+        <Card v-for="section in ['career', 'stack', 'projects'] as const" :key="section">
+          <CardHeader
+            ><CardTitle>{{ copy(section) }}</CardTitle></CardHeader
+          >
+          <CardContent>
+            <p
+              v-if="current.analysis.summary[section].length === 0"
+              class="text-sm text-muted-foreground"
+            >
+              {{ copy("noEvidence") }}
+            </p>
+            <ul v-else class="grid list-disc gap-2 pl-5 text-sm leading-6">
+              <li v-for="item in current.analysis.summary[section]" :key="item">{{ item }}</li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
       <div class="grid gap-5 lg:grid-cols-2">
         <Card
           ><CardHeader
@@ -237,14 +337,33 @@ onBeforeUnmount(() => loadController.abort())
             <p class="mt-3 text-sm font-medium">{{ copy("advisoryNotice") }}</p>
             <p class="mt-3 text-sm leading-6 text-muted-foreground">
               {{ current.analysis.fitAssessment.summary }}
-            </p></CardContent
+            </p>
+            <div v-if="current.analysis.fitAssessment.strengths.length" class="mt-4">
+              <p class="text-sm font-medium">{{ copy("strengths") }}</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li v-for="item in current.analysis.fitAssessment.strengths" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div v-if="current.analysis.fitAssessment.risks.length" class="mt-4">
+              <p class="text-sm font-medium">{{ copy("risks") }}</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li v-for="item in current.analysis.fitAssessment.risks" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div></CardContent
           ></Card
         >
       </div>
       <Card
         ><CardHeader class="flex-row items-center justify-between"
           ><CardTitle>{{ copy("sources") }}</CardTitle
-          ><Button variant="outline" :disabled="running" @click="submit(current.id)"
+          ><Button
+            variant="outline"
+            :disabled="running || parsedSourceUrls === null"
+            @click="submit(current.id)"
             ><RefreshCw />{{ copy("refresh") }}</Button
           ></CardHeader
         ><CardContent class="grid gap-3"
@@ -276,6 +395,7 @@ onBeforeUnmount(() => loadController.abort())
             v-for="record in records"
             :key="record.id"
             class="flex justify-between rounded-lg border p-3 text-left"
+            :disabled="running || openingRecordId === record.id"
             @click="openRecord(record.id)"
           >
             <span>{{ record.subjectName }} · {{ identityLabel(record.identityStatus) }}</span

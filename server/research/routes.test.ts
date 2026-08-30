@@ -27,7 +27,9 @@ const setup = async () => {
       status: 200,
       headers: new Headers({ "content-type": "text/html" }),
       body: (async function* () {
-        yield new TextEncoder().encode("<h1>Acme Engineering</h1><p>Public profile</p>")
+        yield new TextEncoder().encode(
+          "<h1>Acme Engineering</h1><p>Kim worked as a TypeScript engineer.</p><p>Kim launched the Atlas migration project.</p>"
+        )
       })()
     })
   }
@@ -47,6 +49,32 @@ const setup = async () => {
 describe("cited research API", () => {
   test("requires CSRF and preserves citations across create, read, list, and refresh", async () => {
     const { app, headers } = await setup()
+    const documents = new FormData()
+    documents.set("kind", "resume")
+    documents.set(
+      "files",
+      new File(["Built TypeScript platform services"], "resume.txt", { type: "text/plain" })
+    )
+    const uploaded = (await (
+      await app.request(`${base}/documents/upload`, {
+        method: "POST",
+        headers: {
+          Cookie: headers.Cookie,
+          "X-CSRF-Token": headers["X-CSRF-Token"]
+        },
+        body: documents
+      })
+    ).json()) as { documents: Array<{ id: string }> }
+    const selectedDocumentId = uploaded.documents[0]?.id
+    if (selectedDocumentId === undefined) throw new Error("uploaded document missing")
+    expect(
+      (
+        await app.request(`${base}/documents/${selectedDocumentId}/selection`, {
+          method: "PUT",
+          headers
+        })
+      ).status
+    ).toBe(204)
     const request = {
       subjectType: "team_lead",
       subjectName: "Kim",
@@ -66,6 +94,20 @@ describe("cited research API", () => {
       ).status
     ).toBe(403)
 
+    for (const sourceUrl of [
+      "ftp://example.com/profile",
+      "https://user:secret@example.com/profile"
+    ])
+      expect(
+        (
+          await app.request(`${base}/research`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ ...request, sourceUrls: [sourceUrl] })
+          })
+        ).status
+      ).toBe(400)
+
     const createdResponse = await app.request(`${base}/research`, {
       method: "POST",
       headers,
@@ -75,10 +117,31 @@ describe("cited research API", () => {
     const created = (await createdResponse.json()) as {
       id: string
       identityStatus: string
+      analysis: {
+        summary: { career: string[]; stack: string[]; projects: string[] }
+        fitAssessment: { strengths: string[] }
+      }
       sources: Array<{ id: string }>
       claims: Array<{ sourceIds: string[] }>
     }
     expect(created.identityStatus).toBe("ambiguous")
+    expect(created.analysis.summary.stack).toEqual(["TypeScript"])
+    expect(
+      created.analysis.summary.career.some((item) =>
+        item.includes("Kim worked as a TypeScript engineer.")
+      )
+    ).toBe(true)
+    expect(
+      created.analysis.summary.projects.some((item) =>
+        item.includes("Kim launched the Atlas migration project.")
+      )
+    ).toBe(true)
+    expect(created.analysis.fitAssessment.strengths).toContain(
+      "Publicly evidenced stack: TypeScript"
+    )
+    expect(created.analysis.fitAssessment.strengths).toContain(
+      "Applicant evidence overlap: TypeScript"
+    )
     expect(created.claims[0]?.sourceIds).toEqual([created.sources[0]?.id])
 
     const listed = (await (await app.request(`${base}/research`)).json()) as {
@@ -96,5 +159,14 @@ describe("cited research API", () => {
     expect(((await refreshedResponse.json()) as { parentRecordId: string }).parentRecordId).toBe(
       created.id
     )
+    expect(
+      (
+        await app.request(`${base}/research/${created.id}/refresh`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ sourceUrls: ["ftp://example.com/profile"] })
+        })
+      ).status
+    ).toBe(400)
   })
 })

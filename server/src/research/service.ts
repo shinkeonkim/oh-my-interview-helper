@@ -3,7 +3,12 @@ import { createHash } from "node:crypto"
 import type { Persistence } from "../db"
 import { fetchPublicText, type PinnedTransport, type Resolver } from "../ingest/safe-fetcher"
 import type { LocalSecuritySettings } from "../security/config"
-import { ResearchAnalysisSchema, ResearchRequestSchema, type ResearchAnalyzer } from "./contracts"
+import {
+  ResearchAnalysisSchema,
+  ResearchRequestSchema,
+  type ResearchAnalyzer,
+  type ResearchAnalyzerInput
+} from "./contracts"
 import { CitedResearchRepository } from "./repository"
 
 export class ResearchService {
@@ -82,7 +87,8 @@ export class ResearchService {
           organization: request.organization,
           roleHint: request.roleHint
         },
-        sources: analyzerSources
+        sources: analyzerSources,
+        applicantEvidence: this.applicantEvidence(request.jobPostId)
       })
     )
     const analysisBlob = await this.persistence.blobs.put(
@@ -113,6 +119,25 @@ export class ResearchService {
       sourceUrls,
       parentRecordId: previous.id
     })
+  }
+
+  private applicantEvidence(jobPostId: string | null): ResearchAnalyzerInput["applicantEvidence"] {
+    const documents = this.persistence.database
+      .query<{ label: string; text: string }, []>(
+        "SELECT d.title label,v.extracted_text text FROM profile_document_selections s JOIN documents d ON d.id=s.document_id JOIN document_versions v ON v.id=d.current_version_id WHERE d.state='active' AND v.extraction_status='completed' AND v.extracted_text IS NOT NULL ORDER BY s.selected_at,d.id LIMIT 30"
+      )
+      .all()
+      .map((document) => ({ ...document, text: document.text.slice(0, 40_000) }))
+    if (jobPostId === null) return { jobPost: null, documents }
+    const jobPost = this.persistence.database
+      .query<{ label: string; text: string }, [string]>(
+        "SELECT p.title label,v.structured_content text FROM job_posts p JOIN job_post_versions v ON v.id=p.current_version_id WHERE p.id=? AND p.state!='deleted'"
+      )
+      .get(jobPostId)
+    return {
+      jobPost: jobPost === null ? null : { ...jobPost, text: jobPost.text.slice(0, 40_000) },
+      documents
+    }
   }
 }
 const canonical = (value: string) => {

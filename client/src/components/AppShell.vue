@@ -81,7 +81,11 @@ const navIcons = {
 const copy = (key: string): string => translate(settings.locale, key)
 const currentRouteLabel = computed(() => {
   const currentItem = NAVIGATION_ITEMS.find((item) => item.name === route.name)
-  return currentItem ? copy(`nav.${currentItem.name}`) : copy("notFound.title")
+  if (currentItem) return copy(`nav.${currentItem.name}`)
+  if (route.name === "research") return copy("research.title")
+  if (route.name === "preparation") return copy("preparation.title")
+  if (typeof route.name === "string" && route.name.startsWith("workspace-")) return copy("nav.jobs")
+  return copy("notFound.title")
 })
 const themeLabel = computed(() => copy(`settings.${settings.theme}`))
 const themeIcon = computed(() => {
@@ -327,7 +331,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown))
           class="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 px-4 py-4 text-xs text-muted-foreground sm:px-6 lg:px-10"
         >
           <span>{{ copy("footer") }}</span>
-          <span class="font-mono">v0.1 / {{ copy("states.placeholder") }}</span>
+          <span class="font-mono">v0.1</span>
         </footer>
       </SidebarInset>
     </SidebarProvider>

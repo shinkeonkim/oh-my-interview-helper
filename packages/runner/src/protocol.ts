@@ -34,6 +34,7 @@ export const PairAcceptedSchema = z
     expiresAt: TimestampSchema.nullable()
   })
   .strict()
+export type PairAccepted = z.output<typeof PairAcceptedSchema>
 export const AuthenticateSchema = z
   .object({
     version: z.literal(RUNNER_PROTOCOL_VERSION),

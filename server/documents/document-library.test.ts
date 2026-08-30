@@ -81,10 +81,67 @@ describe("uploaded career document library", () => {
     expect(
       (await (await app.request(url("/api/documents/context"))).json()) as { documents: unknown[] }
     ).toEqual({ documents: [] })
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/selection`), {
+          method: "PUT",
+          headers
+        })
+      ).status
+    ).toBe(409)
+    expect(
+      persistence.database
+        .query<{ count: number }, [string]>(
+          "SELECT count(*) count FROM profile_document_selections WHERE document_id=?"
+        )
+        .get(first)?.count
+    ).toBe(0)
+
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count ?? 0
+    const blobsBeforeRejectedVersion = blobCount()
+    const rejectedVersion = new FormData()
+    rejectedVersion.set(
+      "file",
+      new File(["must not persist"], "archived-v3.txt", { type: "text/plain" })
+    )
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/versions`), {
+          method: "POST",
+          headers,
+          body: rejectedVersion
+        })
+      ).status
+    ).toBe(409)
+    expect(blobCount()).toBe(blobsBeforeRejectedVersion)
+    expect(
+      (
+        (await (await app.request(url(`/api/documents/${first}/versions`))).json()) as {
+          versions: unknown[]
+        }
+      ).versions
+    ).toHaveLength(2)
+
+    expect(
+      (
+        await app.request(url(`/api/documents/${first}/delete`), {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    const remaining = (await (await app.request(url("/api/documents"))).json()) as {
+      documents: Array<{ id: string }>
+    }
+    expect(remaining.documents.some((document) => document.id === first)).toBe(false)
+    expect((await app.request(url(`/api/documents/${first}`))).status).toBe(404)
+    expect((await app.request(url(`/api/documents/${first}/versions`))).status).toBe(404)
   })
 
   test("previews and downloads originals while returning actionable extraction failures", async () => {
-    const { app, headers } = await setup()
+    const { app, headers, persistence } = await setup()
     const manual = await app.request(url("/api/documents/manual"), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
@@ -110,5 +167,27 @@ describe("uploaded career document library", () => {
     })
     expect(failed.status).toBe(422)
     expect(await failed.json()).toEqual({ error: { code: "MAGIC_MISMATCH" } })
+
+    const documentCount = () =>
+      persistence.database
+        .query<{ count: number }, []>("SELECT count(*) count FROM documents")
+        .get()?.count ?? 0
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count ?? 0
+    const documentsBeforeBatch = documentCount()
+    const blobsBeforeBatch = blobCount()
+    const mixed = new FormData()
+    mixed.set("kind", "resume")
+    mixed.append("files", new File(["valid profile"], "valid.txt", { type: "text/plain" }))
+    mixed.append("files", new File(["not pdf"], "invalid.pdf", { type: "application/pdf" }))
+    const rejectedBatch = await app.request(url("/api/documents/upload"), {
+      method: "POST",
+      headers,
+      body: mixed
+    })
+    expect(rejectedBatch.status).toBe(422)
+    expect(documentCount()).toBe(documentsBeforeBatch)
+    expect(blobCount()).toBe(blobsBeforeBatch)
   })
 })

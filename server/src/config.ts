@@ -21,17 +21,19 @@ const PortSchema = z
 
 const ServerEnvironmentSchema = z.object({
   PORT: PortSchema,
-  DATA_DIR: z.string().trim().min(1)
+  DATA_DIR: z.string().trim().min(1),
+  BIND_HOST: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1")
 })
 
 export type ServerConfig = {
   readonly port: z.output<typeof PortSchema>
+  readonly bindHost: "127.0.0.1" | "0.0.0.0"
   readonly dataDirectory: string
   readonly security: LocalSecuritySettings
 }
 
 export type StartupConfigurationIssue = {
-  readonly field: "PORT" | "DATA_DIR" | "SECURITY"
+  readonly field: "PORT" | "DATA_DIR" | "BIND_HOST" | "SECURITY"
   readonly code: "missing" | "invalid" | "unavailable"
 }
 
@@ -53,7 +55,8 @@ const toStartupConfigurationIssue = (
   issue: SchemaIssue,
   environment: RawEnvironment
 ): StartupConfigurationIssue => {
-  const field = issue.path[0] === "PORT" ? "PORT" : "DATA_DIR"
+  const field =
+    issue.path[0] === "PORT" ? "PORT" : issue.path[0] === "BIND_HOST" ? "BIND_HOST" : "DATA_DIR"
 
   return {
     field,
@@ -82,6 +85,7 @@ export const parseServerConfig = (environment: RawEnvironment): ServerConfig => 
 
   return {
     port: parsed.data.PORT,
+    bindHost: parsed.data.BIND_HOST,
     dataDirectory: resolve(parsed.data.DATA_DIR),
     security
   }

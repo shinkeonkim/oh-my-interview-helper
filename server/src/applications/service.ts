@@ -2,7 +2,7 @@ import type { Persistence } from "../db"
 import { previewFile } from "../ingest/file-preview"
 import { fetchPublicText, type PinnedTransport, type Resolver } from "../ingest/safe-fetcher"
 import type { LocalSecuritySettings } from "../security/config"
-import { ApplicationRepository } from "./repository"
+import { ApplicationDomainError, ApplicationRepository } from "./repository"
 
 type PostMetadata = {
   readonly title: string
@@ -46,9 +46,11 @@ export class ApplicationService {
     return this.persistPost(input, "url", fetched.text, fetched.url)
   }
   async addManualVersion(postId: string, text: string) {
+    this.assertActivePost(postId)
     return this.persistVersion(postId, "manual", text)
   }
   async addFileVersion(postId: string, file: File) {
+    this.assertActivePost(postId)
     const extracted = await previewFile({
       dataDirectory: this.dataDirectory,
       file,
@@ -57,6 +59,7 @@ export class ApplicationService {
     return this.persistVersion(postId, "file", extracted.text)
   }
   async addUrlVersion(postId: string, url: string) {
+    this.assertActivePost(postId)
     const fetched = await fetchPublicText({
       limits: this.limits,
       resolver: this.resolver,
@@ -73,19 +76,29 @@ export class ApplicationService {
   ) {
     const postId = crypto.randomUUID()
     const at = this.now()
-    this.repository.createPost({
-      id: postId,
-      title: metadata.title,
-      companyName: metadata.companyName,
-      teamName: metadata.teamName,
-      canonicalUrl,
-      metadata: {
-        location: metadata.location ?? null,
-        employmentType: metadata.employmentType ?? null
-      },
-      createdAt: at
+    const stored = await this.storeContent(text)
+    this.persistence.repositories.transaction(() => {
+      this.repository.createPost({
+        id: postId,
+        title: metadata.title,
+        companyName: metadata.companyName,
+        teamName: metadata.teamName,
+        canonicalUrl,
+        metadata: {
+          location: metadata.location ?? null,
+          employmentType: metadata.employmentType ?? null
+        },
+        createdAt: at
+      })
+      this.repository.addPostVersion({
+        id: crypto.randomUUID(),
+        postId,
+        sourceKind,
+        bodyBlobHash: stored.blobHash,
+        content: { text: stored.text, sourceUrl: canonicalUrl },
+        createdAt: at
+      })
     })
-    await this.persistVersion(postId, sourceKind, text, canonicalUrl)
     return this.repository.post(postId)
   }
   private async persistVersion(
@@ -94,6 +107,19 @@ export class ApplicationService {
     text: string,
     sourceUrl: string | null = null
   ) {
+    this.assertActivePost(postId)
+    const stored = await this.storeContent(text)
+    this.repository.addPostVersion({
+      id: crypto.randomUUID(),
+      postId,
+      sourceKind,
+      bodyBlobHash: stored.blobHash,
+      content: { text: stored.text, sourceUrl },
+      createdAt: this.now()
+    })
+    return this.repository.post(postId)
+  }
+  private async storeContent(text: string) {
     const normalized = text.trim()
     if (normalized.length === 0) throw new ApplicationServiceError("content_required")
     const blob = await this.persistence.blobs.put(
@@ -101,15 +127,11 @@ export class ApplicationService {
       "text/plain;charset=utf-8"
     )
     this.persistence.repositories.blobs.register(blob)
-    this.repository.addPostVersion({
-      id: crypto.randomUUID(),
-      postId,
-      sourceKind,
-      bodyBlobHash: blob.sha256,
-      content: { text: normalized, sourceUrl },
-      createdAt: this.now()
-    })
-    return this.repository.post(postId)
+    return { blobHash: blob.sha256, text: normalized }
+  }
+  private assertActivePost(postId: string): void {
+    if (this.repository.post(postId)?.state !== "active")
+      throw new ApplicationDomainError("post_unavailable")
   }
 }
 

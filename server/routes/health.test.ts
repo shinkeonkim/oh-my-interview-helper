@@ -91,4 +91,31 @@ describe("server startup contracts", () => {
     expect(error.message).toBe("CONFIGURATION_ERROR: DATA_DIR: unavailable")
     expect(error.message).not.toContain(dataCanary)
   })
+
+  test("keeps loopback as the default and permits an explicit container bind address", () => {
+    expect(parseServerConfig({ PORT: "3000", DATA_DIR: "/tmp/interview-helper" }).bindHost).toBe(
+      "127.0.0.1"
+    )
+    expect(
+      parseServerConfig({
+        PORT: "3000",
+        DATA_DIR: "/tmp/interview-helper",
+        BIND_HOST: "0.0.0.0"
+      }).bindHost
+    ).toBe("0.0.0.0")
+  })
+
+  test("rejects an arbitrary bind address without reflecting it", () => {
+    const bindCanary = "BIND_CANARY_must_not_leak"
+    const error = captureStartupConfigurationError(() =>
+      parseServerConfig({
+        PORT: "3000",
+        DATA_DIR: "/tmp/interview-helper",
+        BIND_HOST: bindCanary
+      })
+    )
+    expect(error.issues).toEqual([{ field: "BIND_HOST", code: "invalid" }])
+    expect(error.message).toBe("CONFIGURATION_ERROR: BIND_HOST: invalid")
+    expect(error.message).not.toContain(bindCanary)
+  })
 })

@@ -71,18 +71,38 @@ describe("local preview routes", () => {
 
   test("returns a controlled public URL preview through the injected pinned resolver and transport", async () => {
     // Given
+    let requests = 0
     const resolver: Resolver = { resolve: async () => ["93.184.216.34"] }
     const transport: PinnedTransport = {
-      request: async () => ({
-        body: (async function* (): AsyncGenerator<Uint8Array> {
-          yield new TextEncoder().encode("<p>Public role</p>")
-        })(),
-        headers: new Headers({ "content-type": "text/html" }),
-        status: 200
-      })
+      request: async () => {
+        requests += 1
+        return {
+          body: (async function* (): AsyncGenerator<Uint8Array> {
+            yield new TextEncoder().encode("<p>Public role</p>")
+          })(),
+          headers: new Headers({ "content-type": "text/html" }),
+          status: 200
+        }
+      }
     }
     const app = createApp({ dataDirectory: dataDirectory(), resolver, transport })
     const token = await csrf(app)
+
+    for (const url of ["ftp://public.test/job", "https://user:secret@public.test/job"])
+      expect(
+        (
+          await app.request("http://localhost:3000/api/preview/url", {
+            body: JSON.stringify({ url }),
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: token.cookie,
+              "X-CSRF-Token": token.token
+            },
+            method: "POST"
+          })
+        ).status
+      ).toBe(400)
+    expect(requests).toBe(0)
 
     // When
     const response = await app.request("http://localhost:3000/api/preview/url", {
@@ -102,5 +122,6 @@ describe("local preview routes", () => {
       text: "Public role",
       url: "https://public.test/job"
     })
+    expect(requests).toBe(1)
   })
 })

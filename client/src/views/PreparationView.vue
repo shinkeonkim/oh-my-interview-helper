@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { Clipboard, Download, RotateCw, ShieldCheck } from "lucide-vue-next"
 import { toast } from "vue-sonner"
@@ -54,6 +54,14 @@ type Manifest = {
   action: string
   inputs: Array<{ type: string; label: string; version: number | null; hash: string }>
 }
+type WorkflowRequest = {
+  workflow: Workflow
+  providerId: string
+  seriesId: string | null
+  inputs: Array<Record<string, string>>
+  practiceAnswer: string | null
+  generationKey: string
+}
 type Revision = {
   id: string
   seriesId: string
@@ -61,6 +69,24 @@ type Revision = {
   content: Record<string, unknown>
   providerId: string
   providerModel: string
+}
+type StaleReason =
+  | "source_content_changed"
+  | "source_current_version_changed"
+  | "source_unavailable"
+  | "provider_disabled"
+  | "provider_unavailable"
+  | "provider_changed"
+  | "model_changed"
+  | "mode_changed"
+  | "prompt_missing"
+  | "prompt_changed"
+type Provenance = Revision & {
+  providerMode: string
+  promptTemplateId: string
+  promptTemplateRevision: number
+  inputs: Array<{ hash: string; label: string; version: number | null }>
+  staleReasons: StaleReason[]
 }
 
 const props = withDefaults(
@@ -83,10 +109,20 @@ const providerId = ref("")
 const documentVersionId = ref("none")
 const practiceAnswer = ref("")
 const generationKey = ref(crypto.randomUUID())
-const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
+const preview = ref<{
+  manifest: Manifest
+  authorizationToken: string
+  request: WorkflowRequest
+} | null>(null)
 const revision = ref<Revision | null>(null)
+const provenance = ref<Provenance | null>(null)
+const reviewing = ref(false)
 const running = ref(false)
-const posting = computed(() => postings.value.find((item) => item.id === route.params["postId"]))
+let contextId = 0
+let loadRequestId = 0
+let provenanceRequestId = 0
+const postId = computed(() => String(route.params["postId"] ?? ""))
+const posting = computed(() => postings.value.find((item) => item.id === postId.value))
 const inputs = computed(() => {
   const values: Array<Record<string, string>> = []
   if (posting.value?.currentVersionId)
@@ -114,7 +150,7 @@ const post = async (path: string, body: unknown) => {
   if (!response.ok) throw new Error("request")
   return response
 }
-const requestBody = () => ({
+const requestBody = (): WorkflowRequest => ({
   workflow: workflow.value,
   providerId: providerId.value,
   seriesId: revision.value?.seriesId ?? null,
@@ -123,48 +159,75 @@ const requestBody = () => ({
   generationKey: generationKey.value
 })
 const load = async () => {
-  const [postingsResponse, documentsResponse, providersResponse] = await Promise.all([
-    fetch("/api/postings", { signal: controller.signal }),
-    fetch("/api/documents", { signal: controller.signal }),
-    fetch("/api/providers/status", { signal: controller.signal })
-  ])
-  postings.value = ((await postingsResponse.json()) as { postings: Posting[] }).postings
-  documents.value = (
-    (await documentsResponse.json()) as { documents: Document[] }
-  ).documents.filter((item) => item.state === "active" && item.currentVersionId)
-  providers.value = (
-    (await providersResponse.json()) as { providers: Provider[] }
-  ).providers.filter((item) => item.configured)
-  providerId.value = providers.value[0]?.id ?? ""
+  const requestId = ++loadRequestId
+  try {
+    const [postingsResponse, documentsResponse, providersResponse] = await Promise.all([
+      fetch("/api/postings", { signal: controller.signal }),
+      fetch("/api/documents", { signal: controller.signal }),
+      fetch("/api/providers/status", { signal: controller.signal })
+    ])
+    if (!postingsResponse.ok || !documentsResponse.ok || !providersResponse.ok)
+      throw new Error("request")
+    const [postingValue, documentValue, providerValue] = await Promise.all([
+      postingsResponse.json() as Promise<{ postings: Posting[] }>,
+      documentsResponse.json() as Promise<{ documents: Document[] }>,
+      providersResponse.json() as Promise<{ providers: Provider[] }>
+    ])
+    if (requestId !== loadRequestId) return
+    postings.value = postingValue.postings
+    documents.value = documentValue.documents.filter(
+      (item) => item.state === "active" && item.currentVersionId
+    )
+    providers.value = providerValue.providers.filter((item) => item.configured)
+    providerId.value = providers.value[0]?.id ?? ""
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
+  }
 }
 const review = async () => {
+  if (!posting.value?.currentVersionId || !providerId.value || reviewing.value || running.value)
+    return
+  const operationContext = contextId
+  const request = requestBody()
+  reviewing.value = true
   try {
-    preview.value = (await (await post("/api/workflows/preview", requestBody())).json()) as {
+    const value = (await (await post("/api/workflows/preview", request)).json()) as {
       manifest: Manifest
       authorizationToken: string
     }
+    if (operationContext === contextId) preview.value = { ...value, request }
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
+  } finally {
+    if (operationContext === contextId) reviewing.value = false
   }
 }
 const generate = async () => {
-  if (!preview.value) return
+  if (!preview.value || running.value) return
+  const operationContext = contextId
+  const reviewed = preview.value
   running.value = true
   try {
     const confirmation = (await (
       await post("/api/disclosures/confirm", {
-        authorizationToken: preview.value.authorizationToken
+        authorizationToken: reviewed.authorizationToken
       })
     ).json()) as { id: string }
-    revision.value = (await (
-      await post("/api/workflows/run", { ...requestBody(), disclosureId: confirmation.id })
+    if (operationContext !== contextId) return
+    const value = (await (
+      await post("/api/workflows/run", { ...reviewed.request, disclosureId: confirmation.id })
     ).json()) as Revision
+    if (operationContext !== contextId) return
+    revision.value = value
     preview.value = null
+    await loadProvenance(value)
   } catch {
-    toast.error(copy("failed"))
+    if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    running.value = false
-    generationKey.value = crypto.randomUUID()
+    if (operationContext === contextId) {
+      running.value = false
+      generationKey.value = crypto.randomUUID()
+    }
   }
 }
 const copyResult = async () => {
@@ -181,16 +244,51 @@ const exportResult = () => {
     "noopener,noreferrer"
   )
 }
-const viewProvenance = () => {
-  if (!revision.value) return
-  window.open(
-    `/api/artifacts/revisions/${revision.value.id}/provenance`,
-    "_blank",
-    "noopener,noreferrer"
-  )
+const loadProvenance = async (target: Revision | null = revision.value) => {
+  if (target === null) return
+  const requestId = ++provenanceRequestId
+  const operationContext = contextId
+  try {
+    const response = await fetch(`/api/artifacts/revisions/${target.id}/provenance`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as Provenance
+    if (
+      requestId === provenanceRequestId &&
+      operationContext === contextId &&
+      revision.value?.id === target.id
+    )
+      provenance.value = value
+  } catch {
+    if (requestId === provenanceRequestId && operationContext === contextId)
+      toast.error(copy("provenanceFailed"))
+  }
 }
-onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => controller.abort())
+watch(
+  () => [postId.value, props.workflowPreset] as const,
+  () => {
+    contextId += 1
+    loadRequestId += 1
+    provenanceRequestId += 1
+    workflow.value = props.workflowPreset
+    providerId.value = ""
+    documentVersionId.value = "none"
+    practiceAnswer.value = ""
+    generationKey.value = crypto.randomUUID()
+    preview.value = null
+    revision.value = null
+    provenance.value = null
+    reviewing.value = false
+    running.value = false
+    void load().catch(() => toast.error(copy("failed")))
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  contextId += 1
+  loadRequestId += 1
+  provenanceRequestId += 1
+  controller.abort()
+})
 </script>
 
 <template>
@@ -212,9 +310,9 @@ onBeforeUnmount(() => controller.abort())
         </p>
         <div class="grid gap-4 md:grid-cols-3">
           <div class="grid gap-2">
-            <Label>{{ copy("workflow") }}</Label
+            <Label for="preparation-workflow">{{ copy("workflow") }}</Label
             ><Select v-model="workflow"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-workflow"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="[value, label] in workflowLabels" :key="value" :value="value">{{
                   copy(label)
@@ -223,9 +321,9 @@ onBeforeUnmount(() => controller.abort())
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("provider") }}</Label
+            <Label for="preparation-provider">{{ copy("provider") }}</Label
             ><Select v-model="providerId"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-provider"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="provider in providers" :key="provider.id" :value="provider.id"
                   >{{ provider.id }} · {{ provider.model.displayName }}</SelectItem
@@ -234,9 +332,9 @@ onBeforeUnmount(() => controller.abort())
             >
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("document") }}</Label
+            <Label for="preparation-document">{{ copy("document") }}</Label
             ><Select v-model="documentVersionId"
-              ><SelectTrigger><SelectValue /></SelectTrigger
+              ><SelectTrigger id="preparation-document"><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem value="none">{{ copy("noDocument") }}</SelectItem
                 ><SelectItem
@@ -250,13 +348,17 @@ onBeforeUnmount(() => controller.abort())
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("practiceAnswer") }}</Label
+          <Label for="preparation-practice-answer">{{ copy("practiceAnswer") }}</Label
           ><textarea
+            id="preparation-practice-answer"
             v-model="practiceAnswer"
             class="min-h-24 rounded-lg border bg-background p-3"
           />
         </div>
-        <Button class="w-fit" :disabled="!posting?.currentVersionId || !providerId" @click="review"
+        <Button
+          class="w-fit"
+          :disabled="!posting?.currentVersionId || !providerId || reviewing || running"
+          @click="review"
           ><ShieldCheck />{{ revision ? copy("regenerate") : copy("generate") }}</Button
         >
       </CardContent></Card
@@ -273,12 +375,54 @@ onBeforeUnmount(() => controller.abort())
           <Button variant="outline" @click="copyResult"
             ><Clipboard />{{ copy("copyResult") }}</Button
           ><Button variant="outline" @click="exportResult"><Download />{{ copy("export") }}</Button
-          ><Button variant="outline" @click="viewProvenance"
-            ><ShieldCheck />{{ copy("provenance") }}</Button
-          ><Button variant="secondary" @click="review"><RotateCw />{{ copy("regenerate") }}</Button>
+          ><Button variant="outline" :disabled="running" @click="loadProvenance()"
+            ><ShieldCheck />{{ copy("refreshProvenance") }}</Button
+          ><Button variant="secondary" :disabled="reviewing || running" @click="review"
+            ><RotateCw />{{ copy("regenerate") }}</Button
+          >
         </div></CardContent
       ></Card
     >
+    <Card v-if="provenance">
+      <CardHeader class="flex-row items-center justify-between">
+        <CardTitle>{{ copy("provenance") }}</CardTitle>
+        <Badge :variant="provenance.staleReasons.length === 0 ? 'secondary' : 'destructive'">
+          {{ provenance.staleReasons.length === 0 ? copy("current") : copy("staleStatus") }}
+        </Badge>
+      </CardHeader>
+      <CardContent class="grid gap-5 text-sm">
+        <div class="grid gap-1">
+          <p class="font-medium">{{ copy("providerContext") }}</p>
+          <p class="text-muted-foreground">
+            {{ provenance.providerId }} · {{ provenance.providerMode }} ·
+            {{ provenance.providerModel }}
+          </p>
+        </div>
+        <div class="grid gap-1">
+          <p class="font-medium">{{ copy("promptContext") }}</p>
+          <p class="text-muted-foreground">
+            {{ provenance.promptTemplateId }} · r{{ provenance.promptTemplateRevision }}
+          </p>
+        </div>
+        <div>
+          <p class="font-medium">{{ copy("inputs") }}</p>
+          <ul class="mt-2 grid gap-2">
+            <li v-for="input in provenance.inputs" :key="input.hash" class="rounded border p-3">
+              {{ input.label }} · v{{ input.version ?? "-" }}<br />
+              <code class="text-xs text-muted-foreground">{{ input.hash.slice(0, 12) }}…</code>
+            </li>
+          </ul>
+        </div>
+        <div v-if="provenance.staleReasons.length" class="grid gap-2">
+          <p class="font-medium text-destructive">{{ copy("staleReasons") }}</p>
+          <ul class="grid gap-1 text-destructive">
+            <li v-for="reason in provenance.staleReasons" :key="reason">
+              {{ copy(`stale.${reason}`) }}
+            </li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
     <Dialog
       :open="preview !== null"
       @update:open="
@@ -312,7 +456,9 @@ onBeforeUnmount(() => controller.abort())
           </div>
         </div>
         <DialogFooter
-          ><Button variant="outline" @click="preview = null">{{ copy("cancel") }}</Button
+          ><Button variant="outline" :disabled="running" @click="preview = null">{{
+            copy("cancel")
+          }}</Button
           ><Button :disabled="running" @click="generate">{{
             copy("confirm")
           }}</Button></DialogFooter

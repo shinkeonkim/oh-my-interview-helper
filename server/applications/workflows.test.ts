@@ -20,14 +20,18 @@ const setup = async () => {
   const persistence = createPersistence({ dataDirectory: directory })
   handles.push(persistence)
   const resolver: Resolver = { resolve: async () => ["93.184.216.34"] }
+  let transportRequests = 0
   const transport: PinnedTransport = {
-    request: async () => ({
-      status: 200,
-      headers: new Headers({ "content-type": "text/html" }),
-      body: (async function* () {
-        yield new TextEncoder().encode("<h1>URL posting</h1>")
-      })()
-    })
+    request: async () => {
+      transportRequests += 1
+      return {
+        status: 200,
+        headers: new Headers({ "content-type": "text/html" }),
+        body: (async function* () {
+          yield new TextEncoder().encode("<h1>URL posting</h1>")
+        })()
+      }
+    }
   }
   const app = createApp({ dataDirectory: directory, persistence, resolver, transport })
   const csrfResponse = await app.request(`${base}/security/csrf`)
@@ -36,13 +40,52 @@ const setup = async () => {
     Cookie: csrfResponse.headers.get("set-cookie")?.split(";", 1)[0] ?? "",
     "X-CSRF-Token": token
   }
-  return { app, headers }
+  return { app, headers, persistence, transportRequestCount: () => transportRequests }
 }
 
 describe("job posting and hiring pipeline API", () => {
   test("ingests manual, file, and pinned URL postings with immutable versions", async () => {
-    const { app, headers } = await setup()
+    const { app, headers, persistence, transportRequestCount } = await setup()
     const jsonHeaders = { ...headers, "Content-Type": "application/json" }
+    const rejected = await app.request(`${base}/postings/manual`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        title: "Incomplete",
+        companyName: "Acme",
+        teamName: null,
+        text: "   "
+      })
+    })
+    expect(rejected.status).toBe(400)
+    expect(
+      ((await (await app.request(`${base}/postings`)).json()) as { postings: unknown[] }).postings
+    ).toHaveLength(0)
+    expect(
+      persistence.database.query<{ count: number }, []>("SELECT count(*) count FROM blobs").get()
+        ?.count
+    ).toBe(0)
+    expect(
+      persistence.database
+        .query<{ count: number }, []>("SELECT count(*) count FROM job_post_versions")
+        .get()?.count
+    ).toBe(0)
+    for (const url of ["ftp://jobs.example/role", "https://user:secret@jobs.example/role"])
+      expect(
+        (
+          await app.request(`${base}/postings/url`, {
+            method: "POST",
+            headers: jsonHeaders,
+            body: JSON.stringify({
+              title: "Denied",
+              companyName: "Acme",
+              teamName: null,
+              url
+            })
+          })
+        ).status
+      ).toBe(400)
+    expect(transportRequestCount()).toBe(0)
     const manual = await app.request(`${base}/postings/manual`, {
       method: "POST",
       headers: jsonHeaders,
@@ -55,6 +98,17 @@ describe("job posting and hiring pipeline API", () => {
     })
     expect(manual.status).toBe(201)
     const manualPost = (await manual.json()) as { id: string }
+    for (const url of ["ftp://jobs.example/role", "https://user:secret@jobs.example/role"])
+      expect(
+        (
+          await app.request(`${base}/postings/${manualPost.id}/versions/url`, {
+            method: "POST",
+            headers: jsonHeaders,
+            body: JSON.stringify({ url })
+          })
+        ).status
+      ).toBe(400)
+    expect(transportRequestCount()).toBe(0)
     const file = new FormData()
     file.set("title", "Frontend")
     file.set("companyName", "Beta")
@@ -88,6 +142,58 @@ describe("job posting and hiring pipeline API", () => {
     expect(
       ((await (await app.request(`${base}/postings`)).json()) as { postings: unknown[] }).postings
     ).toHaveLength(3)
+
+    const blobCount = () =>
+      persistence.database.query<{ count: number }, []>("SELECT COUNT(*) count FROM blobs").get()
+        ?.count ?? 0
+    const blobsBeforeArchive = blobCount()
+    const requestsBeforeArchive = transportRequestCount()
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/manual`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ text: "must not persist" })
+        })
+      ).status
+    ).toBe(400)
+    const archivedFile = new FormData()
+    archivedFile.set("file", new File(["must not extract"], "post.txt", { type: "text/plain" }))
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/file`, {
+          method: "POST",
+          headers,
+          body: archivedFile
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      (
+        await app.request(`${base}/postings/${manualPost.id}/versions/url`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ url: "https://jobs.example/archived" })
+        })
+      ).status
+    ).toBe(400)
+    expect(blobCount()).toBe(blobsBeforeArchive)
+    expect(transportRequestCount()).toBe(requestsBeforeArchive)
+    expect(
+      (
+        (await (await app.request(`${base}/postings/${manualPost.id}/versions`)).json()) as {
+          versions: unknown[]
+        }
+      ).versions
+    ).toHaveLength(2)
   })
 
   test("enforces idempotency and terminal transitions while retaining notes and interview history", async () => {
@@ -115,6 +221,19 @@ describe("job posting and hiring pipeline API", () => {
     const first = await create()
     const application = (await first.json()) as { id: string }
     expect((await create()).status).toBe(201)
+    expect(
+      (
+        await app.request(`${base}/applications`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ jobPostId: post.id, idempotencyKey: crypto.randomUUID() })
+        })
+      ).status
+    ).toBe(409)
+    expect(
+      ((await (await app.request(`${base}/applications`)).json()) as { applications: unknown[] })
+        .applications
+    ).toHaveLength(1)
     const stages = (
       (await (await app.request(`${base}/pipeline/stages`)).json()) as {
         stages: Array<{ id: string; key: string }>
@@ -162,11 +281,77 @@ describe("job posting and hiring pipeline API", () => {
         })
       ).status
     ).toBe(409)
+    const afterDeniedTransition = (
+      (await (await app.request(`${base}/applications`)).json()) as {
+        applications: Array<{ id: string; stageId: string; outcomeAt: string | null }>
+      }
+    ).applications.find((item) => item.id === application.id)
+    expect(afterDeniedTransition?.stageId).toBe(offered.id)
+    expect(afterDeniedTransition?.outcomeAt).not.toBeNull()
     const history = (await (
       await app.request(`${base}/applications/${application.id}/history`)
     ).json()) as { events: unknown[]; interviews: unknown[] }
     expect(history.events).toHaveLength(5)
     expect(history.interviews).toHaveLength(1)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/notes`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ text: "Late mutation" })
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      (
+        await app.request(`${base}/applications/${application.id}/interviews`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            scheduledAt: "2026-09-02T01:00:00.000Z",
+            kind: "late interview"
+          })
+        })
+      ).status
+    ).toBe(400)
+    const archivedHistory = (await (
+      await app.request(`${base}/applications/${application.id}/history`)
+    ).json()) as { events: unknown[]; interviews: unknown[] }
+    expect(archivedHistory.events).toHaveLength(5)
+    expect(archivedHistory.interviews).toHaveLength(1)
+
+    expect(
+      (
+        await app.request(`${base}/postings/${post.id}/archive`, {
+          method: "POST",
+          headers
+        })
+      ).status
+    ).toBe(204)
+    const retried = await create()
+    expect(retried.status).toBe(201)
+    expect(((await retried.json()) as { id: string }).id).toBe(application.id)
+    expect(
+      (
+        await app.request(`${base}/applications`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ jobPostId: post.id, idempotencyKey: crypto.randomUUID() })
+        })
+      ).status
+    ).toBe(400)
+    expect(
+      ((await (await app.request(`${base}/applications`)).json()) as { applications: unknown[] })
+        .applications
+    ).toHaveLength(1)
   })
 
   test("allows bounded custom stage CRUD and rejects deleted-stage transitions atomically", async () => {
@@ -179,6 +364,24 @@ describe("job posting and hiring pipeline API", () => {
     })
     const stage = (await created.json()) as { id: string }
     expect(created.status).toBe(201)
+    const additionalStages = await Promise.all(
+      ["Recruiter screen", "Team interview", "Reference check"].map((name, index) =>
+        app.request(`${base}/pipeline/stages`, {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({ key: `parallel_${index}`, name })
+        })
+      )
+    )
+    expect(additionalStages.map((response) => response.status)).toEqual([201, 201, 201])
+    const orderedAfterCreation = (
+      (await (await app.request(`${base}/pipeline/stages`)).json()) as {
+        stages: Array<{ position: number }>
+      }
+    ).stages
+    expect(orderedAfterCreation.map((item) => item.position)).toEqual(
+      orderedAfterCreation.map((_, index) => index + 1)
+    )
     expect(
       (
         await app.request(`${base}/pipeline/stages/${stage.id}`, {
@@ -209,7 +412,7 @@ describe("job posting and hiring pipeline API", () => {
     expect(
       ((await (await app.request(`${base}/pipeline/stages`)).json()) as { stages: unknown[] })
         .stages
-    ).toHaveLength(6)
+    ).toHaveLength(beforeOrder.length - 1)
     expect(
       (
         await app.request(`${base}/pipeline/stages/${beforeOrder[0] ?? "missing"}`, {

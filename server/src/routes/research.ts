@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono"
 import { z } from "zod"
 
 import { ResearchIntegrityError } from "../research/repository"
+import { ResearchSourceUrlSchema } from "../research/contracts"
 import { ResearchServiceError, type ResearchService } from "../research/service"
 import { safeErrorCode } from "../security/redaction"
 
@@ -44,7 +45,7 @@ export const createResearchRoutes = (service: ResearchService): Hono => {
   routes.post("/:id/refresh", async (context) => {
     try {
       const body = z
-        .object({ sourceUrls: z.array(z.string().url()).min(1).max(8) })
+        .object({ sourceUrls: z.array(ResearchSourceUrlSchema).min(1).max(8) })
         .strict()
         .parse(await context.req.json())
       return context.json(await service.refresh(context.req.param("id"), body.sourceUrls), 201)

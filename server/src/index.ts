@@ -54,7 +54,8 @@ const main = (): void => {
       persistence,
       jobRuntime: jobs,
       providerRegistry: providers,
-      runnerPairing: pairing
+      runnerPairing: pairing,
+      revokeRunnerConnection: (runnerId) => runnerHub.revoke(runnerId)
     })
     const server = Bun.serve<HubSocketData>({
       fetch: (request, bunServer) => {
@@ -84,12 +85,11 @@ const main = (): void => {
         },
         close: (socket) => runnerHub.close(socket as unknown as HubSocket)
       },
-      hostname: "127.0.0.1",
+      hostname: configuration.bindHost,
       port: configuration.port,
       maxRequestBodySize: configuration.security.requestBytes
     })
 
-    console.info(`Server listening at ${server.url}`)
     const shutdown = (): void => {
       server.stop(true)
       void scheduler.stop().then(() => {
@@ -99,6 +99,7 @@ const main = (): void => {
     }
     process.once("SIGINT", shutdown)
     process.once("SIGTERM", shutdown)
+    console.info(`Server listening at ${server.url}`)
   } catch (error) {
     if (error instanceof StartupConfigurationError) {
       console.error(error.message)

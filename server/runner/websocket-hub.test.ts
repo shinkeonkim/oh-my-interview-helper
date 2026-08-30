@@ -178,4 +178,49 @@ describe("authenticated runner WebSocket hub", () => {
     )
     expect(await collecting).toEqual([{ kind: "text", text: "hi" }])
   })
+
+  test("disconnects a revoked runner and fails its active stream", async () => {
+    const harness = setup()
+    let closeReason = ""
+    harness.socket.close = (_code, reason) => {
+      closeReason = reason ?? ""
+    }
+    const invitation = harness.pairing.issueCode()
+    await harness.hub.message(
+      harness.socket,
+      JSON.stringify({
+        version: RUNNER_PROTOCOL_VERSION,
+        type: "pair_request",
+        runnerName: "revoked-runner",
+        pairingCode: invitation.code,
+        capabilities: {
+          claudeSubscription: true,
+          claudeDirectAuth: false,
+          claudeBare: false,
+          codexSkipGitRepoCheck: false,
+          claudeVersion: "2.1.0",
+          codexVersion: null
+        }
+      })
+    )
+    const accepted = JSON.parse(harness.sent.at(-1) ?? "{}") as { runnerId: string }
+    const collecting = (async () => {
+      for await (const event of harness.hub.stream({
+        provider: "claude-cli",
+        model: "sonnet",
+        prompt: "p"
+      })) {
+        // No output is expected before revocation.
+        void event
+      }
+    })()
+    await Promise.resolve()
+
+    harness.pairing.revoke("revoked-runner")
+    harness.hub.revoke(accepted.runnerId)
+
+    expect(harness.hub.connected("claude-cli")).toBeFalse()
+    expect(closeReason).toBe("runner_revoked")
+    await expect(collecting).rejects.toThrow("RUNNER_HUB_RUNNER_REVOKED")
+  })
 })

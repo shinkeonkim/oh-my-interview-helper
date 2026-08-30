@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { z } from "zod"
+import { PublicHttpUrlSchema } from "../security/public-url"
 
 const Id = z.string().uuid()
 const Timestamp = z.string().datetime()
@@ -93,29 +94,34 @@ export class ApplicationRepository {
       .map((row) => StageRow.parse(row))
   }
   createStage(input: { id: string; key: string; name: string; createdAt: string }): PipelineStage {
-    const position =
-      this.database
-        .query<{ value: number }, []>(
-          "SELECT COALESCE(MAX(position),0)+1 value FROM pipeline_stages"
+    return this.database
+      .transaction(() => {
+        const position =
+          this.database
+            .query<{ value: number }, []>(
+              "SELECT COALESCE(MAX(position),0)+1 value FROM pipeline_stages"
+            )
+            .get()?.value ?? 1
+        const id = Id.parse(input.id)
+        this.database.run(
+          "INSERT INTO pipeline_stages (id,stage_key,name,position,is_system,created_at) VALUES (?,?,?,?,0,?)",
+          [
+            id,
+            z.string().trim().min(1).max(64).parse(input.key),
+            z.string().trim().min(1).max(80).parse(input.name),
+            position,
+            Timestamp.parse(input.createdAt)
+          ]
         )
-        .get()?.value ?? 1
-    this.database.run(
-      "INSERT INTO pipeline_stages (id,stage_key,name,position,is_system,created_at) VALUES (?,?,?,?,0,?)",
-      [
-        Id.parse(input.id),
-        z.string().trim().min(1).max(64).parse(input.key),
-        z.string().trim().min(1).max(80).parse(input.name),
-        position,
-        Timestamp.parse(input.createdAt)
-      ]
-    )
-    return StageRow.parse(
-      this.database
-        .query<unknown, [string]>(
-          "SELECT id,stage_key key,name,position,outcome,is_system system FROM pipeline_stages WHERE id=?"
+        return StageRow.parse(
+          this.database
+            .query<unknown, [string]>(
+              "SELECT id,stage_key key,name,position,outcome,is_system system FROM pipeline_stages WHERE id=?"
+            )
+            .get(id)
         )
-        .get(input.id)
-    )
+      })
+      .immediate()
   }
   renameStage(id: string, name: string): void {
     if (
@@ -177,7 +183,7 @@ export class ApplicationRepository {
         z.string().trim().min(1).max(200).parse(input.title),
         z.string().trim().min(1).max(200).parse(input.companyName),
         z.string().trim().min(1).max(200).nullable().parse(input.teamName),
-        z.string().url().nullable().parse(input.canonicalUrl),
+        PublicHttpUrlSchema.nullable().parse(input.canonicalUrl),
         JSON.stringify(JsonObject.parse(input.metadata)),
         Timestamp.parse(input.createdAt)
       ]
@@ -202,38 +208,38 @@ export class ApplicationRepository {
     content: Record<string, unknown>
     createdAt: string
   }): void {
-    this.database
-      .transaction(() => {
-        const number =
-          this.database
-            .query<{ value: number }, [string]>(
-              "SELECT COALESCE(MAX(version_number),0)+1 value FROM job_post_versions WHERE job_post_id=?"
-            )
-            .get(Id.parse(input.postId))?.value ?? 1
+    const insert = () => {
+      const number =
+        this.database
+          .query<{ value: number }, [string]>(
+            "SELECT COALESCE(MAX(version_number),0)+1 value FROM job_post_versions WHERE job_post_id=?"
+          )
+          .get(Id.parse(input.postId))?.value ?? 1
+      this.database.run(
+        "INSERT INTO job_post_versions (id,job_post_id,version_number,source_kind,body_blob_hash,structured_content,created_at) VALUES (?,?,?,?,?,?,?)",
+        [
+          Id.parse(input.id),
+          input.postId,
+          number,
+          input.sourceKind,
+          z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .parse(input.bodyBlobHash),
+          JSON.stringify(JsonObject.parse(input.content)),
+          Timestamp.parse(input.createdAt)
+        ]
+      )
+      if (
         this.database.run(
-          "INSERT INTO job_post_versions (id,job_post_id,version_number,source_kind,body_blob_hash,structured_content,created_at) VALUES (?,?,?,?,?,?,?)",
-          [
-            Id.parse(input.id),
-            input.postId,
-            number,
-            input.sourceKind,
-            z
-              .string()
-              .regex(/^[a-f0-9]{64}$/)
-              .parse(input.bodyBlobHash),
-            JSON.stringify(JsonObject.parse(input.content)),
-            Timestamp.parse(input.createdAt)
-          ]
-        )
-        if (
-          this.database.run(
-            "UPDATE job_posts SET current_version_id=? WHERE id=? AND state='active'",
-            [input.id, input.postId]
-          ).changes !== 1
-        )
-          throw new ApplicationDomainError("post_unavailable")
-      })
-      .immediate()
+          "UPDATE job_posts SET current_version_id=? WHERE id=? AND state='active'",
+          [input.id, input.postId]
+        ).changes !== 1
+      )
+        throw new ApplicationDomainError("post_unavailable")
+    }
+    if (this.database.inTransaction) insert()
+    else this.database.transaction(insert).immediate()
   }
   versions(postId: string): readonly JobPostingVersion[] {
     return this.database
@@ -273,17 +279,23 @@ export class ApplicationRepository {
     idempotencyKey: string
     createdAt: string
   }): HiringApplication {
-    const existing = this.applicationByKey(input.idempotencyKey)
-    if (existing !== null) {
-      if (existing.jobPostId !== input.postId)
-        throw new ApplicationDomainError("idempotency_conflict")
-      return existing
-    }
-    const saved = this.stages().find((stage) => stage.key === "saved")
-    if (saved === undefined || this.post(input.postId)?.state !== "active")
-      throw new ApplicationDomainError("post_unavailable")
-    this.database
+    return this.database
       .transaction(() => {
+        const existing = this.applicationByKey(input.idempotencyKey)
+        if (existing !== null) {
+          if (existing.jobPostId !== input.postId)
+            throw new ApplicationDomainError("idempotency_conflict")
+          return existing
+        }
+        const saved = this.stages().find((stage) => stage.key === "saved")
+        if (saved === undefined || this.post(input.postId)?.state !== "active")
+          throw new ApplicationDomainError("post_unavailable")
+        const active = this.database
+          .query<{ id: string }, [string]>(
+            "SELECT id FROM applications WHERE job_post_id=? AND archived_at IS NULL LIMIT 1"
+          )
+          .get(input.postId)
+        if (active !== null) throw new ApplicationDomainError("active_application_exists")
         this.database.run(
           "INSERT INTO applications (id,job_post_id,status,idempotency_key,current_stage_id,created_at) VALUES (?,?,?,?,?,?)",
           [
@@ -296,25 +308,25 @@ export class ApplicationRepository {
           ]
         )
         this.appendEventUnsafe(input.id, "created", { stageId: saved.id }, input.createdAt)
+        return this.requireApplication(input.id)
       })
       .immediate()
-    return this.requireApplication(input.id)
   }
   transition(input: { applicationId: string; stageId: string; at: string }): HiringApplication {
-    const application = this.application(input.applicationId)
-    const target = this.stages().find((stage) => stage.id === Id.parse(input.stageId))
-    if (application === null || target === undefined || application.archivedAt !== null)
-      throw new ApplicationDomainError("transition_denied")
-    const current = this.stages().find((stage) => stage.id === application.stageId)
-    if (current?.outcome !== null || target.id === application.stageId)
-      throw new ApplicationDomainError("transition_denied")
-    const status =
-      target.outcome ??
-      (target.key === "saved" || target.key === "applied" || target.key === "interviewing"
-        ? target.key
-        : "interviewing")
-    this.database
+    return this.database
       .transaction(() => {
+        const application = this.application(Id.parse(input.applicationId))
+        const target = this.stages().find((stage) => stage.id === Id.parse(input.stageId))
+        if (application === null || target === undefined || application.archivedAt !== null)
+          throw new ApplicationDomainError("transition_denied")
+        const current = this.stages().find((stage) => stage.id === application.stageId)
+        if (current?.outcome !== null || target.id === application.stageId)
+          throw new ApplicationDomainError("transition_denied")
+        const status =
+          target.outcome ??
+          (target.key === "saved" || target.key === "applied" || target.key === "interviewing"
+            ? target.key
+            : "interviewing")
         this.database.run(
           "UPDATE applications SET current_stage_id=?,status=?,applied_at=CASE WHEN ?='applied' AND applied_at IS NULL THEN ? ELSE applied_at END,outcome_at=CASE WHEN ? IS NOT NULL THEN ? ELSE outcome_at END WHERE id=?",
           [target.id, status, target.key, input.at, target.outcome, input.at, application.id]
@@ -325,18 +337,22 @@ export class ApplicationRepository {
           { fromStageId: application.stageId, toStageId: target.id, outcome: target.outcome },
           input.at
         )
+        return this.requireApplication(application.id)
       })
       .immediate()
-    return this.requireApplication(application.id)
   }
   addNote(applicationId: string, text: string, at: string): void {
-    this.requireApplication(applicationId)
-    this.appendEventUnsafe(
-      applicationId,
-      "note_added",
-      { text: z.string().trim().min(1).max(10_000).parse(text) },
-      at
-    )
+    this.database
+      .transaction(() => {
+        this.requireActiveApplication(applicationId)
+        this.appendEventUnsafe(
+          applicationId,
+          "note_added",
+          { text: z.string().trim().min(1).max(10_000).parse(text) },
+          at
+        )
+      })
+      .immediate()
   }
   scheduleInterview(input: {
     id: string
@@ -348,9 +364,9 @@ export class ApplicationRepository {
     notes: string
     createdAt: string
   }): void {
-    this.requireApplication(input.applicationId)
     this.database
       .transaction(() => {
+        this.requireActiveApplication(input.applicationId)
         this.database.run(
           "INSERT INTO application_interviews (id,application_id,scheduled_at,ended_at,interview_kind,location,notes,created_at) VALUES (?,?,?,?,?,?,?,?)",
           [
@@ -405,6 +421,11 @@ export class ApplicationRepository {
     if (application === null) throw new ApplicationDomainError("application_unavailable")
     return application
   }
+  private requireActiveApplication(id: string) {
+    const application = this.requireApplication(id)
+    if (application.archivedAt !== null) throw new ApplicationDomainError("application_unavailable")
+    return application
+  }
   private appendEventUnsafe(
     applicationId: string,
     kind: string,
@@ -436,6 +457,7 @@ export class ApplicationDomainError extends Error {
   constructor(
     readonly code:
       | "application_unavailable"
+      | "active_application_exists"
       | "idempotency_conflict"
       | "invalid_stage_order"
       | "post_unavailable"

@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
-import { Archive, BriefcaseBusiness, CalendarPlus, History, Plus, Sparkles } from "lucide-vue-next"
+import {
+  Archive,
+  ArrowDown,
+  ArrowUp,
+  BriefcaseBusiness,
+  CalendarPlus,
+  History,
+  Plus,
+  RefreshCw,
+  Save,
+  Sparkles,
+  Trash2
+} from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -27,8 +39,23 @@ type Posting = {
   state: string
   versionNumber: number
   sourceKind: Source
+  canonicalUrl: string | null
+  metadata?: { location?: unknown; employmentType?: unknown }
 }
-type Stage = { id: string; key: string; name: string; position: number; outcome: string | null }
+type PostingVersion = {
+  id: string
+  versionNumber: number
+  sourceKind: Source
+  createdAt: string
+}
+type Stage = {
+  id: string
+  key: string
+  name: string
+  position: number
+  outcome: string | null
+  system: boolean
+}
 type Application = {
   id: string
   jobPostId: string
@@ -50,24 +77,129 @@ const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `applications.${key}`)
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
+const startingPostIds = ref<ReadonlySet<string>>(new Set())
+const pendingPostIds = ref<ReadonlySet<string>>(new Set())
 const stages = ref<Stage[]>([])
+const stageNames = ref<Record<string, string>>({})
 const source = ref<Source>("manual")
 const title = ref("")
 const company = ref("")
 const team = ref("")
+const location = ref("")
+const employmentType = ref("")
 const body = ref("")
 const sourceUrl = ref("")
 const file = ref<File | null>(null)
+const savingPosting = ref(false)
 const selectedStages = ref<Record<string, string>>({})
+const pendingApplicationIds = ref<ReadonlySet<string>>(new Set())
 const note = ref("")
+const addingNote = ref(false)
 const interviewAt = ref("")
 const interviewKind = ref("")
+const interviewLocation = ref("")
+const interviewNotes = ref("")
+const schedulingInterview = ref(false)
 const activeApplication = ref<string | null>(null)
 const history = ref<HistoryEntry[]>([])
-const interviews = ref<Array<{ id: string; scheduledAt: string; kind: string; notes: string }>>([])
+const interviews = ref<
+  Array<{
+    id: string
+    scheduledAt: string
+    kind: string
+    location: string | null
+    notes: string
+  }>
+>([])
 const newStage = ref("")
+const stagesBusy = ref(false)
+const activePost = ref<Posting | null>(null)
+const postingVersions = ref<PostingVersion[]>([])
+const versionSource = ref<Source>("url")
+const updateUrl = ref("")
+const versionBody = ref("")
+const versionFile = ref<File | null>(null)
+const updatingPost = ref(false)
 const loadController = new AbortController()
+let loadRequestId = 0
+let historyRequestId = 0
+let versionsRequestId = 0
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
+const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
+const activeApplicationPostIds = computed(
+  () =>
+    new Set(
+      applications.value.filter((item) => item.archivedAt === null).map((item) => item.jobPostId)
+    )
+)
+const isTerminalApplication = (application: Application) =>
+  typeof stages.value.find((stage) => stage.id === application.stageId)?.outcome === "string"
+const hasPublicUrl = computed(() => {
+  try {
+    const parsed = new URL(sourceUrl.value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+})
+const postingReady = computed(
+  () =>
+    title.value.trim().length > 0 &&
+    company.value.trim().length > 0 &&
+    ((source.value === "manual" && body.value.trim().length > 0) ||
+      (source.value === "url" && hasPublicUrl.value) ||
+      (source.value === "file" && file.value !== null))
+)
+const noteReady = computed(() => note.value.trim().length > 0)
+const interviewReady = computed(() => {
+  if (interviewAt.value.length === 0 || interviewKind.value.trim().length === 0) return false
+  return !Number.isNaN(new Date(interviewAt.value).getTime())
+})
+const newStageReady = computed(() => newStage.value.trim().length > 0)
+const updateHasPublicUrl = computed(() => {
+  try {
+    const parsed = new URL(updateUrl.value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+})
+const versionReady = computed(
+  () =>
+    (versionSource.value === "url" && updateHasPublicUrl.value) ||
+    (versionSource.value === "manual" && versionBody.value.trim().length > 0) ||
+    (versionSource.value === "file" && versionFile.value !== null)
+)
+
+const payloadText = (event: HistoryEntry, key: string) => {
+  const value = event.payload[key]
+  return typeof value === "string" ? value : null
+}
+const eventTitle = (event: HistoryEntry) => {
+  const known: Record<string, string> = {
+    created: "eventCreated",
+    stage_changed: "eventStageChanged",
+    note_added: "eventNoteAdded",
+    interview_scheduled: "eventInterviewScheduled"
+  }
+  const key = known[event.kind]
+  return key === undefined ? copy("eventOther") : copy(key)
+}
+const eventDetail = (event: HistoryEntry) => {
+  if (event.kind === "created") {
+    const stageId = payloadText(event, "stageId")
+    return stageId === null ? "" : (stageById.value.get(stageId) ?? "")
+  }
+  if (event.kind === "stage_changed") {
+    const from = payloadText(event, "fromStageId")
+    const to = payloadText(event, "toStageId")
+    if (from === null || to === null) return ""
+    return `${stageById.value.get(from) ?? copy("unknownStage")} → ${stageById.value.get(to) ?? copy("unknownStage")}`
+  }
+  if (event.kind === "note_added") return payloadText(event, "text") ?? ""
+  if (event.kind === "interview_scheduled") return payloadText(event, "kind") ?? ""
+  return ""
+}
 
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
@@ -78,23 +210,48 @@ const request = async (path: string, method: string, value?: FormData | string) 
   if (!response.ok) throw new Error("request")
   return response
 }
+const setApplicationPending = (id: string, pending: boolean) => {
+  const next = new Set(pendingApplicationIds.value)
+  if (pending) next.add(id)
+  else next.delete(id)
+  pendingApplicationIds.value = next
+}
+const setPostPending = (id: string, pending: boolean) => {
+  const next = new Set(pendingPostIds.value)
+  if (pending) next.add(id)
+  else next.delete(id)
+  pendingPostIds.value = next
+}
 const load = async () => {
-  const [postResponse, applicationResponse, stageResponse] = await Promise.all([
-    fetch("/api/postings", { signal: loadController.signal }),
-    fetch("/api/applications", { signal: loadController.signal }),
-    fetch("/api/pipeline/stages", { signal: loadController.signal })
-  ])
-  postings.value = ((await postResponse.json()) as { postings: Posting[] }).postings
-  applications.value = (
-    (await applicationResponse.json()) as { applications: Application[] }
-  ).applications
-  stages.value = ((await stageResponse.json()) as { stages: Stage[] }).stages
-  selectedStages.value = Object.fromEntries(
-    applications.value.map((item) => [item.id, item.stageId])
-  )
+  const requestId = ++loadRequestId
+  try {
+    const [postResponse, applicationResponse, stageResponse] = await Promise.all([
+      fetch("/api/postings", { signal: loadController.signal }),
+      fetch("/api/applications", { signal: loadController.signal }),
+      fetch("/api/pipeline/stages", { signal: loadController.signal })
+    ])
+    if (!postResponse.ok || !applicationResponse.ok || !stageResponse.ok) throw new Error("request")
+    const [postValue, applicationValue, stageValue] = await Promise.all([
+      postResponse.json() as Promise<{ postings: Posting[] }>,
+      applicationResponse.json() as Promise<{ applications: Application[] }>,
+      stageResponse.json() as Promise<{ stages: Stage[] }>
+    ])
+    if (requestId !== loadRequestId) return
+    postings.value = postValue.postings
+    applications.value = applicationValue.applications
+    stages.value = stageValue.stages
+    stageNames.value = Object.fromEntries(stages.value.map((stage) => [stage.id, stage.name]))
+    selectedStages.value = Object.fromEntries(
+      applications.value.map((item) => [item.id, item.stageId])
+    )
+  } catch (error) {
+    if (requestId === loadRequestId) throw error
+  }
 }
 
 const savePosting = async () => {
+  if (!postingReady.value || savingPosting.value) return
+  savingPosting.value = true
   try {
     if (source.value === "file") {
       if (file.value === null) throw new Error("file")
@@ -102,6 +259,8 @@ const savePosting = async () => {
       form.set("title", title.value)
       form.set("companyName", company.value)
       form.set("teamName", team.value)
+      form.set("location", location.value)
+      form.set("employmentType", employmentType.value)
       form.set("file", file.value)
       await request("/api/postings/file", "POST", form)
     } else {
@@ -112,19 +271,31 @@ const savePosting = async () => {
           title: title.value,
           companyName: company.value,
           teamName: team.value || null,
+          location: location.value || null,
+          employmentType: employmentType.value || null,
           ...(source.value === "url" ? { url: sourceUrl.value } : { text: body.value })
         })
       )
     }
-    title.value = company.value = team.value = body.value = sourceUrl.value = ""
+    title.value = company.value = team.value = location.value = employmentType.value = ""
+    body.value = sourceUrl.value = ""
     file.value = null
     toast.success(copy("saved"))
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    savingPosting.value = false
   }
 }
 const startApplication = async (post: Posting) => {
+  if (
+    startingPostIds.value.has(post.id) ||
+    pendingPostIds.value.has(post.id) ||
+    activeApplicationPostIds.value.has(post.id)
+  )
+    return
+  startingPostIds.value = new Set([...startingPostIds.value, post.id])
   try {
     await request(
       "/api/applications",
@@ -134,9 +305,15 @@ const startApplication = async (post: Posting) => {
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    const next = new Set(startingPostIds.value)
+    next.delete(post.id)
+    startingPostIds.value = next
   }
 }
 const move = async (application: Application) => {
+  if (pendingApplicationIds.value.has(application.id)) return
+  setApplicationPending(application.id, true)
   try {
     await request(
       `/api/applications/${application.id}/transition`,
@@ -147,75 +324,230 @@ const move = async (application: Application) => {
   } catch {
     toast.error(copy("failed"))
     await load()
+  } finally {
+    setApplicationPending(application.id, false)
+  }
+}
+const archiveApplication = async (application: Application) => {
+  if (pendingApplicationIds.value.has(application.id)) return
+  setApplicationPending(application.id, true)
+  try {
+    await request(`/api/applications/${application.id}/archive`, "POST")
+    if (activeApplication.value === application.id) {
+      historyRequestId += 1
+      activeApplication.value = null
+    }
+    await load()
+    toast.success(copy("applicationArchived"))
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    setApplicationPending(application.id, false)
   }
 }
 const addNote = async () => {
-  if (activeApplication.value === null) return
+  if (activeApplication.value === null || !noteReady.value || addingNote.value) return
+  const applicationId = activeApplication.value
+  addingNote.value = true
   try {
     await request(
-      `/api/applications/${activeApplication.value}/notes`,
+      `/api/applications/${applicationId}/notes`,
       "POST",
-      JSON.stringify({ text: note.value })
+      JSON.stringify({ text: note.value.trim() })
     )
-    note.value = ""
-    await showHistory(activeApplication.value)
+    if (activeApplication.value === applicationId) {
+      note.value = ""
+      await showHistory(applicationId)
+    }
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    addingNote.value = false
   }
 }
 const schedule = async () => {
-  if (activeApplication.value === null) return
+  if (activeApplication.value === null || !interviewReady.value || schedulingInterview.value) return
+  const applicationId = activeApplication.value
+  schedulingInterview.value = true
   try {
     await request(
-      `/api/applications/${activeApplication.value}/interviews`,
+      `/api/applications/${applicationId}/interviews`,
       "POST",
       JSON.stringify({
         scheduledAt: new Date(interviewAt.value).toISOString(),
         kind: interviewKind.value,
-        location: null,
-        notes: ""
+        location: interviewLocation.value.trim() || null,
+        notes: interviewNotes.value.trim()
       })
     )
-    interviewAt.value = interviewKind.value = ""
-    await showHistory(activeApplication.value)
+    if (activeApplication.value === applicationId) {
+      interviewAt.value = interviewKind.value = interviewLocation.value = interviewNotes.value = ""
+      await showHistory(applicationId)
+    }
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    schedulingInterview.value = false
   }
 }
 const showHistory = async (id: string) => {
-  const response = await fetch(`/api/applications/${id}/history`)
-  if (!response.ok) {
-    toast.error(copy("failed"))
-    return
+  const requestId = ++historyRequestId
+  try {
+    const response = await fetch(`/api/applications/${id}/history`)
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as {
+      events: HistoryEntry[]
+      interviews: typeof interviews.value
+    }
+    if (requestId !== historyRequestId) return
+    activeApplication.value = id
+    history.value = value.events
+    interviews.value = value.interviews
+  } catch {
+    if (requestId === historyRequestId) toast.error(copy("failed"))
   }
-  const value = (await response.json()) as {
-    events: HistoryEntry[]
-    interviews: typeof interviews.value
-  }
-  activeApplication.value = id
-  history.value = value.events
-  interviews.value = value.interviews
 }
 const archivePosting = async (post: Posting) => {
+  if (
+    pendingPostIds.value.has(post.id) ||
+    startingPostIds.value.has(post.id) ||
+    (updatingPost.value && activePost.value?.id === post.id)
+  )
+    return
+  setPostPending(post.id, true)
   try {
     await request(`/api/postings/${post.id}/archive`, "POST")
+    if (activePost.value?.id === post.id) activePost.value = null
     await load()
+    toast.success(copy("postingArchived"))
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    setPostPending(post.id, false)
+  }
+}
+const showVersions = async (post: Posting) => {
+  if (updatingPost.value) return
+  const requestId = ++versionsRequestId
+  try {
+    const response = await fetch(`/api/postings/${post.id}/versions`)
+    if (!response.ok) throw new Error("request")
+    const body = (await response.json()) as { versions?: unknown }
+    if (!Array.isArray(body.versions)) throw new Error("response")
+    if (requestId !== versionsRequestId) return
+    activePost.value = post
+    postingVersions.value = body.versions as PostingVersion[]
+    versionSource.value = post.canonicalUrl === null ? "manual" : "url"
+    updateUrl.value = post.canonicalUrl ?? ""
+    versionBody.value = ""
+    versionFile.value = null
+  } catch {
+    if (requestId === versionsRequestId) toast.error(copy("failed"))
+  }
+}
+const addPostingVersion = async () => {
+  if (activePost.value === null || !versionReady.value || updatingPost.value) return
+  const postId = activePost.value.id
+  updatingPost.value = true
+  try {
+    if (versionSource.value === "file") {
+      if (versionFile.value === null) throw new Error("file")
+      const form = new FormData()
+      form.set("file", versionFile.value)
+      await request(`/api/postings/${postId}/versions/file`, "POST", form)
+    } else {
+      await request(
+        `/api/postings/${postId}/versions/${versionSource.value}`,
+        "POST",
+        JSON.stringify(
+          versionSource.value === "url" ? { url: updateUrl.value } : { text: versionBody.value }
+        )
+      )
+    }
+    await load()
+    const refreshed = postings.value.find((post) => post.id === postId)
+    updatingPost.value = false
+    if (refreshed !== undefined && activePost.value?.id === postId) await showVersions(refreshed)
+    toast.success(copy("versionSaved"))
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    updatingPost.value = false
   }
 }
 const addStage = async () => {
+  if (!newStageReady.value || stagesBusy.value) return
+  stagesBusy.value = true
   try {
     const key = `custom_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`
-    await request("/api/pipeline/stages", "POST", JSON.stringify({ key, name: newStage.value }))
+    await request(
+      "/api/pipeline/stages",
+      "POST",
+      JSON.stringify({ key, name: newStage.value.trim() })
+    )
     newStage.value = ""
     await load()
   } catch {
     toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
+  }
+}
+const renameStage = async (stage: Stage) => {
+  const name = stageNames.value[stage.id]?.trim()
+  if (stagesBusy.value || !name || name === stage.name) return
+  stagesBusy.value = true
+  try {
+    await request(`/api/pipeline/stages/${stage.id}`, "PATCH", JSON.stringify({ name }))
+    await load()
+    toast.success(copy("stageSaved"))
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
+  }
+}
+const moveStage = async (stage: Stage, offset: -1 | 1) => {
+  if (stagesBusy.value) return
+  const ordered = [...stages.value].sort((left, right) => left.position - right.position)
+  const index = ordered.findIndex((item) => item.id === stage.id)
+  const target = index + offset
+  if (index < 0 || target < 0 || target >= ordered.length) return
+  ;[ordered[index], ordered[target]] = [ordered[target]!, ordered[index]!]
+  stagesBusy.value = true
+  try {
+    await request(
+      "/api/pipeline/stages/order",
+      "PUT",
+      JSON.stringify({ stageIds: ordered.map((item) => item.id) })
+    )
+    await load()
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
+  }
+}
+const deleteStage = async (stage: Stage) => {
+  if (stagesBusy.value) return
+  stagesBusy.value = true
+  try {
+    await request(`/api/pipeline/stages/${stage.id}`, "DELETE")
+    await load()
+    toast.success(copy("stageDeleted"))
+  } catch {
+    toast.error(copy("failed"))
+  } finally {
+    stagesBusy.value = false
   }
 }
 onMounted(() => void load().catch(() => toast.error(copy("failed"))))
-onBeforeUnmount(() => loadController.abort())
+onBeforeUnmount(() => {
+  loadRequestId += 1
+  historyRequestId += 1
+  versionsRequestId += 1
+  loadController.abort()
+})
 </script>
 
 <template>
@@ -231,22 +563,30 @@ onBeforeUnmount(() => loadController.abort())
       ><CardContent class="grid gap-4">
         <div class="grid gap-4 md:grid-cols-3">
           <div class="grid gap-2">
-            <Label>{{ copy("roleTitle") }}</Label
-            ><Input v-model="title" />
+            <Label for="posting-title">{{ copy("roleTitle") }}</Label
+            ><Input id="posting-title" v-model="title" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("company") }}</Label
-            ><Input v-model="company" />
+            <Label for="posting-company">{{ copy("company") }}</Label
+            ><Input id="posting-company" v-model="company" />
           </div>
           <div class="grid gap-2">
-            <Label>{{ copy("team") }}</Label
-            ><Input v-model="team" />
+            <Label for="posting-team">{{ copy("team") }}</Label
+            ><Input id="posting-team" v-model="team" />
+          </div>
+          <div class="grid gap-2">
+            <Label for="posting-location">{{ copy("location") }}</Label
+            ><Input id="posting-location" v-model="location" />
+          </div>
+          <div class="grid gap-2">
+            <Label for="posting-employment-type">{{ copy("employmentType") }}</Label
+            ><Input id="posting-employment-type" v-model="employmentType" />
           </div>
         </div>
         <div class="grid gap-2">
-          <Label>{{ copy("addPosting") }}</Label
+          <Label for="posting-source">{{ copy("inputMethod") }}</Label
           ><Select v-model="source"
-            ><SelectTrigger class="w-44"><SelectValue /></SelectTrigger
+            ><SelectTrigger id="posting-source" class="w-44"><SelectValue /></SelectTrigger
             ><SelectContent
               ><SelectItem value="manual">{{ copy("manual") }}</SelectItem
               ><SelectItem value="file">{{ copy("file") }}</SelectItem
@@ -258,6 +598,7 @@ onBeforeUnmount(() => loadController.abort())
           v-if="source === 'manual'"
           v-model="body"
           class="min-h-32 rounded-lg border bg-background p-3"
+          :aria-label="copy('body')"
           :placeholder="copy('body')"
         />
         <Input
@@ -270,9 +611,12 @@ onBeforeUnmount(() => loadController.abort())
           v-else
           type="file"
           accept=".pdf,.docx,.md,.txt"
+          :aria-label="copy('chooseFile')"
           @change="file = ($event.target as HTMLInputElement).files?.[0] ?? null"
         />
-        <Button class="w-fit" @click="savePosting"><Plus />{{ copy("save") }}</Button>
+        <Button class="w-fit" :disabled="!postingReady || savingPosting" @click="savePosting"
+          ><Plus />{{ savingPosting ? copy("saving") : copy("save") }}</Button
+        >
       </CardContent></Card
     >
 
@@ -282,25 +626,76 @@ onBeforeUnmount(() => loadController.abort())
         {{ copy("emptyPostings") }}
       </p>
       <div class="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card v-for="post in postings" :key="post.id"
+        <Card
+          v-for="post in postings"
+          :key="post.id"
+          :aria-busy="pendingPostIds.has(post.id) || startingPostIds.has(post.id)"
           ><CardHeader class="flex-row justify-between"
             ><div>
               <CardTitle>{{ post.title }}</CardTitle>
               <p class="mt-2 text-sm text-muted-foreground">
                 {{ post.companyName }}<span v-if="post.teamName"> · {{ post.teamName }}</span>
               </p>
+              <p
+                v-if="
+                  typeof post.metadata?.location === 'string' ||
+                  typeof post.metadata?.employmentType === 'string'
+                "
+                class="mt-1 text-sm text-muted-foreground"
+              >
+                <span v-if="typeof post.metadata?.location === 'string'">{{
+                  post.metadata?.location
+                }}</span>
+                <span
+                  v-if="
+                    typeof post.metadata?.location === 'string' &&
+                    typeof post.metadata?.employmentType === 'string'
+                  "
+                >
+                  ·
+                </span>
+                <span v-if="typeof post.metadata?.employmentType === 'string'">{{
+                  post.metadata?.employmentType
+                }}</span>
+              </p>
             </div>
-            <Badge variant="outline"
-              >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
-            ></CardHeader
+            <div class="flex flex-wrap gap-2">
+              <Badge v-if="post.state === 'archived'" variant="secondary">{{
+                copy("archived")
+              }}</Badge>
+              <Badge variant="outline"
+                >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
+              >
+            </div></CardHeader
           ><CardContent class="flex gap-2"
             ><Button as-child variant="secondary"
               ><RouterLink :to="`/jobs/${post.id}/overview`"
                 ><Sparkles />{{ copy("prepare") }}</RouterLink
               ></Button
-            ><Button @click="startApplication(post)"
-              ><BriefcaseBusiness />{{ copy("startApplication") }}</Button
-            ><Button variant="ghost" @click="archivePosting(post)"
+            ><Button
+              :disabled="
+                post.state !== 'active' ||
+                startingPostIds.has(post.id) ||
+                pendingPostIds.has(post.id) ||
+                activeApplicationPostIds.has(post.id)
+              "
+              @click="startApplication(post)"
+              ><BriefcaseBusiness />{{
+                activeApplicationPostIds.has(post.id)
+                  ? copy("applicationInProgress")
+                  : copy("startApplication")
+              }}</Button
+            ><Button variant="outline" :disabled="updatingPost" @click="showVersions(post)"
+              ><History />{{ copy("versionHistory") }}</Button
+            ><Button
+              v-if="post.state === 'active'"
+              variant="ghost"
+              :disabled="
+                pendingPostIds.has(post.id) ||
+                startingPostIds.has(post.id) ||
+                (updatingPost && activePost?.id === post.id)
+              "
+              @click="archivePosting(post)"
               ><Archive />{{ copy("archive") }}</Button
             ></CardContent
           ></Card
@@ -308,28 +703,133 @@ onBeforeUnmount(() => loadController.abort())
       </div>
     </section>
 
+    <Card v-if="activePost">
+      <CardHeader>
+        <CardTitle>{{ activePost.title }} · {{ copy("versionHistory") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="grid gap-5 lg:grid-cols-2">
+        <div class="grid gap-3">
+          <Label for="posting-version-source">{{ copy("versionSource") }}</Label>
+          <Select v-model="versionSource" :disabled="activePost.state !== 'active' || updatingPost">
+            <SelectTrigger id="posting-version-source" class="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="manual">{{ copy("manual") }}</SelectItem>
+              <SelectItem value="file">{{ copy("file") }}</SelectItem>
+              <SelectItem value="url">{{ copy("url") }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            v-if="versionSource === 'url'"
+            v-model="updateUrl"
+            type="url"
+            :disabled="activePost.state !== 'active' || updatingPost"
+            :aria-label="copy('updateUrl')"
+          />
+          <textarea
+            v-else-if="versionSource === 'manual'"
+            v-model="versionBody"
+            class="min-h-28 rounded-lg border bg-background p-3"
+            :disabled="activePost.state !== 'active' || updatingPost"
+            :aria-label="copy('body')"
+            :placeholder="copy('body')"
+          />
+          <Input
+            v-else
+            type="file"
+            accept=".pdf,.docx,.md,.txt"
+            :disabled="activePost.state !== 'active' || updatingPost"
+            :aria-label="copy('versionFile')"
+            @change="versionFile = ($event.target as HTMLInputElement).files?.[0] ?? null"
+          />
+          <Button
+            class="w-fit"
+            :disabled="updatingPost || activePost.state !== 'active' || !versionReady"
+            @click="addPostingVersion"
+          >
+            <RefreshCw />{{ copy("addVersion") }}
+          </Button>
+          <p class="text-sm text-muted-foreground">{{ copy("versionHelp") }}</p>
+        </div>
+        <ol class="grid gap-2 text-sm">
+          <li
+            v-for="version in postingVersions"
+            :key="version.id"
+            class="flex items-center justify-between gap-3 rounded border p-3"
+          >
+            <span
+              >{{ copy("version") }} {{ version.versionNumber }} ·
+              {{ copy(version.sourceKind) }}</span
+            >
+            <time :datetime="version.createdAt">{{
+              new Date(version.createdAt).toLocaleString(settings.locale)
+            }}</time>
+          </li>
+        </ol>
+      </CardContent>
+    </Card>
+
     <section>
       <h2 class="text-xl font-semibold">{{ copy("applications") }}</h2>
       <p v-if="applications.length === 0" class="mt-4 text-muted-foreground">
         {{ copy("emptyApplications") }}
       </p>
       <div class="mt-4 grid gap-4">
-        <Card v-for="application in applications" :key="application.id"
+        <Card
+          v-for="application in applications"
+          :key="application.id"
+          :aria-busy="pendingApplicationIds.has(application.id)"
           ><CardContent class="flex flex-col gap-4 py-5 lg:flex-row lg:items-center"
             ><div class="min-w-48 flex-1">
               <p class="font-semibold">{{ postingById.get(application.jobPostId)?.title }}</p>
-              <p class="text-sm text-muted-foreground">{{ application.stageName }}</p>
+              <div class="mt-1 flex items-center gap-2">
+                <p class="text-sm text-muted-foreground">{{ application.stageName }}</p>
+                <Badge v-if="application.archivedAt" variant="secondary">{{
+                  copy("archived")
+                }}</Badge>
+              </div>
+              <p v-if="application.appliedAt" class="mt-1 text-xs text-muted-foreground">
+                {{ copy("appliedAt") }} ·
+                {{ new Date(application.appliedAt).toLocaleString(settings.locale) }}
+              </p>
+              <p v-if="application.outcomeAt" class="mt-1 text-xs text-muted-foreground">
+                {{ copy("outcomeAt") }} ·
+                {{ new Date(application.outcomeAt).toLocaleString(settings.locale) }}
+              </p>
             </div>
-            <Select v-model="selectedStages[application.id]"
-              ><SelectTrigger class="w-48"><SelectValue /></SelectTrigger
+            <Select
+              v-model="selectedStages[application.id]"
+              :disabled="
+                application.archivedAt !== null ||
+                isTerminalApplication(application) ||
+                pendingApplicationIds.has(application.id)
+              "
+              ><SelectTrigger
+                class="w-48"
+                :aria-label="`${copy('stage')}: ${application.stageName}`"
+                ><SelectValue /></SelectTrigger
               ><SelectContent
                 ><SelectItem v-for="stage in stages" :key="stage.id" :value="stage.id">{{
                   stage.name
                 }}</SelectItem></SelectContent
               ></Select
-            ><Button variant="secondary" @click="move(application)">{{ copy("move") }}</Button
+            ><Button
+              variant="secondary"
+              :disabled="
+                application.archivedAt !== null ||
+                isTerminalApplication(application) ||
+                pendingApplicationIds.has(application.id) ||
+                selectedStages[application.id] === application.stageId
+              "
+              @click="move(application)"
+              >{{ copy("move") }}</Button
             ><Button variant="outline" @click="showHistory(application.id)"
               ><History />{{ copy("history") }}</Button
+            ><Button
+              v-if="application.archivedAt === null"
+              variant="ghost"
+              :disabled="pendingApplicationIds.has(application.id)"
+              @click="archiveApplication(application)"
+              ><Archive />{{ copy("archiveApplication") }}</Button
             ></CardContent
           ></Card
         >
@@ -342,41 +842,132 @@ onBeforeUnmount(() => loadController.abort())
       ><CardContent class="grid gap-6 lg:grid-cols-2"
         ><div class="grid gap-3">
           <div class="flex gap-2">
-            <Input v-model="note" :placeholder="copy('notes')" /><Button @click="addNote">{{
-              copy("addNote")
-            }}</Button>
+            <Input v-model="note" :aria-label="copy('notes')" :placeholder="copy('notes')" /><Button
+              :disabled="!noteReady || addingNote"
+              @click="addNote"
+              >{{ addingNote ? copy("saving") : copy("addNote") }}</Button
+            >
           </div>
-          <div class="grid gap-2 sm:grid-cols-3">
-            <Input v-model="interviewAt" type="datetime-local" /><Input
+          <div class="grid gap-2 sm:grid-cols-2">
+            <Input
+              v-model="interviewAt"
+              type="datetime-local"
+              :aria-label="copy('interviewAt')"
+            /><Input
               v-model="interviewKind"
+              :aria-label="copy('interviewKind')"
               :placeholder="copy('interviewKind')"
-            /><Button @click="schedule"><CalendarPlus />{{ copy("scheduleInterview") }}</Button>
+            />
+            <Input
+              v-model="interviewLocation"
+              :aria-label="copy('interviewLocation')"
+              :placeholder="copy('interviewLocation')"
+            />
+            <Input
+              v-model="interviewNotes"
+              :aria-label="copy('interviewNotes')"
+              :placeholder="copy('interviewNotes')"
+            />
+            <Button
+              class="w-fit"
+              :disabled="!interviewReady || schedulingInterview"
+              @click="schedule"
+              ><CalendarPlus />{{
+                schedulingInterview ? copy("saving") : copy("scheduleInterview")
+              }}</Button
+            >
           </div>
         </div>
         <ol class="grid gap-2 text-sm">
           <li v-for="event in history" :key="event.id" class="rounded border p-3">
-            #{{ event.sequence }} {{ event.kind }} ·
-            {{ new Date(event.createdAt).toLocaleString(settings.locale) }}
+            <p class="font-medium">
+              #{{ event.sequence }} {{ eventTitle(event) }} ·
+              {{ new Date(event.createdAt).toLocaleString(settings.locale) }}
+            </p>
+            <p v-if="eventDetail(event)" class="mt-1 whitespace-pre-wrap text-muted-foreground">
+              {{ eventDetail(event) }}
+            </p>
           </li>
           <li v-for="interview in interviews" :key="interview.id" class="rounded border p-3">
-            {{ interview.kind }} ·
-            {{ new Date(interview.scheduledAt).toLocaleString(settings.locale) }}
+            <p class="font-medium">
+              {{ interview.kind }} ·
+              {{ new Date(interview.scheduledAt).toLocaleString(settings.locale) }}
+            </p>
+            <p v-if="interview.location" class="mt-1 text-muted-foreground">
+              {{ copy("interviewLocation") }} · {{ interview.location }}
+            </p>
+            <p v-if="interview.notes" class="mt-1 whitespace-pre-wrap text-muted-foreground">
+              {{ interview.notes }}
+            </p>
           </li>
         </ol></CardContent
       ></Card
     >
 
-    <Card
+    <Card :aria-busy="stagesBusy"
       ><CardHeader
         ><CardTitle>{{ copy("stages") }}</CardTitle></CardHeader
       ><CardContent
-        ><div class="flex flex-wrap gap-2">
-          <Badge v-for="stage in stages" :key="stage.id" variant="outline"
-            >{{ stage.position }}. {{ stage.name }}</Badge
+        ><div class="grid gap-2">
+          <div
+            v-for="(stage, index) in stages"
+            :key="stage.id"
+            class="grid grid-cols-[auto_minmax(0,1fr)_repeat(3,auto)] items-center gap-2 rounded-lg border p-2 sm:grid-cols-[auto_minmax(0,1fr)_repeat(4,auto)]"
           >
+            <span class="w-6 text-center text-sm text-muted-foreground">{{ stage.position }}</span>
+            <Input
+              v-model="stageNames[stage.id]"
+              class="col-span-4 min-w-0 sm:col-span-1"
+              :aria-label="`${copy('saveStage')}: ${stage.name}`"
+              :disabled="stagesBusy"
+            />
+            <Button
+              :class="
+                stage.system ? 'col-start-3 sm:col-start-auto' : 'col-start-2 sm:col-start-auto'
+              "
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('moveStageUp')}: ${stage.name}`"
+              :disabled="stagesBusy || index === 0"
+              @click="moveStage(stage, -1)"
+              ><ArrowUp
+            /></Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('moveStageDown')}: ${stage.name}`"
+              :disabled="stagesBusy || index === stages.length - 1"
+              @click="moveStage(stage, 1)"
+              ><ArrowDown
+            /></Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('saveStage')}: ${stage.name}`"
+              :disabled="
+                stagesBusy || !stageNames[stage.id]?.trim() || stageNames[stage.id] === stage.name
+              "
+              @click="renameStage(stage)"
+              ><Save
+            /></Button>
+            <Button
+              v-if="!stage.system"
+              size="icon"
+              variant="ghost"
+              :aria-label="`${copy('deleteStage')}: ${stage.name}`"
+              :disabled="stagesBusy"
+              @click="deleteStage(stage)"
+              ><Trash2
+            /></Button>
+          </div>
         </div>
         <div class="mt-4 flex max-w-md gap-2">
-          <Input v-model="newStage" :placeholder="copy('newStage')" /><Button @click="addStage">{{
+          <Input
+            v-model="newStage"
+            :disabled="stagesBusy"
+            :aria-label="copy('newStage')"
+            :placeholder="copy('newStage')"
+          /><Button :disabled="stagesBusy || !newStageReady" @click="addStage">{{
             copy("addStage")
           }}</Button>
         </div></CardContent

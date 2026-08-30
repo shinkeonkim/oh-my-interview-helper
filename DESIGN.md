@@ -74,18 +74,18 @@ Breakpoints: mobile below 768px uses a Sheet; desktop uses Sidebar. At 320px the
 - **States**: default, hover, active, focus-visible, disabled, loading, empty, error.
 - **Rule**: compose these primitives before adding a new bespoke control.
 
-### Future feature mappings
+### Product feature compositions
 
 - `AppShell`: Sidebar + Sheet + CommandDialog + DropdownMenu + Tooltip.
 - `HeaderSearch`: CommandDialog with local entity groups and honest empty/loading/error states.
-- `JobIndicator`: Badge + Progress + Tooltip, linking to Job postings.
-- `AgentProgress`: Progress + Skeleton + Alert, never fake completion.
-- Job card/create dialog: Card + Badge + Dialog + Input + Select + AlertDialog for destructive confirmation.
-- Detail header/tabs: Card header + Button + Tabs with emerald underline and route-backed active tab.
-- Chat panel/query composer: ScrollArea + Card + Textarea/Input + Button, with mobile Sheet.
-- Recommendations/application tracker: Card + Badge + Progress + Select, sourced only from real data.
-- Document import: Dialog + Input + Alert + Skeleton, with explicit local parsing status.
-- Setting section: Card + Label + Select + Separator + Sonner.
+- `JobIndicator`: Badge + Progress + Tooltip linked to saved job postings.
+- `AgentProgress`: Progress + Skeleton + Alert driven by persisted job state, never fake completion.
+- Job cards and forms: Card + Badge + Dialog + Input + Select, with explicit destructive confirmation.
+- Detail navigation: route-backed workspace links with an emerald active state and preserved job context.
+- Chat and preparation composers: Card + Textarea/Input + Button with disclosure review dialogs.
+- Application tracker: Card + Badge + Progress + Select sourced only from persisted pipeline data.
+- Document import: Dialog + Input + Alert + Skeleton with explicit local parsing status.
+- Settings: Card + Label + Select + Separator + Sonner for Provider, runner, locale, and theme state.
 
 ## 6. Motion & Interaction
 
@@ -95,14 +95,11 @@ Micro interactions use 150ms ease-out; Sheets and dialogs use the generated Reka
 
 Depth strategy is tonal shift plus rules. Cards and sidebar use semantic background/border tokens. Popovers, dialogs, and Sheets may use the generated restrained shadow. No gradients, blobs, decorative metrics, or fake data.
 
-## 8. Accessibility Constraints & Accepted Debt
+## 8. Accessibility Constraints & Verification
 
 - WCAG 2.2 AA target: 4.5:1 body contrast, 3:1 large text/controls, visible focus on every interactive element.
 - Every route has a semantic heading, honest empty state, and keyboard-reachable navigation.
 - Locale updates `<html lang>`; invalid preferences recover to Korean/system; system theme follows live `matchMedia` changes.
 - CJK text must wrap safely at 320px; no horizontal overflow in the primary route canvas.
 
-| Item                                | Location                               | Why accepted                       | Exit                               |
-| ----------------------------------- | -------------------------------------- | ---------------------------------- | ---------------------------------- |
-| Feature routes are empty states     | `client/src/views/PlaceholderView.vue` | Domain flows belong to later todos | Replace when domain todo lands     |
-| Search contains route commands only | `client/src/components/AppShell.vue`   | No search persistence exists yet   | Connect local index in search todo |
+The earlier placeholder routes and route-only search have been replaced by persisted domain flows and local entity search. Playwright covers every route, keyboard navigation, focus restoration, mobile focus trapping, theme and locale persistence, and 320px overflow. Manual assistive-technology review remains part of release verification rather than an accepted product exception.
