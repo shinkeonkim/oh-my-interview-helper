@@ -11,7 +11,7 @@ const DiscoveryOutputSchema = z
   .object({ sourceUrls: z.array(ResearchSourceUrlSchema).min(1).max(8) })
   .strict()
 
-type LocalResearchCli = "claude" | "codex"
+export type LocalResearchCli = "claude" | "codex"
 
 export class LocalAgentResearchSourceDiscoverer implements ResearchSourceDiscoverer {
   constructor(
@@ -117,6 +117,16 @@ const run = async (
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+}
+
+export const runLocalWebAgent = async (
+  prompt: string,
+  signal?: AbortSignal,
+  timeoutMilliseconds = 180_000
+): Promise<string | null> => {
+  const cli: LocalResearchCli | null =
+    Bun.which("claude") !== null ? "claude" : Bun.which("codex") !== null ? "codex" : null
+  return cli === null ? null : run(cli, prompt, timeoutMilliseconds, signal)
 }
 
 const claudeResult = (stdout: string): string => {

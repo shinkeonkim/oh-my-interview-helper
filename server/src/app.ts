@@ -50,6 +50,8 @@ import { StrandsPreparationExecutor } from "./workflows/strands-executor"
 import { WorkflowSourceContentResolver } from "./workflows/source-content"
 import { StrandsChatExecutor } from "./workflows/strands-chat-executor"
 import { createStatsRoutes } from "./routes/stats"
+import { createJobSearchRoutes } from "./routes/job-search"
+import { JobDiscoveryService } from "./job-search/service"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -152,6 +154,7 @@ export const createApp = ({
   )
   app.route("/api/jobs", createJobsRoutes(jobs))
   app.route("/api/stats", createStatsRoutes(persistence.database))
+  app.route("/api/job-search", createJobSearchRoutes(new JobDiscoveryService(persistence.database)))
   app.route(
     "/api/settings",
     createSettingsRoutes({
