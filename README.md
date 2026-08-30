@@ -52,16 +52,16 @@ Docker 이미지는 기본적으로 API 키 없이 실행됩니다. Provider 설
 - Node.js 22.14.0
 
 ```bash
-cp .env.example .env
 bun install --frozen-lockfile
 bun run dev
 ```
 
-`bun run dev`는 클라이언트를 먼저 빌드한 뒤 기본 주소 <http://127.0.0.1:3000>에서 서버를 실행합니다.
+브라우저에서 <http://127.0.0.1:5173>을 엽니다. `bun run dev` 하나로 API 서버와 HMR이 적용되는 클라이언트를 함께 실행하며, `Ctrl+C`로 두 프로세스를 모두 종료합니다. `.env`가 없으면 `.env.example`과 같은 로컬 기본값을 사용합니다.
 
-클라이언트 HMR이 필요하면 서버를 실행한 상태에서 다른 터미널에서 아래 명령을 실행하고 <http://127.0.0.1:5173>을 여세요. Vite가 `/api`와 runner WebSocket 요청을 3000번 서버로 전달합니다.
+포트나 데이터 경로를 바꾸려면 `.env.example`을 `.env`로 복사해 수정합니다. 서버나 클라이언트만 따로 실행해야 할 때는 아래 명령을 사용할 수 있습니다.
 
 ```bash
+bun run dev:server
 bun run dev:client
 ```
 
