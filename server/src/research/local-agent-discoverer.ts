@@ -50,7 +50,7 @@ const promptFor = (
     JSON.stringify(subject)
   ].join("\n")
 
-const commandFor = (cli: LocalResearchCli): readonly string[] =>
+export const researchDiscoveryCommand = (cli: LocalResearchCli): readonly string[] =>
   cli === "claude"
     ? [
         "claude",
@@ -62,6 +62,8 @@ const commandFor = (cli: LocalResearchCli): readonly string[] =>
         "dontAsk",
         "--restricted",
         "--tools",
+        "WebSearch,WebFetch",
+        "--allowedTools",
         "WebSearch,WebFetch",
         "--model",
         "sonnet"
@@ -88,7 +90,7 @@ const run = async (
 ): Promise<string | null> => {
   const directory = mkdtempSync(join(tmpdir(), "interview-research-"))
   try {
-    const child = Bun.spawn([...commandFor(cli)], {
+    const child = Bun.spawn([...researchDiscoveryCommand(cli)], {
       cwd: directory,
       env: process.env,
       stdin: "pipe",
