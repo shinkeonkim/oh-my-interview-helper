@@ -15,7 +15,7 @@ export const ResearchRequestSchema = z
     organization: z.string().trim().min(1).max(200).nullable().default(null),
     roleHint: z.string().trim().min(1).max(200).nullable().default(null),
     jobPostId: z.string().uuid().nullable().default(null),
-    sourceUrls: z.array(ResearchSourceUrlSchema).min(1).max(8),
+    sourceUrls: z.array(ResearchSourceUrlSchema).max(8).default([]),
     parentRecordId: z.string().uuid().nullable().default(null)
   })
   .strict()

@@ -7,9 +7,17 @@ import {
   ResearchAnalysisSchema,
   ResearchRequestSchema,
   type ResearchAnalyzer,
-  type ResearchAnalyzerInput
+  type ResearchAnalyzerInput,
+  type ResearchRequest
 } from "./contracts"
 import { CitedResearchRepository } from "./repository"
+
+export type ResearchSourceDiscoverer = {
+  readonly discover: (
+    subject: Pick<ResearchRequest, "subjectType" | "subjectName" | "organization" | "roleHint">,
+    signal?: AbortSignal
+  ) => Promise<readonly string[]>
+}
 
 export class ResearchService {
   readonly repository: CitedResearchRepository
@@ -19,14 +27,21 @@ export class ResearchService {
     private readonly analyzer: ResearchAnalyzer | undefined,
     private readonly resolver?: Resolver,
     private readonly transport?: PinnedTransport,
-    private readonly now: () => string = () => new Date().toISOString()
+    private readonly now: () => string = () => new Date().toISOString(),
+    private readonly discoverer?: ResearchSourceDiscoverer
   ) {
     this.repository = new CitedResearchRepository(persistence.database)
   }
 
-  async run(raw: unknown) {
+  async run(raw: unknown, signal?: AbortSignal) {
     if (this.analyzer === undefined) throw new ResearchServiceError("analyzer_unavailable")
-    const request = ResearchRequestSchema.parse(raw)
+    const parsedRequest = ResearchRequestSchema.parse(raw)
+    const discoveredUrls =
+      parsedRequest.sourceUrls.length === 0
+        ? await this.discoverSources(parsedRequest, signal)
+        : parsedRequest.sourceUrls
+    if (discoveredUrls.length === 0) throw new ResearchServiceError("sources_not_found")
+    const request = ResearchRequestSchema.parse({ ...parsedRequest, sourceUrls: discoveredUrls })
     if (request.parentRecordId !== null && this.repository.get(request.parentRecordId) === null)
       throw new ResearchServiceError("parent_not_found")
     const sources = []
@@ -107,18 +122,40 @@ export class ResearchService {
     })
     return this.repository.get(id)
   }
-  refresh(recordId: string, sourceUrls: readonly string[]) {
+  refresh(recordId: string, sourceUrls: readonly string[], signal?: AbortSignal) {
     const previous = this.repository.get(recordId)
     if (previous === null) throw new ResearchServiceError("parent_not_found")
-    return this.run({
-      subjectType: previous.subjectType,
-      subjectName: previous.subjectName,
-      organization: previous.analysis.organization ?? null,
-      roleHint: previous.analysis.roleHint ?? null,
-      jobPostId: previous.jobPostId,
-      sourceUrls,
-      parentRecordId: previous.id
-    })
+    return this.run(
+      {
+        subjectType: previous.subjectType,
+        subjectName: previous.subjectName,
+        organization: previous.analysis.organization ?? null,
+        roleHint: previous.analysis.roleHint ?? null,
+        jobPostId: previous.jobPostId,
+        sourceUrls,
+        parentRecordId: previous.id
+      },
+      signal
+    )
+  }
+
+  private async discoverSources(
+    request: ResearchRequest,
+    signal?: AbortSignal
+  ): Promise<readonly string[]> {
+    if (this.discoverer === undefined)
+      throw new ResearchServiceError("source_discovery_unavailable")
+    return ResearchRequestSchema.shape.sourceUrls.parse(
+      await this.discoverer.discover(
+        {
+          subjectType: request.subjectType,
+          subjectName: request.subjectName,
+          organization: request.organization,
+          roleHint: request.roleHint
+        },
+        signal
+      )
+    )
   }
 
   private applicantEvidence(jobPostId: string | null): ResearchAnalyzerInput["applicantEvidence"] {
@@ -155,7 +192,14 @@ const titleFor = (text: string, url: string) =>
     ?.slice(0, 300) ?? new URL(url).hostname
 export class ResearchServiceError extends Error {
   override readonly name = "ResearchServiceError"
-  constructor(readonly code: "analyzer_unavailable" | "parent_not_found" | "source_denied") {
+  constructor(
+    readonly code:
+      | "analyzer_unavailable"
+      | "parent_not_found"
+      | "source_denied"
+      | "source_discovery_unavailable"
+      | "sources_not_found"
+  ) {
     super(`RESEARCH_${code.toUpperCase()}`)
   }
 }

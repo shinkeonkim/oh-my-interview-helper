@@ -40,6 +40,8 @@ import { ApplicationService } from "./applications/service"
 import { createApplicationRoutes } from "./routes/applications"
 import { localEvidenceAnalyzer, type ResearchAnalyzer } from "./research/contracts"
 import { ResearchService } from "./research/service"
+import type { ResearchSourceDiscoverer } from "./research/service"
+import { LocalAgentResearchSourceDiscoverer } from "./research/local-agent-discoverer"
 import { createResearchRoutes } from "./routes/research"
 import { PreparationWorkflowService, type PreparationExecutor } from "./workflows/service"
 import { createChatRoutes, createWorkflowRoutes } from "./routes/workflows"
@@ -64,6 +66,7 @@ export type AppOptions = {
   readonly runnerPairing?: RunnerPairingService
   readonly revokeRunnerConnection?: (runnerId: string) => void
   readonly researchAnalyzer?: ResearchAnalyzer
+  readonly researchSourceDiscoverer?: ResearchSourceDiscoverer
   readonly preparationExecutor?: PreparationExecutor
   readonly chatExecutor?: ChatExecutor
 }
@@ -84,6 +87,7 @@ export const createApp = ({
   runnerPairing,
   revokeRunnerConnection,
   researchAnalyzer = localEvidenceAnalyzer,
+  researchSourceDiscoverer = new LocalAgentResearchSourceDiscoverer(),
   preparationExecutor,
   chatExecutor
 }: AppOptions = {}): Hono => {
@@ -134,7 +138,15 @@ export const createApp = ({
   app.route(
     "/api/research",
     createResearchRoutes(
-      new ResearchService(persistence, security, researchAnalyzer, resolver, transport)
+      new ResearchService(
+        persistence,
+        security,
+        researchAnalyzer,
+        resolver,
+        transport,
+        undefined,
+        researchSourceDiscoverer
+      )
     )
   )
   app.route("/api/jobs", createJobsRoutes(jobs))

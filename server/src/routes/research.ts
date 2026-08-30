@@ -27,7 +27,7 @@ export const createResearchRoutes = (service: ResearchService): Hono => {
   })
   routes.post("/", async (context) => {
     try {
-      return context.json(await service.run(await context.req.json()), 201)
+      return context.json(await service.run(await context.req.json(), context.req.raw.signal), 201)
     } catch (error) {
       return failure(context, error)
     }
@@ -45,10 +45,13 @@ export const createResearchRoutes = (service: ResearchService): Hono => {
   routes.post("/:id/refresh", async (context) => {
     try {
       const body = z
-        .object({ sourceUrls: z.array(ResearchSourceUrlSchema).min(1).max(8) })
+        .object({ sourceUrls: z.array(ResearchSourceUrlSchema).max(8).default([]) })
         .strict()
         .parse(await context.req.json())
-      return context.json(await service.refresh(context.req.param("id"), body.sourceUrls), 201)
+      return context.json(
+        await service.refresh(context.req.param("id"), body.sourceUrls, context.req.raw.signal),
+        201
+      )
     } catch (error) {
       return failure(context, error)
     }

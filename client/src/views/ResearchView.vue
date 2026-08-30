@@ -88,7 +88,8 @@ const parsedSourceUrls = computed(() => {
     .split("\n")
     .map((url) => url.trim())
     .filter(Boolean)
-  if (values.length === 0 || values.length > 8) return null
+  if (values.length === 0) return []
+  if (values.length > 8) return null
   try {
     const parsed = values.map((value) => new URL(value))
     if (
@@ -360,10 +361,7 @@ onBeforeUnmount(() => {
       <Card
         ><CardHeader class="flex-row items-center justify-between"
           ><CardTitle>{{ copy("sources") }}</CardTitle
-          ><Button
-            variant="outline"
-            :disabled="running || parsedSourceUrls === null"
-            @click="submit(current.id)"
+          ><Button variant="outline" :disabled="running" @click="submit(current.id)"
             ><RefreshCw />{{ copy("refresh") }}</Button
           ></CardHeader
         ><CardContent class="grid gap-3"

@@ -260,9 +260,9 @@ export const en = {
     subjectName: "Name or company",
     organization: "Organization",
     roleHint: "Role hint",
-    sourceUrls: "Public source URLs",
+    sourceUrls: "Additional public URLs (optional)",
     sourceHelp:
-      "Enter one URL per line, up to eight. Login-only and private pages are not supported.",
+      "Leave this empty and the agent will find public evidence from the company or person details and posting context. Add up to eight URLs, one per line, when you have extra sources.",
     run: "Start research",
     refresh: "Refresh with sources",
     identity: "Identity resolution",

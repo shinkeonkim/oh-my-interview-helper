@@ -17,7 +17,10 @@ afterEach(() => {
   for (const handle of handles.splice(0)) handle.close()
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
-const setup = (provider: "anthropic" | "openai" = "anthropic") => {
+const setup = (
+  provider: "anthropic" | "openai" = "anthropic",
+  discovered: readonly string[] | null = null
+) => {
   const directory = mkdtempSync(join(tmpdir(), "cited-research-"))
   directories.push(directory)
   const persistence = createPersistence({ dataDirectory: directory })
@@ -81,12 +84,29 @@ const setup = (provider: "anthropic" | "openai" = "anthropic") => {
       }
     },
     resolver,
-    transport
+    transport,
+    undefined,
+    discovered === null ? undefined : { discover: async () => discovered }
   )
   return { captured, persistence, resolver, service, transport }
 }
 
 describe("restricted cited research", () => {
+  test("discovers public evidence when the user does not supply links", async () => {
+    const harness = setup("anthropic", ["https://example.com/discovered"])
+    const result = await harness.service.run({
+      subjectType: "company",
+      subjectName: "Acme",
+      organization: null,
+      roleHint: "Platform engineering",
+      jobPostId: null,
+      sourceUrls: [],
+      parentRecordId: null
+    })
+    expect(result?.sources.map((source) => source.url)).toEqual(["https://example.com/discovered"])
+    expect(result?.analysis.summary.stack).toEqual(["TypeScript"])
+  })
+
   test("default local analyzer extracts cited professional evidence without adopting source instructions", async () => {
     const sourceId = "11111111-1111-4111-8111-111111111111"
     const analysis = await localEvidenceAnalyzer.analyze({

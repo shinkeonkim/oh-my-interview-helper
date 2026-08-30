@@ -257,9 +257,9 @@ export const ko = {
     subjectName: "이름 또는 회사명",
     organization: "소속 회사",
     roleHint: "역할 단서",
-    sourceUrls: "공개 출처 URL",
+    sourceUrls: "추가로 참고할 공개 URL (선택)",
     sourceHelp:
-      "한 줄에 하나씩 최대 8개를 입력하세요. 로그인이나 비공개 페이지는 사용할 수 없습니다.",
+      "입력하지 않아도 에이전트가 회사명·인물명과 공고 맥락으로 공개 자료를 직접 찾습니다. 보강할 자료가 있다면 한 줄에 하나씩 최대 8개를 입력하세요.",
     run: "리서치 시작",
     refresh: "새 출처로 갱신",
     identity: "신원 확인",
