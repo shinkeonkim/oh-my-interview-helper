@@ -25,7 +25,7 @@ test("registers every AI screen as a durable background job", async () => {
     "X-CSRF-Token": ((await csrf.json()) as { csrfToken: string }).csrfToken,
     "Content-Type": "application/json"
   }
-  for (const kind of ["ui.research", "ui.preparation", "ui.job_discovery"]) {
+  for (const kind of ["ui.research", "ui.preparation", "ui.job_discovery", "ui.chat"]) {
     const response = await app.request("http://localhost:3000/api/jobs", {
       method: "POST",
       headers,

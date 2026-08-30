@@ -249,6 +249,7 @@ export const ko = {
       cancel: "취소",
       send: "확인하고 전송",
       sending: "전송 중",
+      backgroundRunning: "백그라운드에서 답변을 생성하고 있습니다",
       failed: "대화 요청을 처리하지 못했습니다."
     },
     failed: "공고 워크스페이스를 불러오지 못했습니다."

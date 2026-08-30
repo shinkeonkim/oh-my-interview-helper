@@ -55,7 +55,8 @@ import { JobDiscoveryService } from "./job-search/service"
 import {
   jobDiscoveryTaskDefinition,
   preparationTaskDefinition,
-  researchTaskDefinition
+  researchTaskDefinition,
+  chatTaskDefinition
 } from "./jobs/ui-task-definitions"
 
 export type AppOptions = {
@@ -219,27 +220,24 @@ export const createApp = ({
       preparationExecutor === undefined ? strandsPreparationExecutor : undefined
     )
   )
+  const strandsChatExecutor = new StrandsChatExecutor({
+    kernel,
+    providers: providerRegistry,
+    providerRuns: persistence.repositories.providerArtifacts,
+    disclosures,
+    conversations: persistence.repositories.researchConversations,
+    sources: new WorkflowSourceContentResolver(persistence.database)
+  })
+  const activeChatExecutor = chatExecutor ?? strandsChatExecutor
+  const chatService = new ChatWorkflowService(
+    persistence.repositories.researchConversations,
+    activeChatExecutor,
+    persistence.database
+  )
+  jobs.register(chatTaskDefinition(chatService, persistence.repositories.jobs))
   app.route(
     "/api/conversations",
-    (() => {
-      const strandsChatExecutor = new StrandsChatExecutor({
-        kernel,
-        providers: providerRegistry,
-        providerRuns: persistence.repositories.providerArtifacts,
-        disclosures,
-        conversations: persistence.repositories.researchConversations,
-        sources: new WorkflowSourceContentResolver(persistence.database)
-      })
-      const activeChatExecutor = chatExecutor ?? strandsChatExecutor
-      return createChatRoutes(
-        new ChatWorkflowService(
-          persistence.repositories.researchConversations,
-          activeChatExecutor,
-          persistence.database
-        ),
-        chatExecutor === undefined ? strandsChatExecutor : undefined
-      )
-    })()
+    createChatRoutes(chatService, chatExecutor === undefined ? strandsChatExecutor : undefined)
   )
   app.use("/assets/*", serveStatic({ root: "./server/public" }))
   app.get("/", serveStatic({ root: "./server/public" }))

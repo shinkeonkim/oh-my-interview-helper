@@ -3,6 +3,7 @@ import type { JobsRepository } from "./repository"
 import type { ResearchService } from "../research/service"
 import type { JobDiscoveryService } from "../job-search/service"
 import type { PreparationWorkflowService } from "../workflows/service"
+import type { ChatWorkflowService } from "../workflows/chat-service"
 import { z } from "zod"
 
 const progress = (jobs: JobsRepository, id: string, payload: Record<string, unknown>) =>
@@ -59,5 +60,19 @@ export const preparationTaskDefinition = (
     progress(jobs, job.id, { phase: "generating" })
     const result = await service.run(job.payload["request"], signal)
     progress(jobs, job.id, { phase: "result", revision: result })
+  }
+})
+
+export const chatTaskDefinition = (
+  service: ChatWorkflowService,
+  jobs: JobsRepository
+): JobDefinition => ({
+  kind: "ui.chat",
+  retryClass: "external",
+  maxAttempts: 1,
+  run: async ({ job, signal }) => {
+    progress(jobs, job.id, { phase: "answering" })
+    const result = await service.send(job.payload["request"], signal)
+    progress(jobs, job.id, { phase: "result", ...result })
   }
 })

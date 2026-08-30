@@ -251,6 +251,7 @@ export const en = {
       cancel: "Cancel",
       send: "Confirm and send",
       sending: "Sending",
+      backgroundRunning: "The answer is being generated in the background",
       failed: "The chat request could not be completed."
     },
     failed: "The job workspace could not be loaded."

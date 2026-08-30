@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
+import { runBackgroundTask } from "../lib/background-task"
 
 type Document = {
   id: string
@@ -60,6 +61,7 @@ const turnKey = ref(crypto.randomUUID())
 const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
 const reviewing = ref(false)
 const running = ref(false)
+const taskPhase = ref<string | null>(null)
 let contextId = 0
 let loadRequestId = 0
 const inputs = computed(() => {
@@ -162,12 +164,13 @@ const send = async () => {
       })
     ).json()) as { id: string }
     if (operationContext !== contextId) return
-    const result = (await (
-      await post("/api/conversations/send", {
-        ...body,
-        disclosureId: confirmation.id
-      })
-    ).json()) as { conversation: Conversation; messages: Message[] }
+    const result = (await runBackgroundTask(
+      "ui.chat",
+      { request: { ...body, disclosureId: confirmation.id } },
+      await csrf(),
+      (_state, phase) => (taskPhase.value = phase),
+      controller.signal
+    )) as { conversation: Conversation; messages: Message[] }
     if (operationContext !== contextId) return
     conversationId.value = result.conversation.id
     messages.value.push(...result.messages)
@@ -179,7 +182,10 @@ const send = async () => {
   } catch {
     if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
-    if (operationContext === contextId) running.value = false
+    if (operationContext === contextId) {
+      running.value = false
+      taskPhase.value = null
+    }
   }
 }
 watch(
@@ -287,6 +293,10 @@ onBeforeUnmount(() => {
         ><DialogDescription>{{ copy("disclosureCopy") }}</DialogDescription></DialogHeader
       >
       <div v-if="preview" class="grid gap-3 text-sm">
+        <p v-if="running" class="flex items-center gap-3 text-muted-foreground" role="status">
+          <span class="size-2 animate-pulse rounded-full bg-primary" />
+          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+        </p>
         <p class="font-medium">{{ preview.manifest.destination }} · {{ preview.manifest.model }}</p>
         <ul class="grid gap-2">
           <li v-for="input in preview.manifest.inputs" :key="input.hash" class="rounded border p-3">

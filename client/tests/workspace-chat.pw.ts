@@ -80,6 +80,31 @@ test("reviews exact sources and keeps a cited application conversation", async (
   await page.route("**/api/disclosures/confirm", (route) =>
     fulfill(route, { id: "66666666-6666-4666-8666-666666666666" })
   )
+  const taskId = "77777777-7777-4777-8777-777777777777"
+  const taskResult = {
+    conversation: { id: conversationId, title: "Backend Engineer" },
+    messages: [
+      { id: crypto.randomUUID(), role: "user", content: { text: "강조할 경험은?" } },
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: {
+          answer: "대규모 플랫폼 운영 경험을 강조하세요.",
+          citations: [{ sourceId: postVersionId, note: "공고의 운영 역량 요구" }]
+        }
+      }
+    ]
+  }
+  await page.route("**/api/jobs", async (route) => {
+    bodies.push((route.request().postDataJSON() as { input: { request: unknown } }).input.request)
+    await route.fulfill({ status: 201, json: { id: taskId, state: "queued" } })
+  })
+  await page.route(`**/api/jobs/${taskId}`, (route) =>
+    fulfill(route, { id: taskId, state: "succeeded" })
+  )
+  await page.route(`**/api/jobs/${taskId}/events?transport=poll`, (route) =>
+    fulfill(route, { events: [{ kind: "progress", payload: { phase: "result", ...taskResult } }] })
+  )
   await page.route("**/api/conversations/send", async (route) => {
     bodies.push(route.request().postDataJSON())
     await fulfill(route, {
