@@ -32,6 +32,21 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await page.route("**/api/security/csrf", (route) =>
     route.fulfill({ json: { csrfToken: "stats-csrf-token" } })
   )
+  await page.route("**/api/stats/overview", (route) =>
+    route.fulfill({
+      json: {
+        uptime: { since: "2026-08-28T00:00:00.000Z", milliseconds: 3_900_000 },
+        memory: { rssMb: 120, heapUsedMb: 40, heapTotalMb: 80, externalMb: 2 },
+        counts: { research: 4, messages: 7, artifacts: 3, interviews: 2 },
+        providerRuns: {
+          total: 6,
+          tokens: { input: 100, output: 200, cache: 300 },
+          byKind: [{ kind: "interview_brief", count: 2, outputTokens: 200 }],
+          states: [{ provider: "claude-cli", status: "succeeded", count: 6 }]
+        }
+      }
+    })
+  )
   await page.route(
     "**/api/jobs/22222222-2222-4222-8222-222222222222/events?transport=poll",
     (route) =>
@@ -101,6 +116,8 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await expect(page.getByText("실행 중 · 1")).toBeVisible()
   await expect(page.getByText("완료 · 1")).toBeVisible()
   await expect(page.getByText("provider.invoke")).toBeVisible()
+  await expect(page.getByText("1h 5m")).toBeVisible()
+  await expect(page.getByText("interview_brief")).toBeVisible()
 
   await page.getByRole("button", { name: "이벤트 보기" }).first().click()
   const eventHistory = page.getByLabel("작업 이벤트 이력")

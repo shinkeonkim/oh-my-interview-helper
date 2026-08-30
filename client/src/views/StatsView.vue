@@ -5,8 +5,13 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Gauge,
   ListChecks,
+  MessageSquareText,
   RefreshCw,
+  SearchCheck,
+  ServerCog,
+  Sparkles,
   Workflow,
   X
 } from "lucide-vue-next"
@@ -27,6 +32,17 @@ type Job = {
   updatedAt: string
 }
 type JobEvent = { id: string; sequence: number; kind: string; createdAt: string }
+type SystemStats = {
+  uptime: { since: string; milliseconds: number }
+  memory: { rssMb: number; heapUsedMb: number; heapTotalMb: number; externalMb: number }
+  counts: Record<string, number>
+  providerRuns: {
+    total: number
+    tokens: { input: number; output: number; cache: number }
+    byKind: Array<{ kind: string; count: number; outputTokens: number }>
+    states: Array<{ provider: string; status: string; count: number }>
+  }
+}
 
 const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `statistics.${key}`)
@@ -38,6 +54,7 @@ const jobs = ref<Job[]>([])
 const cancellingJobId = ref<string | null>(null)
 const expandedJobId = ref<string | null>(null)
 const jobEvents = ref<JobEvent[]>([])
+const systemStats = ref<SystemStats | null>(null)
 const eventsLoading = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const stageCounts = computed(() => {
@@ -118,15 +135,16 @@ const toggleEvents = async (job: Job) => {
   }
 }
 const load = async () => {
-  const [postingsResponse, applicationsResponse, documentsResponse, jobsResponse] =
+  const [postingsResponse, applicationsResponse, documentsResponse, jobsResponse, statsResponse] =
     await Promise.all([
       fetch("/api/postings", { signal: controller.signal }),
       fetch("/api/applications", { signal: controller.signal }),
       fetch("/api/documents", { signal: controller.signal }),
-      fetch("/api/jobs", { signal: controller.signal })
+      fetch("/api/jobs", { signal: controller.signal }),
+      fetch("/api/stats/overview", { signal: controller.signal })
     ])
   if (
-    ![postingsResponse, applicationsResponse, documentsResponse, jobsResponse].every(
+    ![postingsResponse, applicationsResponse, documentsResponse, jobsResponse, statsResponse].every(
       (item) => item.ok
     )
   )
@@ -135,6 +153,7 @@ const load = async () => {
   const applicationsBody = (await applicationsResponse.json()) as { applications?: unknown }
   const documentsBody = (await documentsResponse.json()) as { documents?: unknown }
   const jobsBody = await jobsResponse.json()
+  const statsBody = (await statsResponse.json()) as SystemStats
   if (
     !Array.isArray(postingsBody.postings) ||
     !Array.isArray(applicationsBody.applications) ||
@@ -146,7 +165,14 @@ const load = async () => {
   applications.value = applicationsBody.applications as Application[]
   documents.value = documentsBody.documents as Document[]
   jobs.value = jobsBody as Job[]
+  systemStats.value = statsBody
 }
+const uptime = computed(() => {
+  const milliseconds = systemStats.value?.uptime.milliseconds ?? 0
+  const hours = Math.floor(milliseconds / 3_600_000)
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000)
+  return `${hours}h ${minutes}m`
+})
 onMounted(() => {
   void load().catch(() => toast.error(copy("failed")))
   refreshTimer = setInterval(() => void refreshJobs(), 5_000)
@@ -205,6 +231,110 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="grid gap-5 lg:grid-cols-2">
+      <Card
+        v-if="systemStats"
+        class="overflow-hidden border-0 bg-foreground text-background lg:col-span-2"
+      >
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2"
+            ><ServerCog />{{ copy("systemHealth") }}</CardTitle
+          >
+        </CardHeader>
+        <CardContent class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p class="text-xs uppercase tracking-widest text-background/60">{{ copy("uptime") }}</p>
+            <p class="mt-2 text-3xl font-semibold">{{ uptime }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-widest text-background/60">RSS</p>
+            <p class="mt-2 text-3xl font-semibold">{{ systemStats.memory.rssMb }} MB</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-widest text-background/60">Heap</p>
+            <p class="mt-2 text-3xl font-semibold">{{ systemStats.memory.heapUsedMb }} MB</p>
+            <p class="text-xs text-background/60">/ {{ systemStats.memory.heapTotalMb }} MB</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-widest text-background/60">
+              {{ copy("agentRuns") }}
+            </p>
+            <p class="mt-2 text-3xl font-semibold">{{ systemStats.providerRuns.total }}</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card v-if="systemStats">
+        <CardHeader
+          ><CardTitle class="flex items-center gap-2"
+            ><Gauge />{{ copy("tokens") }}</CardTitle
+          ></CardHeader
+        >
+        <CardContent class="grid grid-cols-3 gap-3 text-center">
+          <div class="rounded-xl bg-muted p-3">
+            <p class="text-2xl font-semibold">
+              {{ systemStats.providerRuns.tokens.input.toLocaleString() }}
+            </p>
+            <p class="text-xs text-muted-foreground">Input</p>
+          </div>
+          <div class="rounded-xl bg-muted p-3">
+            <p class="text-2xl font-semibold">
+              {{ systemStats.providerRuns.tokens.output.toLocaleString() }}
+            </p>
+            <p class="text-xs text-muted-foreground">Output</p>
+          </div>
+          <div class="rounded-xl bg-muted p-3">
+            <p class="text-2xl font-semibold">
+              {{ systemStats.providerRuns.tokens.cache.toLocaleString() }}
+            </p>
+            <p class="text-xs text-muted-foreground">Cache</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card v-if="systemStats">
+        <CardHeader
+          ><CardTitle class="flex items-center gap-2"
+            ><Sparkles />{{ copy("outputs") }}</CardTitle
+          ></CardHeader
+        >
+        <CardContent class="grid gap-3">
+          <div
+            v-for="item in systemStats.providerRuns.byKind"
+            :key="item.kind"
+            class="flex items-center justify-between rounded-lg border p-3 text-sm"
+          >
+            <span>{{ item.kind }}</span
+            ><Badge variant="secondary"
+              >{{ item.count }} · {{ item.outputTokens.toLocaleString() }} tok</Badge
+            >
+          </div>
+        </CardContent>
+      </Card>
+      <Card v-if="systemStats" class="lg:col-span-2">
+        <CardHeader
+          ><CardTitle>{{ copy("activity") }}</CardTitle></CardHeader
+        >
+        <CardContent class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border p-4">
+            <SearchCheck class="text-primary" />
+            <p class="mt-3 text-2xl font-semibold">{{ systemStats.counts["research"] ?? 0 }}</p>
+            <p class="text-sm text-muted-foreground">{{ copy("researchRecords") }}</p>
+          </div>
+          <div class="rounded-xl border p-4">
+            <MessageSquareText class="text-primary" />
+            <p class="mt-3 text-2xl font-semibold">{{ systemStats.counts["messages"] ?? 0 }}</p>
+            <p class="text-sm text-muted-foreground">{{ copy("messages") }}</p>
+          </div>
+          <div class="rounded-xl border p-4">
+            <FileText class="text-primary" />
+            <p class="mt-3 text-2xl font-semibold">{{ systemStats.counts["artifacts"] ?? 0 }}</p>
+            <p class="text-sm text-muted-foreground">{{ copy("artifacts") }}</p>
+          </div>
+          <div class="rounded-xl border p-4">
+            <BriefcaseBusiness class="text-primary" />
+            <p class="mt-3 text-2xl font-semibold">{{ systemStats.counts["interviews"] ?? 0 }}</p>
+            <p class="text-sm text-muted-foreground">{{ copy("interviews") }}</p>
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader
           ><CardTitle>{{ copy("pipeline") }}</CardTitle></CardHeader

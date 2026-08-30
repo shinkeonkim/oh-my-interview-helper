@@ -49,6 +49,7 @@ import { ChatWorkflowService, type ChatExecutor } from "./workflows/chat-service
 import { StrandsPreparationExecutor } from "./workflows/strands-executor"
 import { WorkflowSourceContentResolver } from "./workflows/source-content"
 import { StrandsChatExecutor } from "./workflows/strands-chat-executor"
+import { createStatsRoutes } from "./routes/stats"
 
 export type AppOptions = {
   readonly dataDirectory?: string
@@ -150,6 +151,7 @@ export const createApp = ({
     )
   )
   app.route("/api/jobs", createJobsRoutes(jobs))
+  app.route("/api/stats", createStatsRoutes(persistence.database))
   app.route(
     "/api/settings",
     createSettingsRoutes({
