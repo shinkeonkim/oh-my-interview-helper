@@ -77,7 +77,6 @@ const main = (): void => {
       ])
     )
     const scheduler = new JobScheduler(jobs)
-    scheduler.start()
 
     const app = createApp({
       dataDirectory: configuration.dataDirectory,
@@ -89,6 +88,7 @@ const main = (): void => {
       runnerPairing: pairing,
       revokeRunnerConnection: (runnerId) => runnerHub.revoke(runnerId)
     })
+    scheduler.start()
     const server = Bun.serve<HubSocketData>({
       fetch: (request, bunServer) => {
         const url = new URL(request.url)
