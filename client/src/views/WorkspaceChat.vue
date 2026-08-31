@@ -26,7 +26,9 @@ type Document = {
   state: string
   currentVersionId: string | null
   versionNumber: number | null
+  selected: boolean
 }
+type ResearchSource = { id: string; title: string; url: string; status: string }
 type Provider = { id: string; configured: boolean }
 type Conversation = { id: string; title: string }
 type Message = {
@@ -43,6 +45,7 @@ type Manifest = {
 
 const props = defineProps<{
   applicationId: string
+  jobPostId: string
   postingTitle: string
   postingVersionId: string
 }>()
@@ -55,7 +58,9 @@ const conversations = ref<Conversation[]>([])
 const messages = ref<Message[]>([])
 const conversationId = ref<string | null>(null)
 const providerId = ref("")
-const documentVersionId = ref("none")
+const selectedDocumentVersionIds = ref<string[]>([])
+const researchSources = ref<ResearchSource[]>([])
+const selectedResearchSourceIds = ref<string[]>([])
 const message = ref("")
 const turnKey = ref(crypto.randomUUID())
 const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(null)
@@ -68,10 +73,13 @@ const inputs = computed(() => {
   const selected: Array<Record<string, string>> = [
     { kind: "job_post_version", jobPostVersionId: props.postingVersionId }
   ]
-  if (documentVersionId.value !== "none")
-    selected.push({ kind: "document_version", documentVersionId: documentVersionId.value })
+  for (const documentVersionId of selectedDocumentVersionIds.value)
+    selected.push({ kind: "document_version", documentVersionId })
+  for (const researchSourceId of selectedResearchSourceIds.value)
+    selected.push({ kind: "research_source", researchSourceId })
   return selected
 })
+const hostname = (url: string) => new URL(url).hostname
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const post = async (path: string, body: unknown) => {
@@ -96,20 +104,38 @@ const load = async () => {
   const requestId = ++loadRequestId
   const requestedApplicationId = props.applicationId
   try {
-    const [documentsResponse, providersResponse, conversationsResponse] = await Promise.all([
-      fetch("/api/documents", { signal: controller.signal }),
-      fetch("/api/providers/status", { signal: controller.signal }),
-      fetch(`/api/conversations?applicationId=${encodeURIComponent(requestedApplicationId)}`, {
-        signal: controller.signal
-      })
-    ])
-    if (!documentsResponse.ok || !providersResponse.ok || !conversationsResponse.ok)
+    const [documentsResponse, providersResponse, conversationsResponse, researchResponse] =
+      await Promise.all([
+        fetch("/api/documents", { signal: controller.signal }),
+        fetch("/api/providers/status", { signal: controller.signal }),
+        fetch(`/api/conversations?applicationId=${encodeURIComponent(requestedApplicationId)}`, {
+          signal: controller.signal
+        }),
+        fetch(`/api/research?jobPostId=${encodeURIComponent(props.jobPostId)}`, {
+          signal: controller.signal
+        })
+      ])
+    if (
+      !documentsResponse.ok ||
+      !providersResponse.ok ||
+      !conversationsResponse.ok ||
+      !researchResponse.ok
+    )
       throw new Error("request")
-    const [documentValue, providerValue, conversationValue] = await Promise.all([
+    const [documentValue, providerValue, conversationValue, researchValue] = await Promise.all([
       documentsResponse.json() as Promise<{ documents: Document[] }>,
       providersResponse.json() as Promise<{ providers: Provider[] }>,
-      conversationsResponse.json() as Promise<{ conversations: Conversation[] }>
+      conversationsResponse.json() as Promise<{ conversations: Conversation[] }>,
+      researchResponse.json() as Promise<{ records: Array<{ id: string }> }>
     ])
+    const researchDetails = await Promise.all(
+      researchValue.records.map(async (record) => {
+        const response = await fetch(`/api/research/${record.id}`, { signal: controller.signal })
+        return response.ok
+          ? ((await response.json()) as { sources: ResearchSource[] })
+          : { sources: [] }
+      })
+    )
     const configuredProviders = providerValue.providers.filter((item) => item.configured)
     const activeDocuments = documentValue.documents.filter(
       (item) => item.state === "active" && item.currentVersionId
@@ -125,6 +151,12 @@ const load = async () => {
     }
     if (requestId !== loadRequestId || requestedApplicationId !== props.applicationId) return
     documents.value = activeDocuments
+    selectedDocumentVersionIds.value = activeDocuments
+      .filter((item) => item.selected && item.currentVersionId !== null)
+      .map((item) => item.currentVersionId as string)
+    researchSources.value = researchDetails
+      .flatMap((item) => item.sources)
+      .filter((item) => item.status === "available")
     providers.value = configuredProviders
     conversations.value = conversationValue.conversations
     providerId.value = configuredProviders[0]?.id ?? ""
@@ -199,7 +231,9 @@ watch(
     messages.value = []
     conversationId.value = null
     providerId.value = ""
-    documentVersionId.value = "none"
+    selectedDocumentVersionIds.value = []
+    researchSources.value = []
+    selectedResearchSourceIds.value = []
     message.value = ""
     preview.value = null
     reviewing.value = false
@@ -249,22 +283,49 @@ onBeforeUnmount(() => {
       </div>
       <p v-else class="text-sm text-muted-foreground">{{ copy("empty") }}</p>
       <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>
-      <div class="grid gap-2">
-        <Label for="chat-document">{{ copy("document") }}</Label
-        ><select
-          id="chat-document"
-          v-model="documentVersionId"
-          class="h-9 rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="none">{{ copy("noDocument") }}</option>
-          <option
+      <div class="grid gap-3">
+        <Label>{{ copy("documents") }}</Label>
+        <p class="text-sm text-muted-foreground">{{ copy("sourcesHelp") }}</p>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label
             v-for="document in documents"
             :key="document.id"
-            :value="document.currentVersionId!"
+            class="flex min-h-11 items-center gap-3 rounded-xl border p-3"
           >
-            {{ document.title }} · v{{ document.versionNumber }}
-          </option>
-        </select>
+            <input
+              v-model="selectedDocumentVersionIds"
+              type="checkbox"
+              :value="document.currentVersionId!"
+            />
+            <span class="text-sm">{{ document.title }} · v{{ document.versionNumber }}</span>
+          </label>
+        </div>
+      </div>
+      <div class="grid gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <Label>{{ copy("researchSources") }}</Label>
+          <Button as-child variant="outline" size="sm"
+            ><RouterLink :to="`/jobs/${jobPostId}/company`">{{
+              copy("addResearch")
+            }}</RouterLink></Button
+          >
+        </div>
+        <p v-if="researchSources.length === 0" class="text-sm text-muted-foreground">
+          {{ copy("noResearch") }}
+        </p>
+        <div v-else class="grid gap-2 sm:grid-cols-2">
+          <label
+            v-for="source in researchSources"
+            :key="source.id"
+            class="flex min-h-11 items-center gap-3 rounded-xl border p-3"
+          >
+            <input v-model="selectedResearchSourceIds" type="checkbox" :value="source.id" />
+            <span class="min-w-0 text-sm"
+              ><strong class="block truncate">{{ source.title }}</strong
+              ><small class="text-muted-foreground">{{ hostname(source.url) }}</small></span
+            >
+          </label>
+        </div>
       </div>
       <div class="grid gap-2">
         <Label for="chat-message">{{ copy("message") }}</Label

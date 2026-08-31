@@ -92,6 +92,7 @@ const body = ref("")
 const sourceUrl = ref("")
 const file = ref<File | null>(null)
 const savingPosting = ref(false)
+const showPostingForm = ref(false)
 const selectedStages = ref<Record<string, string>>({})
 const pendingApplicationIds = ref<ReadonlySet<string>>(new Set())
 const note = ref("")
@@ -250,6 +251,7 @@ const load = async () => {
     )
     if (requestId !== loadRequestId) return
     postings.value = postValue.postings
+    if (postValue.postings.length === 0) showPostingForm.value = true
     applications.value = applicationValue.applications
     stagesByPost.value = Object.fromEntries(stageEntries)
     stages.value = [
@@ -297,6 +299,7 @@ const savePosting = async () => {
     title.value = company.value = team.value = location.value = employmentType.value = ""
     body.value = sourceUrl.value = ""
     file.value = null
+    showPostingForm.value = false
     toast.success(copy("saved"))
     await load()
   } catch {
@@ -582,7 +585,16 @@ onBeforeUnmount(() => {
       <h1 class="page-title mt-4">{{ copy("title") }}</h1>
       <p class="route-copy mt-4">{{ copy("copy") }}</p>
     </section>
-    <Card
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-2xl font-semibold">{{ copy("postings") }}</h2>
+        <p class="mt-1 text-sm text-muted-foreground">{{ copy("postingsHelp") }}</p>
+      </div>
+      <Button @click="showPostingForm = !showPostingForm"
+        ><Plus />{{ showPostingForm ? copy("closePostingForm") : copy("addPosting") }}</Button
+      >
+    </div>
+    <Card v-if="showPostingForm"
       ><CardHeader
         ><CardTitle>{{ copy("addPosting") }}</CardTitle></CardHeader
       ><CardContent class="grid gap-4">
@@ -646,7 +658,6 @@ onBeforeUnmount(() => {
     >
 
     <section>
-      <h2 class="text-xl font-semibold">{{ copy("postings") }}</h2>
       <p v-if="postings.length === 0" class="mt-4 text-muted-foreground">
         {{ copy("emptyPostings") }}
       </p>

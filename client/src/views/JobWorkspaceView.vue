@@ -180,6 +180,7 @@ onBeforeUnmount(() => {
       <WorkspaceChat
         v-if="application && posting?.currentVersionId"
         :application-id="application.id"
+        :job-post-id="postId"
         :posting-title="posting.title"
         :posting-version-id="posting.currentVersionId"
       />

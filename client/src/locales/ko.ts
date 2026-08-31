@@ -96,6 +96,8 @@ export const ko = {
     title: "채용 공고와 지원 파이프라인",
     copy: "공고 원문과 변경 이력, 지원 단계와 면접 기록을 로컬에서 함께 관리합니다.",
     addPosting: "공고 추가",
+    closePostingForm: "입력 닫기",
+    postingsHelp: "기존 공고를 선택해 준비를 이어가거나 새 공고를 추가하세요.",
     inputMethod: "입력 방식",
     manual: "직접 입력",
     file: "파일",
@@ -241,6 +243,12 @@ export const ko = {
       automaticAgent:
         "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
       document: "참고 문서",
+      documents: "함께 보낼 제출 문서",
+      sourcesHelp:
+        "채용공고는 항상 포함됩니다. 필요한 문서와 조사 근거를 여러 개 선택할 수 있습니다.",
+      researchSources: "기업·인물 조사 근거",
+      addResearch: "추가 조사하기",
+      noResearch: "아직 사용할 조사 근거가 없습니다. 기업 또는 인물 조사를 먼저 실행해 주세요.",
       noDocument: "공고만 사용",
       message: "질문",
       placeholder: "이 역할에 맞춰 어떤 경험을 강조해야 할까요?",

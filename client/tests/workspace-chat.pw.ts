@@ -43,7 +43,8 @@ test("reviews exact sources and keeps a cited application conversation", async (
           title: "플랫폼 이력서",
           state: "active",
           currentVersionId: documentVersionId,
-          versionNumber: 2
+          versionNumber: 2,
+          selected: true
         }
       ]
     })
@@ -62,6 +63,7 @@ test("reviews exact sources and keeps a cited application conversation", async (
   await page.route(/\/api\/conversations\?applicationId=/, (route) =>
     fulfill(route, { conversations: [] })
   )
+  await page.route(/\/api\/research\?jobPostId=/, (route) => fulfill(route, { records: [] }))
   await page.route("**/api/conversations/preview", async (route) => {
     bodies.push(route.request().postDataJSON())
     await fulfill(route, {
@@ -126,7 +128,7 @@ test("reviews exact sources and keeps a cited application conversation", async (
 
   await page.goto(`/jobs/${postId}/overview`)
   await expect(page.getByText("지원별 AI 대화", { exact: true })).toBeVisible()
-  await page.getByLabel("참고 문서").selectOption(documentVersionId)
+  await expect(page.getByLabel(/플랫폼 이력서/)).toBeChecked()
   await page.getByLabel("질문").fill("강조할 경험은?")
   await page.getByRole("button", { name: "전송 내용 확인" }).click()
   const dialog = page.getByRole("dialog")
