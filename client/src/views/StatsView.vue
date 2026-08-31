@@ -37,7 +37,13 @@ type Job = {
   errorCode: string | null
   errorMessage: string | null
 }
-type JobEvent = { id: string; sequence: number; kind: string; createdAt: string }
+type JobEvent = {
+  id: string
+  sequence: number
+  kind: string
+  createdAt: string
+  payload: Record<string, unknown>
+}
 type SystemStats = {
   uptime: { since: string; milliseconds: number }
   memory: { rssMb: number; heapUsedMb: number; heapTotalMb: number; externalMb: number }
@@ -166,6 +172,9 @@ const resultRoute = (job: Job) =>
       : job.kind === "ui.preparation" || job.kind === "ui.chat"
         ? "/jobs"
         : null
+const canRetry = (job: Job) =>
+  ["failed", "cancelled"].includes(job.state) &&
+  ["ui.research", "ui.job_discovery"].includes(job.kind)
 const toggleEvents = async (job: Job) => {
   if (expandedJobId.value === job.id) {
     expandedJobId.value = null
@@ -456,7 +465,7 @@ onBeforeUnmount(() => {
                       copy("events")
                     }}</Button
                   ><Button
-                    v-if="['failed', 'cancelled'].includes(job.state)"
+                    v-if="canRetry(job)"
                     size="sm"
                     variant="outline"
                     :disabled="retryingJobId === job.id"
@@ -496,7 +505,11 @@ onBeforeUnmount(() => {
                     :key="event.id"
                     class="flex flex-wrap items-center justify-between gap-2"
                   >
-                    <span>#{{ event.sequence }} · {{ eventLabel(event.kind) }}</span>
+                    <span
+                      >#{{ event.sequence }} · {{ eventLabel(event.kind) }}<span
+                        v-if="typeof event.payload['code'] === 'string'"
+                      > · {{ event.payload["code"] }}</span></span
+                    >
                     <time :datetime="event.createdAt">{{
                       new Date(event.createdAt).toLocaleString(settings.locale)
                     }}</time>

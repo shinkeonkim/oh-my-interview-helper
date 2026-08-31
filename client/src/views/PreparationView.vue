@@ -318,7 +318,7 @@ const generate = async () => {
       controller.signal,
       taskScope.value
     )
-    const value = result["revision"] as Revision
+    const value = await revisionFromTaskResult(result)
     if (operationContext !== contextId) return
     revision.value = value
     preview.value = null
@@ -347,9 +347,9 @@ const resumeTask = () => {
   )
   if (resumed !== null)
     void resumed
-      .then((result) => {
+      .then(async (result) => {
         if (operationContext !== contextId) return
-        revision.value = result["revision"] as Revision
+        revision.value = await revisionFromTaskResult(result)
         preview.value = null
         return loadProvenance(revision.value)
       })
@@ -360,6 +360,14 @@ const resumeTask = () => {
           taskPhase.value = null
         }
       })
+}
+const revisionFromTaskResult = async (result: Record<string, unknown>): Promise<Revision> => {
+  if (typeof result["revisionId"] === "string") {
+    const response = await fetch(`/api/artifacts/revisions/${result["revisionId"]}`)
+    if (!response.ok) throw new Error("revision_unavailable")
+    return (await response.json()) as Revision
+  }
+  return result["revision"] as Revision
 }
 const copyResult = async () => {
   if (revision.value) {

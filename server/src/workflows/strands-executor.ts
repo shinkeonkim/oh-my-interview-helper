@@ -78,7 +78,13 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
     if (result.kind === "completed") {
       this.dependencies.providerRuns.completeProviderRun(runId, result.usage, result.cost)
       if (result.structured === null) throw new PreparationExecutorError("invalid_output")
-      return { output: result.structured, providerRunId: runId }
+      return {
+        output: sanitizeGeneratedCitations(
+          result.structured,
+          new Set(input.inputs.map((source) => referenceId(source)))
+        ),
+        providerRunId: runId
+      }
     }
     if (result.kind === "cancelled") {
       this.dependencies.providerRuns.cancelProviderRun(runId, result.usage, result.cost)
@@ -131,6 +137,39 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
   }
 }
 
+const referenceId = (input: Parameters<PreparationExecutor["execute"]>[0]["inputs"][number]) => {
+  switch (input.kind) {
+    case "document_version":
+      return input.documentVersionId
+    case "job_post_version":
+      return input.jobPostVersionId
+    case "research_source":
+      return input.researchSourceId
+    case "artifact_revision":
+      return input.artifactRevisionId
+  }
+}
+
+export const sanitizeGeneratedCitations = (value: unknown, allowed: ReadonlySet<string>): unknown => {
+  if (Array.isArray(value)) return value.map((item) => sanitizeGeneratedCitations(item, allowed))
+  if (value === null || typeof value !== "object") return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      key === "citations" && Array.isArray(child)
+        ? child.filter(
+            (citation) =>
+              typeof citation === "object" &&
+              citation !== null &&
+              "sourceId" in citation &&
+              typeof citation.sourceId === "string" &&
+              allowed.has(citation.sourceId)
+          )
+        : sanitizeGeneratedCitations(child, allowed)
+    ])
+  )
+}
+
 const workflowMessages = (
   workflow: PreparationWorkflowKind,
   sources: readonly WorkflowSourceContent[],
@@ -150,7 +189,9 @@ const workflowMessages = (
           `Workflow: ${workflow}`,
           `Generation key: ${generationKey}`,
           `Return only JSON matching this schema: ${JSON.stringify(z.toJSONSchema(PreparationOutputSchemas[workflow]))}`,
-          JSON.stringify({ sources, practiceAnswer, topic })
+          JSON.stringify({ sources, practiceAnswer, topic }),
+          `Allowed citation sourceId values: ${JSON.stringify(sources.map((source) => source.id))}`,
+          "Every citation sourceId must be copied exactly from the allowed list. Use an empty citations array when no supplied source supports a statement. Return one JSON object only."
         ].join("\n")
       }
     ]

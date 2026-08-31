@@ -40,6 +40,10 @@ export const createArtifactRoutes = (service: DraftArtifactService): Hono => {
   app.get("/series/:id/revisions", (context) =>
     context.json({ revisions: service.listRevisions(context.req.param("id")) })
   )
+  app.get("/revisions/:id", (context) => {
+    const revision = service.getRevision(context.req.param("id"))
+    return revision === null ? error("ARTIFACT_REVISION_NOT_FOUND", 404) : context.json(revision)
+  })
   app.get("/revisions/:id/provenance", (context) => {
     try {
       return context.json(service.getProvenance(context.req.param("id")))

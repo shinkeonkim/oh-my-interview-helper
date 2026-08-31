@@ -3,6 +3,9 @@ import type { JobsRepository } from "./repository"
 import type { ResearchService } from "../research/service"
 import type { JobDiscoveryService } from "../job-search/service"
 import type { PreparationWorkflowService } from "../workflows/service"
+import { PreparationWorkflowError } from "../workflows/service"
+import { DraftArtifactError } from "../artifacts/draft-artifact-repository"
+import { CurrentGenerationContextError } from "../artifacts/draft-artifact-service"
 import type { ChatWorkflowService } from "../workflows/chat-service"
 import { z } from "zod"
 
@@ -58,8 +61,27 @@ export const preparationTaskDefinition = (
   maxAttempts: 1,
   run: async ({ job, signal }) => {
     progress(jobs, job.id, { phase: "generating" })
-    const result = await service.run(job.payload["request"], signal)
-    progress(jobs, job.id, { phase: "result", revision: result })
+    try {
+      const result = await service.run(job.payload["request"], signal)
+      progress(jobs, job.id, { phase: "result", revisionId: result.id })
+    } catch (error) {
+      const code =
+        error instanceof PreparationWorkflowError
+          ? error.code
+          : error instanceof DraftArtifactError
+            ? error.code
+            : error instanceof CurrentGenerationContextError
+              ? error.code
+              : error instanceof z.ZodError
+                ? "schema_validation_failed"
+            : "generation_failed"
+      progress(jobs, job.id, {
+        phase: "failed",
+        code,
+        errorType: error instanceof Error ? error.name : "unknown"
+      })
+      throw error
+    }
   }
 })
 
