@@ -395,6 +395,12 @@ export const en = {
     cancel: "Cancel job",
     cancelled: "Job cancellation requested.",
     cancelFailed: "The job could not be cancelled.",
+    retry: "Retry",
+    retried: "The job was queued again with the same inputs.",
+    retryFailed: "The job could not be queued again.",
+    openResult: "Open result",
+    failureReason: "Failure reason",
+    unknownFailure: "Unknown execution error",
     noJobs: "No background jobs have run yet.",
     kind: {
       research: "Company and people research",

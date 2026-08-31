@@ -393,6 +393,12 @@ export const ko = {
     cancel: "작업 취소",
     cancelled: "작업 취소를 요청했습니다.",
     cancelFailed: "작업을 취소하지 못했습니다.",
+    retry: "다시 실행",
+    retried: "같은 조건으로 작업을 다시 등록했습니다.",
+    retryFailed: "작업을 다시 등록하지 못했습니다.",
+    openResult: "결과 열기",
+    failureReason: "실패 원인",
+    unknownFailure: "확인되지 않은 실행 오류",
     noJobs: "아직 실행된 백그라운드 작업이 없습니다.",
     kind: {
       research: "기업·인물 리서치",

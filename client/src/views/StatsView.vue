@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { RouterLink } from "vue-router"
 import {
   BriefcaseBusiness,
   ChevronDown,
@@ -8,7 +9,9 @@ import {
   Gauge,
   ListChecks,
   MessageSquareText,
+  Play,
   RefreshCw,
+  RotateCcw,
   SearchCheck,
   ServerCog,
   Sparkles,
@@ -30,6 +33,9 @@ type Job = {
   kind: string
   state: "queued" | "leased" | "running" | "succeeded" | "failed" | "cancelled"
   updatedAt: string
+  payload: Record<string, unknown>
+  errorCode: string | null
+  errorMessage: string | null
 }
 type JobEvent = { id: string; sequence: number; kind: string; createdAt: string }
 type SystemStats = {
@@ -52,6 +58,7 @@ const applications = ref<Application[]>([])
 const documents = ref<Document[]>([])
 const jobs = ref<Job[]>([])
 const cancellingJobId = ref<string | null>(null)
+const retryingJobId = ref<string | null>(null)
 const expandedJobId = ref<string | null>(null)
 const jobEvents = ref<JobEvent[]>([])
 const systemStats = ref<SystemStats | null>(null)
@@ -129,6 +136,36 @@ const cancelJob = async (job: Job) => {
     cancellingJobId.value = null
   }
 }
+const retryJob = async (job: Job) => {
+  retryingJobId.value = job.id
+  try {
+    const response = await fetch("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": await csrf() },
+      body: JSON.stringify({
+        kind: job.kind,
+        input: job.payload,
+        idempotencyKey: crypto.randomUUID()
+      })
+    })
+    if (!response.ok) throw new Error("request")
+    const retried = (await response.json()) as Job
+    jobs.value = [...jobs.value, retried]
+    toast.success(copy("retried"))
+  } catch {
+    toast.error(copy("retryFailed"))
+  } finally {
+    retryingJobId.value = null
+  }
+}
+const resultRoute = (job: Job) =>
+  job.kind === "ui.research"
+    ? "/research"
+    : job.kind === "ui.job_discovery"
+      ? "/job-search"
+      : job.kind === "ui.preparation" || job.kind === "ui.chat"
+        ? "/jobs"
+        : null
 const toggleEvents = async (job: Job) => {
   if (expandedJobId.value === job.id) {
     expandedJobId.value = null
@@ -419,6 +456,19 @@ onBeforeUnmount(() => {
                       copy("events")
                     }}</Button
                   ><Button
+                    v-if="['failed', 'cancelled'].includes(job.state)"
+                    size="sm"
+                    variant="outline"
+                    :disabled="retryingJobId === job.id"
+                    @click="retryJob(job)"
+                    ><RotateCcw />{{ copy("retry") }}</Button
+                  ><Button
+                    v-if="job.state === 'succeeded' && resultRoute(job)"
+                    as-child
+                    size="sm"
+                    variant="outline"
+                    ><RouterLink :to="resultRoute(job)!"><Play />{{ copy("openResult") }}</RouterLink></Button
+                  ><Button
                     v-if="['queued', 'leased', 'running'].includes(job.state)"
                     size="sm"
                     variant="outline"
@@ -428,6 +478,9 @@ onBeforeUnmount(() => {
                   ></span
                 >
               </div>
+              <p v-if="job.state === 'failed'" class="rounded-lg bg-destructive/10 p-3 text-destructive">
+                {{ copy("failureReason") }} · {{ job.errorCode ?? job.errorMessage ?? copy("unknownFailure") }}
+              </p>
               <div
                 v-if="expandedJobId === job.id"
                 class="rounded-lg border bg-muted/30 p-3"
