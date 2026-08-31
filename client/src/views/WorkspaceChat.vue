@@ -158,10 +158,15 @@ const load = async () => {
     ])
     const researchDetails = await Promise.all(
       researchValue.records.map(async (record) => {
-        const response = await fetch(`/api/research/${record.id}`, { signal: controller.signal })
-        return response.ok
-          ? ((await response.json()) as { sources: ResearchSource[] })
-          : { sources: [] }
+        try {
+          const response = await fetch(`/api/research/${record.id}`, { signal: controller.signal })
+          return response.ok
+            ? ((await response.json()) as { sources: ResearchSource[] })
+            : { sources: [] }
+        } catch (error) {
+          if (controller.signal.aborted) throw error
+          return { sources: [] }
+        }
       })
     )
     const configuredProviders = providerValue.providers.filter((item) => item.configured)
