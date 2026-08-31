@@ -46,6 +46,7 @@ type Manifest = {
   action: string
   inputs: Array<{ label: string; version: number | null; hash: string }>
 }
+type DisplayLine = { text: string; kind: "heading" | "bullet" | "paragraph" }
 
 const props = defineProps<{
   applicationId: string
@@ -86,6 +87,19 @@ const inputs = computed(() => {
 })
 const taskScope = computed(() => `chat:${props.applicationId}`)
 const hostname = (url: string) => new URL(url).hostname
+const messageLines = (item: Message): DisplayLine[] =>
+  (item.content.text ?? item.content.answer ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({
+      text: line.replaceAll("**", ""),
+      kind: /^\*\*.+\*\*$/.test(line)
+        ? ("heading" as const)
+        : line.startsWith("- ")
+          ? ("bullet" as const)
+          : ("paragraph" as const)
+    }))
 const maximumResearchSources = 8
 const toggleResearchSource = (sourceId: string) => {
   selectedResearchSourceIds.value = selectedResearchSourceIds.value.includes(sourceId)
@@ -325,9 +339,18 @@ onBeforeUnmount(() => {
           <Badge variant="outline">{{
             item.role === "user" ? copy("you") : copy("assistant")
           }}</Badge>
-          <p class="mt-3 whitespace-pre-wrap text-sm">
-            {{ item.content.text ?? item.content.answer }}
-          </p>
+          <div class="mt-3 grid gap-2 text-sm leading-6">
+            <p
+              v-for="(line, index) in messageLines(item)"
+              :key="item.id + '-' + index"
+              :class="{
+                'mt-2 font-semibold text-foreground': line.kind === 'heading',
+                'pl-4 before:-ml-4 before:content-[&quot;•_&quot;]': line.kind === 'bullet'
+              }"
+            >
+              {{ line.kind === "bullet" ? line.text.slice(2) : line.text }}
+            </p>
+          </div>
           <ul
             v-if="item.content.citations?.length"
             class="mt-3 grid gap-1 text-xs text-muted-foreground"
