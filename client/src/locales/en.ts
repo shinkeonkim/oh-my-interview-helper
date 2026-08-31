@@ -326,6 +326,19 @@ export const en = {
     strengths: "Observed relevance",
     risks: "Limits and checks",
     history: "Refresh history",
+    changes: "Changes from the previous analysis",
+    addedClaims: "claims added",
+    removedClaims: "claims removed",
+    changesHelp: "This is a sentence-level comparison. Verify important facts in the linked source.",
+    retrieved: "Retrieved",
+    staleSource: "Older than 30 days",
+    openSource: "Open source",
+    sourceType: {
+      hiring: "Hiring source",
+      media: "Media or company data",
+      technical: "Technical source",
+      website: "Public website"
+    },
     empty: "No research has been saved yet.",
     failed: "Research could not be completed. Check the public URLs and subject details."
   },

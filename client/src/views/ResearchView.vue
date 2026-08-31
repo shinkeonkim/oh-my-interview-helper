@@ -64,7 +64,14 @@ type ResearchRecord = RecordSummary & {
     sourceIds: string[]
     confidence: string
   }>
-  sources: Array<{ id: string; url: string; title: string; excerpt: string; status: string }>
+  sources: Array<{
+    id: string
+    url: string
+    title: string
+    excerpt: string
+    status: string
+    retrievedAt: string
+  }>
 }
 const route = useRoute()
 const settings = useSettingsStore()
@@ -76,6 +83,8 @@ const roleHint = ref("")
 const urls = ref("")
 const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
+const previous = ref<ResearchRecord | null>(null)
+const selectedClaimId = ref<string | null>(null)
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
 const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
@@ -224,7 +233,16 @@ const openRecord = async (id: string) => {
     const response = await fetch(`/api/research/${id}`)
     if (!response.ok) throw new Error("request")
     const value = (await response.json()) as ResearchRecord
-    if (requestId === recordRequestId && operationContext === contextId) current.value = value
+    let parent: ResearchRecord | null = null
+    if (value.parentRecordId !== null) {
+      const parentResponse = await fetch(`/api/research/${value.parentRecordId}`)
+      if (parentResponse.ok) parent = (await parentResponse.json()) as ResearchRecord
+    }
+    if (requestId === recordRequestId && operationContext === contextId) {
+      current.value = value
+      previous.value = parent
+      selectedClaimId.value = null
+    }
   } catch {
     if (requestId === recordRequestId && operationContext === contextId) toast.error(copy("failed"))
   } finally {
@@ -234,6 +252,34 @@ const openRecord = async (id: string) => {
 }
 const identityLabel = (status: ResearchRecord["identityStatus"]) =>
   copy(status === "not_found" ? "notFound" : status)
+const selectedSourceIds = computed(
+  () => current.value?.claims.find((claim) => claim.id === selectedClaimId.value)?.sourceIds ?? []
+)
+const sourceCategory = (url: string) => {
+  const host = new URL(url).hostname.toLocaleLowerCase()
+  if (/career|jobs|wanted|jobplanet|linkedin/.test(host)) return "hiring"
+  if (/news|techcrunch|thevc|venturesquare|rocketpunch|inno/.test(host)) return "media"
+  if (/github|medium|blog/.test(host)) return "technical"
+  return "website"
+}
+const staleSource = (retrievedAt: string) =>
+  Date.now() - Date.parse(retrievedAt) > 30 * 24 * 60 * 60 * 1_000
+const claimDiff = computed(() => {
+  if (current.value === null || previous.value === null) return null
+  const before = new Set(previous.value.claims.map((claim) => claim.statement))
+  const after = new Set(current.value.claims.map((claim) => claim.statement))
+  return {
+    added: [...after].filter((statement) => !before.has(statement)).length,
+    removed: [...before].filter((statement) => !after.has(statement)).length
+  }
+})
+const focusSource = (sourceId: string, claimId: string) => {
+  selectedClaimId.value = claimId
+  document.getElementById(`research-source-${sourceId}`)?.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  })
+}
 watch(
   () => [jobPostId.value, props.subjectTypePreset] as const,
   () => {
@@ -242,6 +288,8 @@ watch(
     recordRequestId += 1
     records.value = []
     current.value = null
+    previous.value = null
+    selectedClaimId.value = null
     running.value = false
     openingRecordId.value = null
     subjectType.value = props.subjectTypePreset
@@ -361,6 +409,14 @@ onBeforeUnmount(() => {
           </CardContent>
         </Card>
       </div>
+      <Card v-if="claimDiff">
+        <CardHeader><CardTitle>{{ copy("changes") }}</CardTitle></CardHeader>
+        <CardContent class="flex flex-wrap gap-3 text-sm">
+          <Badge variant="secondary">+ {{ claimDiff.added }} {{ copy("addedClaims") }}</Badge>
+          <Badge variant="outline">- {{ claimDiff.removed }} {{ copy("removedClaims") }}</Badge>
+          <span class="text-muted-foreground">{{ copy("changesHelp") }}</span>
+        </CardContent>
+      </Card>
       <div class="grid gap-5 lg:grid-cols-2">
         <Card
           ><CardHeader
@@ -379,10 +435,10 @@ onBeforeUnmount(() => {
                   :href="current.sources.find((source) => source.id === sourceId)?.url"
                   target="_blank"
                   rel="noreferrer"
-                  class="text-xs text-primary underline"
-                  >{{ current.sources.find((source) => source.id === sourceId)?.title }}
-                  <ExternalLink class="inline size-3"
-                /></a>
+                  class="text-left text-xs text-primary underline"
+                  @click="focusSource(sourceId, claim.id)"
+                  >{{ current.sources.find((source) => source.id === sourceId)?.title }}<ExternalLink class="inline size-3" /></a
+                >
               </div></article></CardContent></Card
         ><Card
           ><CardHeader
@@ -419,20 +475,30 @@ onBeforeUnmount(() => {
             ><RefreshCw />{{ copy("refresh") }}</Button
           ></CardHeader
         ><CardContent class="grid gap-3"
-          ><a
+          ><article
             v-for="source in current.sources"
             :key="source.id"
-            :href="source.url"
-            target="_blank"
-            rel="noreferrer"
-            class="rounded-lg border p-4"
+            :id="'research-source-' + source.id"
+            class="rounded-lg border p-4 transition"
+            :class="selectedSourceIds.includes(source.id) ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : ''"
             ><div class="flex justify-between gap-3">
-              <span class="font-medium">{{ source.title }}</span
-              ><Badge :variant="source.status === 'available' ? 'secondary' : 'destructive'">{{
-                source.status
-              }}</Badge>
+              <span class="font-medium">{{ source.title }}</span>
+              <div class="flex flex-wrap justify-end gap-2">
+                <Badge variant="outline">{{ copy("sourceType." + sourceCategory(source.url)) }}</Badge>
+                <Badge v-if="staleSource(source.retrievedAt)" variant="destructive">{{ copy("staleSource") }}</Badge>
+                <Badge :variant="source.status === 'available' ? 'secondary' : 'destructive'">{{
+                  source.status
+                }}</Badge>
+              </div>
             </div>
-            <p class="mt-2 line-clamp-2 text-sm text-muted-foreground">{{ source.excerpt }}</p></a
+            <p class="mt-2 text-xs text-muted-foreground">
+              {{ copy("retrieved") }} · {{ new Date(source.retrievedAt).toLocaleString(settings.locale) }}
+            </p>
+            <p class="mt-2 line-clamp-3 text-sm text-muted-foreground">{{ source.excerpt }}</p>
+            <Button class="mt-3" as-child size="sm" variant="ghost"
+              ><a :href="source.url" target="_blank" rel="noreferrer"
+                ><ExternalLink />{{ copy("openSource") }}</a></Button
+            ></article
           ></CardContent
         ></Card
       >

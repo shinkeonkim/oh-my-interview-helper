@@ -324,6 +324,19 @@ export const ko = {
     strengths: "확인된 연관성",
     risks: "한계와 확인 사항",
     history: "갱신 기록",
+    changes: "이전 분석과 달라진 점",
+    addedClaims: "추가된 주장",
+    removedClaims: "사라진 주장",
+    changesHelp: "문장 단위 비교이며 중요한 사실은 연결된 원문에서 다시 확인하세요.",
+    retrieved: "수집 시각",
+    staleSource: "30일 경과",
+    openSource: "원문 열기",
+    sourceType: {
+      hiring: "채용 자료",
+      media: "언론·기업 데이터",
+      technical: "기술 자료",
+      website: "공개 웹사이트"
+    },
     empty: "아직 저장된 리서치가 없습니다.",
     failed: "리서치를 완료하지 못했습니다. 공개 URL과 대상 정보를 확인하세요."
   },
