@@ -95,3 +95,47 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
     employmentType: null
   })
 })
+
+test("restores completed discovery after returning to the screen", async ({ page }) => {
+  const taskId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+  const recommendation = {
+    title: "Recovered role",
+    company: "Acme",
+    url: "https://careers.example.com/recovered",
+    platform: "wanted",
+    location: null,
+    experience: null,
+    companySize: null,
+    summary: "화면을 벗어난 동안 완료된 결과",
+    score: 88,
+    breakdown: { profile: 90, criteria: 88, freshness: 84 },
+    matchedSkills: [],
+    gaps: [],
+    rationale: "대표 프로필과 일치"
+  }
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    ["background-task:job-discovery", taskId]
+  )
+  await page.route("**/api/documents", (route) => route.fulfill({ json: { documents: [] } }))
+  await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: [] } }))
+  await page.route("**/api/jobs", (route) => route.fulfill({ json: [] }))
+  await page.route(`**/api/jobs/${taskId}`, (route) =>
+    route.fulfill({ json: { id: taskId, state: "succeeded" } })
+  )
+  await page.route(`**/api/jobs/${taskId}/events?transport=poll`, (route) =>
+    route.fulfill({
+      json: {
+        events: [
+          { kind: "progress", payload: { phase: "result", recommendations: [recommendation] } }
+        ]
+      }
+    })
+  )
+
+  await page.goto("/job-search")
+  await expect(page.getByText("Recovered role")).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("background-task:job-discovery")))
+    .toBeNull()
+})

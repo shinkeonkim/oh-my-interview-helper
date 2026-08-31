@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
-import { runBackgroundTask } from "../lib/background-task"
+import {
+  backgroundTaskPhaseLabel,
+  resumeBackgroundTask,
+  runBackgroundTask
+} from "../lib/background-task"
 
 type Platform = "wanted" | "saramin" | "jobkorea" | "remember" | "greeting" | "inthiswork"
 type Document = {
@@ -60,6 +64,7 @@ const recommendations = ref<Recommendation[]>([])
 const savedUrls = ref(new Set<string>())
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
+const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
 const savingUrl = ref<string | null>(null)
 const platformOptions: Array<[Platform, string]> = [
   ["wanted", "원티드"],
@@ -69,6 +74,11 @@ const platformOptions: Array<[Platform, string]> = [
   ["greeting", "그리팅"],
   ["inthiswork", "인디스워크"]
 ]
+const taskScope = "job-discovery"
+const applyTaskResult = (result: Record<string, unknown>) => {
+  if (Array.isArray(result["recommendations"]))
+    recommendations.value = result["recommendations"] as Recommendation[]
+}
 const values = (text: string) =>
   text
     .split(/[,\n]/)
@@ -128,9 +138,10 @@ const discover = async () => {
       },
       await csrf(),
       (_state, phase) => (taskPhase.value = phase),
-      controller.signal
+      controller.signal,
+      taskScope
     )
-    recommendations.value = result["recommendations"] as Recommendation[]
+    applyTaskResult(result)
   } catch {
     toast.error(copy("discoverFailed"))
   } finally {
@@ -163,7 +174,25 @@ const save = async (item: Recommendation) => {
     savingUrl.value = null
   }
 }
-onMounted(() => void load().catch(() => toast.error(copy("loadFailed"))))
+onMounted(() => {
+  void load().catch(() => toast.error(copy("loadFailed")))
+  const resumed = resumeBackgroundTask(
+    taskScope,
+    (_state, phase) => {
+      running.value = true
+      taskPhase.value = phase
+    },
+    controller.signal
+  )
+  if (resumed !== null)
+    void resumed
+      .then(applyTaskResult)
+      .catch(() => toast.error(copy("discoverFailed")))
+      .finally(() => {
+        running.value = false
+        taskPhase.value = null
+      })
+})
 onBeforeUnmount(() => controller.abort())
 </script>
 
@@ -264,7 +293,7 @@ onBeforeUnmount(() => controller.abort())
           role="status"
         >
           <span class="size-2 animate-pulse rounded-full bg-primary" />
-          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+          {{ copy("backgroundRunning") }}<span v-if="taskPhaseCopy"> · {{ taskPhaseCopy }}</span>
         </div>
       </CardContent>
     </Card>

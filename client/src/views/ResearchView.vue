@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/select"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
-import { runBackgroundTask } from "../lib/background-task"
+import {
+  backgroundTaskPhaseLabel,
+  resumeBackgroundTask,
+  runBackgroundTask
+} from "../lib/background-task"
 
 type SubjectType = "company" | "executive" | "team_lead" | "team_member"
 const props = withDefaults(
@@ -74,6 +78,7 @@ const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
+const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
 const openingRecordId = ref<string | null>(null)
 const loadController = new AbortController()
 let contextId = 0
@@ -110,6 +115,9 @@ const parsedSourceUrls = computed(() => {
 })
 const researchReady = computed(
   () => subjectName.value.trim().length > 0 && parsedSourceUrls.value !== null
+)
+const taskScope = computed(
+  () => `research:${jobPostId.value ?? "global"}:${props.subjectTypePreset}`
 )
 const load = async () => {
   const requestId = ++loadRequestId
@@ -166,7 +174,8 @@ const submit = async (parentRecordId: string | null = null) => {
       },
       await csrf(),
       (_state, phase) => (taskPhase.value = phase),
-      loadController.signal
+      loadController.signal,
+      taskScope.value
     )
     if (operationContext !== contextId) return
     await load()
@@ -179,6 +188,33 @@ const submit = async (parentRecordId: string | null = null) => {
       taskPhase.value = null
     }
   }
+}
+const resumeTask = () => {
+  const operationContext = contextId
+  const resumed = resumeBackgroundTask(
+    taskScope.value,
+    (_state, phase) => {
+      if (operationContext === contextId) {
+        running.value = true
+        taskPhase.value = phase
+      }
+    },
+    loadController.signal
+  )
+  if (resumed !== null)
+    void resumed
+      .then(async (result) => {
+        if (operationContext !== contextId) return
+        await load()
+        if (typeof result["recordId"] === "string") await openRecord(result["recordId"])
+      })
+      .catch(() => operationContext === contextId && toast.error(copy("failed")))
+      .finally(() => {
+        if (operationContext === contextId) {
+          running.value = false
+          taskPhase.value = null
+        }
+      })
 }
 const openRecord = async (id: string) => {
   const requestId = ++recordRequestId
@@ -215,7 +251,9 @@ watch(
       roleHint.value = ""
       urls.value = ""
     }
-    void load().catch(() => toast.error(copy("failed")))
+    void load()
+      .then(resumeTask)
+      .catch(() => toast.error(copy("failed")))
   },
   { immediate: true }
 )
@@ -284,7 +322,7 @@ onBeforeUnmount(() => {
           role="status"
         >
           <span class="size-2 animate-pulse rounded-full bg-primary" />
-          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+          {{ copy("backgroundRunning") }}<span v-if="taskPhaseCopy"> · {{ taskPhaseCopy }}</span>
         </p></CardContent
       ></Card
     >

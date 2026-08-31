@@ -395,6 +395,22 @@ export const en = {
     cancelled: "Job cancellation requested.",
     cancelFailed: "The job could not be cancelled.",
     noJobs: "No background jobs have run yet.",
+    kind: {
+      research: "Company and people research",
+      preparation: "Interview preparation",
+      jobDiscovery: "Public job discovery",
+      chat: "Application AI chat",
+      provider: "AI provider invocation"
+    },
+    event: {
+      queued: "Queued",
+      leased: "Preparing",
+      running: "Started",
+      progress: "Progress",
+      succeeded: "Completed",
+      failed: "Failed",
+      cancelled: "Cancelled"
+    },
     failed: "Stats could not be loaded.",
     state: {
       queued: "Queued",

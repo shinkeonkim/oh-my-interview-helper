@@ -115,7 +115,7 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await expect(page.getByText("Interviewing").locator("..")).toContainText("2")
   await expect(page.getByText("실행 중 · 1")).toBeVisible()
   await expect(page.getByText("완료 · 1")).toBeVisible()
-  await expect(page.getByText("provider.invoke")).toBeVisible()
+  await expect(page.getByText("AI Provider 실행")).toBeVisible()
   await expect(page.getByText("1h 5m")).toBeVisible()
   await expect(page.getByText("interview_brief")).toBeVisible()
 

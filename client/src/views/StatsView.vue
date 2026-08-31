@@ -75,9 +75,27 @@ const activeDocuments = computed(
 const maximumStageCount = computed(() => Math.max(1, ...stageCounts.value.map((entry) => entry[1])))
 const recentJobs = computed(() =>
   [...jobs.value]
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
-    .slice(0, 5)
+    .sort((left, right) => {
+      const leftActive = ["queued", "leased", "running"].includes(left.state) ? 1 : 0
+      const rightActive = ["queued", "leased", "running"].includes(right.state) ? 1 : 0
+      return rightActive - leftActive || Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+    })
+    .slice(0, 10)
 )
+const jobLabel = (kind: string) => {
+  const labels: Record<string, string> = {
+    "ui.research": copy("kind.research"),
+    "ui.preparation": copy("kind.preparation"),
+    "ui.job_discovery": copy("kind.jobDiscovery"),
+    "ui.chat": copy("kind.chat"),
+    "provider.invoke": copy("kind.provider")
+  }
+  return labels[kind] ?? kind
+}
+const eventLabel = (kind: string) => {
+  const known = ["queued", "leased", "running", "progress", "succeeded", "failed", "cancelled"]
+  return known.includes(kind) ? copy(`event.${kind}`) : kind
+}
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const parseJobs = async (response: Response): Promise<Job[]> => {
@@ -386,7 +404,7 @@ onBeforeUnmount(() => {
           <ul v-else class="divide-y">
             <li v-for="job in recentJobs" :key="job.id" class="grid gap-3 py-3 text-sm">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="font-medium">{{ job.kind }}</span>
+                <span class="font-medium">{{ jobLabel(job.kind) }}</span>
                 <span class="flex flex-wrap items-center justify-end gap-2"
                   ><Badge variant="outline">{{ copy(`state.${job.state}`) }}</Badge
                   ><time :datetime="job.updatedAt">{{
@@ -425,7 +443,7 @@ onBeforeUnmount(() => {
                     :key="event.id"
                     class="flex flex-wrap items-center justify-between gap-2"
                   >
-                    <span>#{{ event.sequence }} · {{ event.kind }}</span>
+                    <span>#{{ event.sequence }} · {{ eventLabel(event.kind) }}</span>
                     <time :datetime="event.createdAt">{{
                       new Date(event.createdAt).toLocaleString(settings.locale)
                     }}</time>

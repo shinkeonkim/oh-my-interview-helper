@@ -25,7 +25,11 @@ import {
 } from "@/components/ui/dialog"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
-import { runBackgroundTask } from "../lib/background-task"
+import {
+  backgroundTaskPhaseLabel,
+  resumeBackgroundTask,
+  runBackgroundTask
+} from "../lib/background-task"
 
 type Workflow =
   | "cover_letter"
@@ -128,10 +132,12 @@ const provenance = ref<Provenance | null>(null)
 const reviewing = ref(false)
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
+const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
 let contextId = 0
 let loadRequestId = 0
 let provenanceRequestId = 0
 const postId = computed(() => String(route.params["postId"] ?? ""))
+const taskScope = computed(() => `preparation:${postId.value}:${props.workflowPreset}`)
 const posting = computed(() => postings.value.find((item) => item.id === postId.value))
 const inputs = computed(() => {
   const values: Array<Record<string, string>> = []
@@ -288,7 +294,8 @@ const generate = async () => {
       { request: { ...reviewed.request, disclosureId: confirmation.id } },
       await csrf(),
       (_state, phase) => (taskPhase.value = phase),
-      controller.signal
+      controller.signal,
+      taskScope.value
     )
     const value = result["revision"] as Revision
     if (operationContext !== contextId) return
@@ -304,6 +311,34 @@ const generate = async () => {
       generationKey.value = crypto.randomUUID()
     }
   }
+}
+const resumeTask = () => {
+  const operationContext = contextId
+  const resumed = resumeBackgroundTask(
+    taskScope.value,
+    (_state, phase) => {
+      if (operationContext === contextId) {
+        running.value = true
+        taskPhase.value = phase
+      }
+    },
+    controller.signal
+  )
+  if (resumed !== null)
+    void resumed
+      .then((result) => {
+        if (operationContext !== contextId) return
+        revision.value = result["revision"] as Revision
+        preview.value = null
+        return loadProvenance(revision.value)
+      })
+      .catch(() => operationContext === contextId && toast.error(copy("failed")))
+      .finally(() => {
+        if (operationContext === contextId) {
+          running.value = false
+          taskPhase.value = null
+        }
+      })
 }
 const copyResult = async () => {
   if (revision.value) {
@@ -355,7 +390,9 @@ watch(
     provenance.value = null
     reviewing.value = false
     running.value = false
-    void load().catch(() => toast.error(copy("failed")))
+    void load()
+      .then(resumeTask)
+      .catch(() => toast.error(copy("failed")))
   },
   { immediate: true }
 )
@@ -530,7 +567,7 @@ onBeforeUnmount(() => {
         <div v-if="preview" class="grid gap-4 text-sm">
           <p v-if="running" class="flex items-center gap-3 text-muted-foreground" role="status">
             <span class="size-2 animate-pulse rounded-full bg-primary" />
-            {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+            {{ copy("backgroundRunning") }}<span v-if="taskPhaseCopy"> · {{ taskPhaseCopy }}</span>
           </p>
           <div>
             <p class="font-medium">{{ copy("destination") }}</p>

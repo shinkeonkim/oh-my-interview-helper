@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
-import { runBackgroundTask } from "../lib/background-task"
+import {
+  backgroundTaskPhaseLabel,
+  resumeBackgroundTask,
+  runBackgroundTask
+} from "../lib/background-task"
 
 type Document = {
   id: string
@@ -67,6 +71,7 @@ const preview = ref<{ manifest: Manifest; authorizationToken: string } | null>(n
 const reviewing = ref(false)
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
+const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
 let contextId = 0
 let loadRequestId = 0
 const inputs = computed(() => {
@@ -79,6 +84,7 @@ const inputs = computed(() => {
     selected.push({ kind: "research_source", researchSourceId })
   return selected
 })
+const taskScope = computed(() => `chat:${props.applicationId}`)
 const hostname = (url: string) => new URL(url).hostname
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
@@ -201,16 +207,11 @@ const send = async () => {
       { request: { ...body, disclosureId: confirmation.id } },
       await csrf(),
       (_state, phase) => (taskPhase.value = phase),
-      controller.signal
+      controller.signal,
+      taskScope.value
     )) as { conversation: Conversation; messages: Message[] }
     if (operationContext !== contextId) return
-    conversationId.value = result.conversation.id
-    messages.value.push(...result.messages)
-    if (!conversations.value.some((item) => item.id === result.conversation.id))
-      conversations.value.push(result.conversation)
-    message.value = ""
-    preview.value = null
-    turnKey.value = crypto.randomUUID()
+    applyTaskResult(result)
   } catch {
     if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
@@ -219,6 +220,41 @@ const send = async () => {
       taskPhase.value = null
     }
   }
+}
+const applyTaskResult = (result: { conversation: Conversation; messages: Message[] }) => {
+  conversationId.value = result.conversation.id
+  messages.value.push(...result.messages)
+  if (!conversations.value.some((item) => item.id === result.conversation.id))
+    conversations.value.push(result.conversation)
+  message.value = ""
+  preview.value = null
+  turnKey.value = crypto.randomUUID()
+}
+const resumeTask = () => {
+  const operationContext = contextId
+  const resumed = resumeBackgroundTask(
+    taskScope.value,
+    (_state, phase) => {
+      if (operationContext === contextId) {
+        running.value = true
+        taskPhase.value = phase
+      }
+    },
+    controller.signal
+  )
+  if (resumed !== null)
+    void resumed
+      .then((result) => {
+        if (operationContext === contextId)
+          applyTaskResult(result as { conversation: Conversation; messages: Message[] })
+      })
+      .catch(() => operationContext === contextId && toast.error(copy("failed")))
+      .finally(() => {
+        if (operationContext === contextId) {
+          running.value = false
+          taskPhase.value = null
+        }
+      })
 }
 watch(
   () => props.applicationId,
@@ -239,7 +275,9 @@ watch(
     reviewing.value = false
     running.value = false
     turnKey.value = crypto.randomUUID()
-    void load().catch(() => toast.error(copy("failed")))
+    void load()
+      .then(resumeTask)
+      .catch(() => toast.error(copy("failed")))
   },
   { immediate: true }
 )
@@ -356,7 +394,7 @@ onBeforeUnmount(() => {
       <div v-if="preview" class="grid gap-3 text-sm">
         <p v-if="running" class="flex items-center gap-3 text-muted-foreground" role="status">
           <span class="size-2 animate-pulse rounded-full bg-primary" />
-          {{ copy("backgroundRunning") }}<span v-if="taskPhase"> · {{ taskPhase }}</span>
+          {{ copy("backgroundRunning") }}<span v-if="taskPhaseCopy"> · {{ taskPhaseCopy }}</span>
         </p>
         <p class="font-medium">{{ preview.manifest.destination }} · {{ preview.manifest.model }}</p>
         <ul class="grid gap-2">

@@ -393,6 +393,22 @@ export const ko = {
     cancelled: "작업 취소를 요청했습니다.",
     cancelFailed: "작업을 취소하지 못했습니다.",
     noJobs: "아직 실행된 백그라운드 작업이 없습니다.",
+    kind: {
+      research: "기업·인물 리서치",
+      preparation: "면접 준비 자료 생성",
+      jobDiscovery: "공개 채용공고 탐색",
+      chat: "지원별 AI 대화",
+      provider: "AI Provider 실행"
+    },
+    event: {
+      queued: "대기열 등록",
+      leased: "실행 준비",
+      running: "실행 시작",
+      progress: "진행 상황",
+      succeeded: "완료",
+      failed: "실패",
+      cancelled: "취소"
+    },
     failed: "통계를 불러오지 못했습니다.",
     state: {
       queued: "대기",
