@@ -82,6 +82,14 @@ type Revision = {
   providerId: string
   providerModel: string
 }
+type Citation = { sourceId: string; note: string }
+type ResultSection = { heading: string; body: string; citations: Citation[] }
+type ResultQuestion = {
+  question: string
+  suggestedAnswer: string
+  rationale: string
+  citations: Citation[]
+}
 type StaleReason =
   | "source_content_changed"
   | "source_current_version_changed"
@@ -128,6 +136,19 @@ const preview = ref<{
   request: WorkflowRequest
 } | null>(null)
 const revision = ref<Revision | null>(null)
+const resultTitle = computed(() => String(revision.value?.content["title"] ?? copy("result")))
+const resultSummary = computed(() => String(revision.value?.content["summary"] ?? ""))
+const resultSections = computed(
+  () => (revision.value?.content["sections"] ?? []) as ResultSection[]
+)
+const resultQuestions = computed(
+  () => (revision.value?.content["questions"] ?? []) as ResultQuestion[]
+)
+const evidenceGaps = computed(() =>
+  resultSections.value.filter((section) =>
+    /gap|risk|missing|weak|부족|위험|보완|누락/i.test(`${section.heading} ${section.body}`)
+  )
+)
 const provenance = ref<Provenance | null>(null)
 const reviewing = ref(false)
 const running = ref(false)
@@ -497,9 +518,54 @@ onBeforeUnmount(() => {
         ><CardTitle>{{ copy("result") }}</CardTitle
         ><Badge>{{ copy("version") }} {{ revision.number }}</Badge></CardHeader
       ><CardContent>
-        <pre
-          class="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-5 text-sm"
-          >{{ JSON.stringify(revision.content, null, 2) }}</pre>
+        <article class="grid gap-5">
+          <div class="rounded-2xl bg-foreground p-6 text-background">
+            <p class="text-xs uppercase tracking-widest text-background/60">{{ copy("result") }}</p>
+            <h2 class="mt-2 text-2xl font-semibold">{{ resultTitle }}</h2>
+            <p class="mt-3 leading-7 text-background/80">{{ resultSummary }}</p>
+          </div>
+          <Card v-if="workflow === 'resume_feedback'" class="border-primary/30 bg-primary/5">
+            <CardHeader><CardTitle>{{ copy("evidenceGaps") }}</CardTitle></CardHeader>
+            <CardContent>
+              <p v-if="evidenceGaps.length === 0" class="text-sm text-muted-foreground">
+                {{ copy("noExplicitGaps") }}
+              </p>
+              <ul v-else class="grid gap-3">
+                <li v-for="section in evidenceGaps" :key="section.heading" class="rounded-lg border bg-background p-4">
+                  <strong>{{ section.heading }}</strong>
+                  <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{{ section.body }}</p>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+          <section v-if="resultSections.length" class="grid gap-4">
+            <article v-for="section in resultSections" :key="section.heading" class="rounded-xl border p-5">
+              <h3 class="text-lg font-semibold">{{ section.heading }}</h3>
+              <p class="mt-3 whitespace-pre-wrap text-sm leading-7">{{ section.body }}</p>
+              <ul v-if="section.citations.length" class="mt-4 grid gap-1 text-xs text-muted-foreground">
+                <li v-for="citation in section.citations" :key="citation.sourceId">
+                  {{ copy("citation") }} · {{ citation.note }}
+                </li>
+              </ul>
+            </article>
+          </section>
+          <section v-if="resultQuestions.length" class="grid gap-4">
+            <article v-for="(question, index) in resultQuestions" :key="question.question" class="rounded-xl border p-5">
+              <Badge variant="outline">Q{{ index + 1 }}</Badge>
+              <h3 class="mt-3 text-lg font-semibold">{{ question.question }}</h3>
+              <p class="mt-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">{{ copy("suggestedAnswer") }}</p>
+              <p class="mt-2 whitespace-pre-wrap text-sm leading-7">{{ question.suggestedAnswer }}</p>
+              <p class="mt-4 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                <strong>{{ copy("rationale") }}</strong> · {{ question.rationale }}
+              </p>
+              <ul v-if="question.citations.length" class="mt-3 grid gap-1 text-xs text-muted-foreground">
+                <li v-for="citation in question.citations" :key="citation.sourceId">
+                  {{ copy("citation") }} · {{ citation.note }}
+                </li>
+              </ul>
+            </article>
+          </section>
+        </article>
         <div class="mt-4 flex flex-wrap gap-2">
           <Button variant="outline" @click="copyResult"
             ><Clipboard />{{ copy("copyResult") }}</Button
