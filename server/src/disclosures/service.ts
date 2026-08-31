@@ -222,7 +222,7 @@ export class DisclosureService {
       inputs: inputs.map((entry) => ({
         type: entry.type,
         hash: entry.hash,
-        label: entry.label,
+        label: entry.label.slice(0, 160),
         version: entry.version,
         parentCurrentId: entry.parentCurrentId
       }))

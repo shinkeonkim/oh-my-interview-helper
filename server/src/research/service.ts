@@ -195,7 +195,7 @@ const titleFor = (text: string, url: string) =>
     .split("\n")
     .map((line) => line.trim())
     .find(Boolean)
-    ?.slice(0, 300) ?? new URL(url).hostname
+    ?.slice(0, 120) ?? new URL(url).hostname
 export class ResearchServiceError extends Error {
   override readonly name = "ResearchServiceError"
   constructor(

@@ -559,7 +559,7 @@ onBeforeUnmount(() => {
           if (!value) preview = null
         }
       "
-      ><DialogContent
+      ><DialogContent class="max-h-[90vh] overflow-y-auto"
         ><DialogHeader
           ><DialogTitle>{{ copy("review") }}</DialogTitle
           ><DialogDescription>{{ copy("copy") }}</DialogDescription></DialogHeader

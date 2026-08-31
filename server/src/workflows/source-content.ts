@@ -23,13 +23,14 @@ export class WorkflowSourceContentResolver {
   }
 
   resolveAll(inputs: readonly DisclosureInputRef[]): readonly WorkflowSourceContent[] {
-    let total = 0
+    const perSourceCharacters = Math.min(
+      MAX_SOURCE_CHARACTERS,
+      Math.floor(MAX_TOTAL_CHARACTERS / Math.max(inputs.length, 1))
+    )
     return inputs.map((input) => {
       const metadata = this.disclosureSources.resolve(input)
       const source = this.resolve(input, metadata.label, metadata.version)
-      total += source.text.length
-      if (total > MAX_TOTAL_CHARACTERS) throw new WorkflowSourceContentError("input_too_large")
-      return source
+      return { ...source, text: source.text.slice(0, perSourceCharacters) }
     })
   }
 

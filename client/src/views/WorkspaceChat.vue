@@ -86,6 +86,14 @@ const inputs = computed(() => {
 })
 const taskScope = computed(() => `chat:${props.applicationId}`)
 const hostname = (url: string) => new URL(url).hostname
+const maximumResearchSources = 8
+const toggleResearchSource = (sourceId: string) => {
+  selectedResearchSourceIds.value = selectedResearchSourceIds.value.includes(sourceId)
+    ? selectedResearchSourceIds.value.filter((id) => id !== sourceId)
+    : selectedResearchSourceIds.value.length < maximumResearchSources
+      ? [...selectedResearchSourceIds.value, sourceId]
+      : selectedResearchSourceIds.value
+}
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const post = async (path: string, body: unknown) => {
@@ -160,9 +168,20 @@ const load = async () => {
     selectedDocumentVersionIds.value = activeDocuments
       .filter((item) => item.selected && item.currentVersionId !== null)
       .map((item) => item.currentVersionId as string)
-    researchSources.value = researchDetails
+    const uniqueResearchSources = new Map<string, ResearchSource>()
+    for (const source of researchDetails
       .flatMap((item) => item.sources)
+      .filter((item) => item.status === "available")) {
+      const canonicalUrl = new URL(source.url)
+      canonicalUrl.hash = ""
+      const key = canonicalUrl.toString().replace(/\/$/, "")
+      if (!uniqueResearchSources.has(key)) uniqueResearchSources.set(key, source)
+    }
+    researchSources.value = [...uniqueResearchSources.values()]
+    selectedResearchSourceIds.value = (researchDetails[0]?.sources ?? [])
       .filter((item) => item.status === "available")
+      .slice(0, maximumResearchSources)
+      .map((item) => item.id)
     providers.value = configuredProviders
     conversations.value = conversationValue.conversations
     providerId.value = configuredProviders[0]?.id ?? ""
@@ -351,13 +370,26 @@ onBeforeUnmount(() => {
         <p v-if="researchSources.length === 0" class="text-sm text-muted-foreground">
           {{ copy("noResearch") }}
         </p>
-        <div v-else class="grid gap-2 sm:grid-cols-2">
+        <p v-else class="text-sm text-muted-foreground">
+          {{ copy("researchSelectionHelp") }} · {{ selectedResearchSourceIds.length }}/{{
+            maximumResearchSources
+          }}
+        </p>
+        <div v-if="researchSources.length > 0" class="grid gap-2 sm:grid-cols-2">
           <label
             v-for="source in researchSources"
             :key="source.id"
             class="flex min-h-11 items-center gap-3 rounded-xl border p-3"
           >
-            <input v-model="selectedResearchSourceIds" type="checkbox" :value="source.id" />
+            <input
+              type="checkbox"
+              :checked="selectedResearchSourceIds.includes(source.id)"
+              :disabled="
+                !selectedResearchSourceIds.includes(source.id) &&
+                selectedResearchSourceIds.length >= maximumResearchSources
+              "
+              @change="toggleResearchSource(source.id)"
+            />
             <span class="min-w-0 text-sm"
               ><strong class="block truncate">{{ source.title }}</strong
               ><small class="text-muted-foreground">{{ hostname(source.url) }}</small></span
@@ -386,7 +418,7 @@ onBeforeUnmount(() => {
       }
     "
   >
-    <DialogContent>
+    <DialogContent class="max-h-[90vh] overflow-y-auto">
       <DialogHeader
         ><DialogTitle>{{ copy("disclosureTitle") }}</DialogTitle
         ><DialogDescription>{{ copy("disclosureCopy") }}</DialogDescription></DialogHeader

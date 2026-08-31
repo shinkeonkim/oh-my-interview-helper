@@ -249,6 +249,7 @@ export const en = {
       sourcesHelp:
         "The posting is always included. Select any documents and research evidence needed.",
       researchSources: "Company and people research evidence",
+      researchSelectionHelp: "Latest sources are preselected. Choose up to 8 sources for the answer.",
       addResearch: "Run more research",
       noResearch: "No research evidence is available yet. Run company or people research first.",
       noDocument: "Posting only",

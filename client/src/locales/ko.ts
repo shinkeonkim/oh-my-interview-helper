@@ -247,6 +247,7 @@ export const ko = {
       sourcesHelp:
         "채용공고는 항상 포함됩니다. 필요한 문서와 조사 근거를 여러 개 선택할 수 있습니다.",
       researchSources: "기업·인물 조사 근거",
+      researchSelectionHelp: "최신 조사 출처를 기본 선택합니다. 답변에 사용할 근거를 최대 8개까지 조정하세요.",
       addResearch: "추가 조사하기",
       noResearch: "아직 사용할 조사 근거가 없습니다. 기업 또는 인물 조사를 먼저 실행해 주세요.",
       noDocument: "공고만 사용",

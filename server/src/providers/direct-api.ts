@@ -197,7 +197,7 @@ export const createDirectApiProvider = (
         displayName: config.model,
         maxOutputTokens: config.maxOutputTokens
       },
-      capabilities: { generation: true, structuredOutput: true, citedResearch: false }
+      capabilities: { generation: true, structuredOutput: true, citedResearch: true }
     },
     enabled: true,
     createModel: () => new DirectApiModel(config, baseUrl, modelFetch),
