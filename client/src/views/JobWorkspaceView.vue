@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
-import { ArrowLeft, Building2, CalendarClock, Users } from "lucide-vue-next"
+import { ArrowLeft, ArrowRight, Building2, CalendarClock, ListTodo, Users } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +33,7 @@ const controller = new AbortController()
 const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
 const interviews = ref<Interview[]>([])
+const researchCount = ref(0)
 let loadRequestId = 0
 const postId = computed(() => String(route.params["postId"] ?? ""))
 const posting = computed(() => postings.value.find((item) => item.id === postId.value) ?? null)
@@ -59,19 +60,33 @@ const workflow = computed(
       }) as const
     )[props.area as "resume" | "interview" | "technical" | "topics"]
 )
+const nextActions = computed(() => [
+  { key: "research", done: researchCount.value > 0, to: "/jobs/" + postId.value + "/company" },
+  { key: "documents", done: false, to: "/jobs/" + postId.value + "/resume" },
+  {
+    key: "interview",
+    done: interviews.value.length > 0,
+    to: "/jobs/" + postId.value + "/interview"
+  }
+])
 
 const load = async () => {
   const requestId = ++loadRequestId
   const requestedPostId = postId.value
   try {
-    const [postResponse, applicationResponse] = await Promise.all([
+    const [postResponse, applicationResponse, researchResponse] = await Promise.all([
       fetch("/api/postings", { signal: controller.signal }),
-      fetch("/api/applications", { signal: controller.signal })
+      fetch("/api/applications", { signal: controller.signal }),
+      fetch("/api/research?jobPostId=" + encodeURIComponent(requestedPostId), {
+        signal: controller.signal
+      })
     ])
-    if (!postResponse.ok || !applicationResponse.ok) throw new Error("request")
-    const [postValue, applicationValue] = await Promise.all([
+    if (!postResponse.ok || !applicationResponse.ok || !researchResponse.ok)
+      throw new Error("request")
+    const [postValue, applicationValue, researchValue] = await Promise.all([
       postResponse.json() as Promise<{ postings: Posting[] }>,
-      applicationResponse.json() as Promise<{ applications: Application[] }>
+      applicationResponse.json() as Promise<{ applications: Application[] }>,
+      researchResponse.json() as Promise<{ records: unknown[] }>
     ])
     const requestedApplication = applicationValue.applications.find(
       (item) => item.jobPostId === requestedPostId
@@ -88,6 +103,7 @@ const load = async () => {
     postings.value = postValue.postings
     applications.value = applicationValue.applications
     interviews.value = requestedInterviews
+    researchCount.value = researchValue.records.length
   } catch (error) {
     if (requestId === loadRequestId) throw error
   }
@@ -177,6 +193,28 @@ onBeforeUnmount(() => {
           </div></CardContent
         ></Card
       >
+      <Card class="lg:col-span-3 overflow-hidden">
+        <CardHeader class="bg-foreground text-background">
+          <CardTitle class="flex items-center gap-2"><ListTodo />{{ copy("nextActions") }}</CardTitle>
+          <p class="text-sm text-background/70">{{ copy("nextActionsHelp") }}</p>
+        </CardHeader>
+        <CardContent class="grid gap-3 pt-5 md:grid-cols-3">
+          <RouterLink
+            v-for="item in nextActions"
+            :key="item.key"
+            :to="item.to"
+            class="group flex min-h-20 items-center justify-between rounded-xl border p-4 transition hover:-translate-y-0.5 hover:border-primary"
+          >
+            <span>
+              <Badge :variant="item.done ? 'secondary' : 'outline'">{{
+                item.done ? copy("done") : copy("recommended")
+              }}</Badge>
+              <strong class="mt-2 block">{{ copy("next." + item.key) }}</strong>
+            </span>
+            <ArrowRight class="transition group-hover:translate-x-1" />
+          </RouterLink>
+        </CardContent>
+      </Card>
       <WorkspaceChat
         v-if="application && posting?.currentVersionId"
         :application-id="application.id"

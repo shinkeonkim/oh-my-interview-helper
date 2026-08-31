@@ -243,6 +243,15 @@ export const en = {
     currentStage: "Current stage",
     upcoming: "Upcoming interviews",
     noInterview: "No upcoming interviews.",
+    nextActions: "Next actions",
+    nextActionsHelp: "Priorities based on current research records and interview schedule.",
+    done: "Ready",
+    recommended: "Recommended",
+    next: {
+      research: "Review current public company and team evidence",
+      documents: "Check resume evidence gaps against the posting",
+      interview: "Prepare likely questions and answer structure"
+    },
     chat: {
       title: "Application AI chat",
       empty: "No messages yet. Ask using the current posting and selected document as evidence.",
@@ -250,6 +259,13 @@ export const en = {
       assistant: "AI answer",
       citation: "Evidence",
       automaticAgent: "The app automatically uses an available local Claude Code or Codex agent.",
+      startPractice: "Start mock interview",
+      followUp: "Ask a follow-up",
+      resetTimer: "Reset timer",
+      practicePrompt:
+        "Act as the interviewer. Ask one important question based on this posting and the selected evidence. After my answer, evaluate specificity, evidence, and technical accuracy before asking the next question.",
+      followUpPrompt:
+        "Evaluate the conversation so far as an interview answer, then ask one follow-up that probes an unverified point and provide the criteria for a strong answer.",
       document: "Reference document",
       documents: "Submitted documents to include",
       sourcesHelp:

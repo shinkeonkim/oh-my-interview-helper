@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { MessageCircle, Send, ShieldCheck } from "lucide-vue-next"
+import { MessageCircle, Play, Send, ShieldCheck, Timer } from "lucide-vue-next"
 import { toast } from "vue-sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -73,6 +73,9 @@ const reviewing = ref(false)
 const running = ref(false)
 const taskPhase = ref<string | null>(null)
 const taskPhaseCopy = computed(() => backgroundTaskPhaseLabel(taskPhase.value, settings.locale))
+const practiceStartedAt = ref<number | null>(null)
+const practiceSeconds = ref(0)
+let practiceTimer: ReturnType<typeof setInterval> | null = null
 let contextId = 0
 let loadRequestId = 0
 const inputs = computed(() => {
@@ -87,6 +90,24 @@ const inputs = computed(() => {
 })
 const taskScope = computed(() => `chat:${props.applicationId}`)
 const hostname = (url: string) => new URL(url).hostname
+const practiceTime = computed(
+  () => `${String(Math.floor(practiceSeconds.value / 60)).padStart(2, "0")}:${String(practiceSeconds.value % 60).padStart(2, "0")}`
+)
+const startPractice = (followUp = false) => {
+  message.value = copy(followUp ? "followUpPrompt" : "practicePrompt")
+  if (practiceStartedAt.value !== null) return
+  practiceStartedAt.value = Date.now()
+  practiceTimer = setInterval(() => {
+    if (practiceStartedAt.value !== null)
+      practiceSeconds.value = Math.floor((Date.now() - practiceStartedAt.value) / 1_000)
+  }, 1_000)
+}
+const resetPractice = () => {
+  practiceStartedAt.value = null
+  practiceSeconds.value = 0
+  if (practiceTimer !== null) clearInterval(practiceTimer)
+  practiceTimer = null
+}
 const messageLines = (item: Message): DisplayLine[] =>
   (item.content.text ?? item.content.answer ?? "")
     .split("\n")
@@ -323,6 +344,7 @@ onBeforeUnmount(() => {
   contextId += 1
   loadRequestId += 1
   controller.abort()
+  if (practiceTimer !== null) clearInterval(practiceTimer)
 })
 </script>
 
@@ -368,6 +390,18 @@ onBeforeUnmount(() => {
       </div>
       <p v-else class="text-sm text-muted-foreground">{{ copy("empty") }}</p>
       <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>
+      <div class="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-3">
+        <Button size="sm" variant="secondary" @click="startPractice(false)"
+          ><Play />{{ copy("startPractice") }}</Button
+        ><Button size="sm" variant="outline" @click="startPractice(true)">{{
+          copy("followUp")
+        }}</Button>
+        <Badge v-if="practiceStartedAt !== null" variant="outline"
+          ><Timer />{{ practiceTime }}</Badge
+        ><Button v-if="practiceStartedAt !== null" size="sm" variant="ghost" @click="resetPractice">{{
+          copy("resetTimer")
+        }}</Button>
+      </div>
       <div class="grid gap-3">
         <Label>{{ copy("documents") }}</Label>
         <p class="text-sm text-muted-foreground">{{ copy("sourcesHelp") }}</p>

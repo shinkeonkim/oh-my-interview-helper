@@ -240,6 +240,15 @@ export const ko = {
     currentStage: "현재 단계",
     upcoming: "예정된 면접",
     noInterview: "예정된 면접이 없습니다.",
+    nextActions: "다음 행동",
+    nextActionsHelp: "현재 조사 기록과 면접 일정에 따라 우선 준비할 항목입니다.",
+    done: "준비됨",
+    recommended: "권장",
+    next: {
+      research: "회사와 팀의 최신 공개 근거 확인",
+      documents: "공고 대비 이력서 근거 부족 점검",
+      interview: "예상 질문과 답변 구조 준비"
+    },
     chat: {
       title: "지원별 AI 대화",
       empty: "아직 대화가 없습니다. 현재 공고와 선택한 문서를 근거로 질문해 보세요.",
@@ -248,6 +257,13 @@ export const ko = {
       citation: "근거",
       automaticAgent:
         "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
+      startPractice: "모의 면접 시작",
+      followUp: "꼬리 질문 받기",
+      resetTimer: "타이머 초기화",
+      practicePrompt:
+        "면접관 역할을 맡아 이 채용공고와 선택한 근거를 기반으로 가장 중요한 질문 하나만 먼저 해주세요. 제가 답하면 구체성, 근거, 기술 정확성을 평가하고 다음 질문을 해주세요.",
+      followUpPrompt:
+        "방금까지의 대화를 면접 답변으로 평가하고, 아직 검증되지 않은 부분을 파고드는 꼬리 질문 하나와 좋은 답변의 평가 기준을 알려주세요.",
       document: "참고 문서",
       documents: "함께 보낼 제출 문서",
       sourcesHelp:
