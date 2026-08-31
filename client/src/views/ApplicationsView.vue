@@ -47,6 +47,7 @@ type PostingVersion = {
   versionNumber: number
   sourceKind: Source
   createdAt: string
+  content?: Record<string, unknown>
 }
 type Stage = {
   id: string
@@ -118,6 +119,8 @@ const stagesBusy = ref(false)
 const activePost = ref<Posting | null>(null)
 const activeStagePost = ref<Posting | null>(null)
 const postingVersions = ref<PostingVersion[]>([])
+const comparedPostIds = ref<string[]>([])
+const comparisonContent = ref<Record<string, string>>({})
 const versionSource = ref<Source>("url")
 const updateUrl = ref("")
 const versionBody = ref("")
@@ -128,6 +131,42 @@ let loadRequestId = 0
 let historyRequestId = 0
 let versionsRequestId = 0
 const postingById = computed(() => new Map(postings.value.map((posting) => [posting.id, posting])))
+const comparedPosts = computed(() =>
+  comparedPostIds.value
+    .map((id) => postingById.value.get(id))
+    .filter((item): item is Posting => item !== undefined)
+)
+const stackTerms = [
+  "TypeScript", "JavaScript", "Python", "Java", "Kotlin", "Go", "Ruby", "React", "Vue",
+  "Node.js", "Spring", "Django", "Rails", "AWS", "GCP", "Docker", "Kubernetes",
+  "PostgreSQL", "Redis", "Elasticsearch"
+]
+const comparisonStack = (postId: string) => {
+  const text = comparisonContent.value[postId] ?? ""
+  return stackTerms.filter((term) => text.toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+}
+const toggleComparison = async (post: Posting) => {
+  if (comparedPostIds.value.includes(post.id)) {
+    comparedPostIds.value = comparedPostIds.value.filter((id) => id !== post.id)
+    return
+  }
+  if (comparedPostIds.value.length >= 3) return
+  comparedPostIds.value = [...comparedPostIds.value, post.id]
+  if (comparisonContent.value[post.id] !== undefined) return
+  try {
+    const response = await fetch("/api/postings/" + post.id + "/versions", {
+      signal: loadController.signal
+    })
+    if (!response.ok) throw new Error("request")
+    const value = (await response.json()) as { versions: PostingVersion[] }
+    comparisonContent.value = {
+      ...comparisonContent.value,
+      [post.id]: JSON.stringify(value.versions[0]?.content ?? {})
+    }
+  } catch {
+    toast.error(copy("compareFailed"))
+  }
+}
 const stageById = computed(() => new Map(stages.value.map((stage) => [stage.id, stage.name])))
 const editableStages = computed(() =>
   activeStagePost.value === null ? [] : (stagesByPost.value[activeStagePost.value.id] ?? [])
@@ -658,6 +697,50 @@ onBeforeUnmount(() => {
     >
 
     <section>
+      <Card v-if="comparedPosts.length > 0" class="mb-5 overflow-hidden">
+        <CardHeader class="bg-foreground text-background">
+          <CardTitle>{{ copy("compareTitle") }} · {{ comparedPosts.length }}/3</CardTitle>
+          <p class="text-sm text-background/70">{{ copy("compareHelp") }}</p>
+        </CardHeader>
+        <CardContent class="grid gap-4 pt-5 md:grid-cols-2 xl:grid-cols-3">
+          <article
+            v-for="post in comparedPosts"
+            :key="post.id"
+            class="grid gap-4 rounded-xl border p-4"
+          >
+            <div>
+              <p class="font-semibold">{{ post.title }}</p>
+              <p class="text-sm text-muted-foreground">{{ post.companyName }}</p>
+            </div>
+            <div class="grid gap-1 text-sm">
+              <p><strong>{{ copy("location") }}</strong> · {{ post.metadata?.location ?? "-" }}</p>
+              <p>
+                <strong>{{ copy("employmentType") }}</strong> ·
+                {{ post.metadata?.employmentType ?? "-" }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm font-medium">{{ copy("detectedStack") }}</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <Badge
+                  v-for="term in comparisonStack(post.id)"
+                  :key="term"
+                  variant="secondary"
+                  >{{ term }}</Badge
+                >
+                <span
+                  v-if="comparisonStack(post.id).length === 0"
+                  class="text-sm text-muted-foreground"
+                  >-</span
+                >
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" @click="toggleComparison(post)">{{
+              copy("removeCompare")
+            }}</Button>
+          </article>
+        </CardContent>
+      </Card>
       <p v-if="postings.length === 0" class="mt-4 text-muted-foreground">
         {{ copy("emptyPostings") }}
       </p>
@@ -725,6 +808,13 @@ onBeforeUnmount(() => {
               ><History />{{ copy("versionHistory") }}</Button
             ><Button variant="outline" @click="editStages(post)"
               ><Save />{{ copy("stages") }}</Button
+            ><Button
+              variant="outline"
+              :disabled="!comparedPostIds.includes(post.id) && comparedPostIds.length >= 3"
+              @click="toggleComparison(post)"
+              >{{
+                comparedPostIds.includes(post.id) ? copy("removeCompare") : copy("addCompare")
+              }}</Button
             ><Button
               v-if="post.state === 'active'"
               variant="ghost"
