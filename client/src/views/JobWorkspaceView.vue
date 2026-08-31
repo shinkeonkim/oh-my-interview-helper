@@ -24,6 +24,7 @@ type Posting = {
 }
 type Application = { id: string; jobPostId: string; stageName: string; appliedAt: string | null }
 type Interview = { id: string; scheduledAt: string; kind: string }
+type DocumentItem = { state: "active" | "archived"; selected: boolean }
 
 const props = defineProps<{ area: Area }>()
 const route = useRoute()
@@ -34,6 +35,7 @@ const postings = ref<Posting[]>([])
 const applications = ref<Application[]>([])
 const interviews = ref<Interview[]>([])
 const researchCount = ref(0)
+const selectedDocumentCount = ref(0)
 let loadRequestId = 0
 const postId = computed(() => String(route.params["postId"] ?? ""))
 const posting = computed(() => postings.value.find((item) => item.id === postId.value) ?? null)
@@ -62,7 +64,11 @@ const workflow = computed(
 )
 const nextActions = computed(() => [
   { key: "research", done: researchCount.value > 0, to: "/jobs/" + postId.value + "/company" },
-  { key: "documents", done: false, to: "/jobs/" + postId.value + "/resume" },
+  {
+    key: "documents",
+    done: selectedDocumentCount.value > 0,
+    to: "/jobs/" + postId.value + "/resume"
+  },
   {
     key: "interview",
     done: interviews.value.length > 0,
@@ -74,19 +80,22 @@ const load = async () => {
   const requestId = ++loadRequestId
   const requestedPostId = postId.value
   try {
-    const [postResponse, applicationResponse, researchResponse] = await Promise.all([
-      fetch("/api/postings", { signal: controller.signal }),
-      fetch("/api/applications", { signal: controller.signal }),
-      fetch("/api/research?jobPostId=" + encodeURIComponent(requestedPostId), {
-        signal: controller.signal
-      })
-    ])
-    if (!postResponse.ok || !applicationResponse.ok || !researchResponse.ok)
+    const [postResponse, applicationResponse, researchResponse, documentResponse] =
+      await Promise.all([
+        fetch("/api/postings", { signal: controller.signal }),
+        fetch("/api/applications", { signal: controller.signal }),
+        fetch("/api/research?jobPostId=" + encodeURIComponent(requestedPostId), {
+          signal: controller.signal
+        }),
+        fetch("/api/documents", { signal: controller.signal })
+      ])
+    if (!postResponse.ok || !applicationResponse.ok || !researchResponse.ok || !documentResponse.ok)
       throw new Error("request")
-    const [postValue, applicationValue, researchValue] = await Promise.all([
+    const [postValue, applicationValue, researchValue, documentValue] = await Promise.all([
       postResponse.json() as Promise<{ postings: Posting[] }>,
       applicationResponse.json() as Promise<{ applications: Application[] }>,
-      researchResponse.json() as Promise<{ records: unknown[] }>
+      researchResponse.json() as Promise<{ records: unknown[] }>,
+      documentResponse.json() as Promise<{ documents: DocumentItem[] }>
     ])
     const requestedApplication = applicationValue.applications.find(
       (item) => item.jobPostId === requestedPostId
@@ -104,6 +113,9 @@ const load = async () => {
     applications.value = applicationValue.applications
     interviews.value = requestedInterviews
     researchCount.value = researchValue.records.length
+    selectedDocumentCount.value = documentValue.documents.filter(
+      (document) => document.state === "active" && document.selected
+    ).length
   } catch (error) {
     if (requestId === loadRequestId) throw error
   }
@@ -195,7 +207,9 @@ onBeforeUnmount(() => {
       >
       <Card class="lg:col-span-3 overflow-hidden">
         <CardHeader class="bg-foreground text-background">
-          <CardTitle class="flex items-center gap-2"><ListTodo />{{ copy("nextActions") }}</CardTitle>
+          <CardTitle class="flex items-center gap-2"
+            ><ListTodo />{{ copy("nextActions") }}</CardTitle
+          >
           <p class="text-sm text-background/70">{{ copy("nextActionsHelp") }}</p>
         </CardHeader>
         <CardContent class="grid gap-3 pt-5 md:grid-cols-3">
