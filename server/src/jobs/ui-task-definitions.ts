@@ -1,7 +1,7 @@
 import type { JobDefinition } from "./runtime"
 import type { JobsRepository } from "./repository"
 import type { ResearchService } from "../research/service"
-import type { JobDiscoveryService } from "../job-search/service"
+import { JobDiscoveryError, type JobDiscoveryService } from "../job-search/service"
 import type { PreparationWorkflowService } from "../workflows/service"
 import { PreparationWorkflowError } from "../workflows/service"
 import { DraftArtifactError } from "../artifacts/draft-artifact-repository"
@@ -47,8 +47,22 @@ export const jobDiscoveryTaskDefinition = (
   maxAttempts: 1,
   run: async ({ job, signal }) => {
     progress(jobs, job.id, { phase: "searching" })
-    const result = await service.discover(job.payload["request"], signal)
-    progress(jobs, job.id, { phase: "result", recommendations: result.recommendations })
+    try {
+      const result = await service.discover(job.payload["request"], signal)
+      progress(jobs, job.id, { phase: "result", recommendations: result.recommendations })
+    } catch (error) {
+      progress(jobs, job.id, {
+        phase: "failed",
+        code:
+          error instanceof JobDiscoveryError
+            ? error.code
+            : error instanceof z.ZodError
+              ? "schema_validation_failed"
+              : "discovery_failed",
+        errorType: error instanceof Error ? error.name : "unknown"
+      })
+      throw error
+    }
   }
 })
 
@@ -74,7 +88,7 @@ export const preparationTaskDefinition = (
               ? error.code
               : error instanceof z.ZodError
                 ? "schema_validation_failed"
-            : "generation_failed"
+                : "generation_failed"
       progress(jobs, job.id, {
         phase: "failed",
         code,

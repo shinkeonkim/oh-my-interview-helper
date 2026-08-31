@@ -14,4 +14,13 @@ describe("local research source discovery", () => {
       "WebSearch,WebFetch"
     ])
   })
+
+  test("Codex fallback also stays web-only and read-only", () => {
+    const command = researchDiscoveryCommand("codex")
+
+    expect(command).toContain("--search")
+    expect(
+      command.slice(command.indexOf("--sandbox"), command.indexOf("--skip-git-repo-check"))
+    ).toEqual(["--sandbox", "read-only"])
+  })
 })

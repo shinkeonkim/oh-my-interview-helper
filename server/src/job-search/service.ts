@@ -21,33 +21,35 @@ export const JobDiscoveryRequestSchema = z
   })
   .strict()
 
+const ScoreSchema = z.coerce
+  .number()
+  .finite()
+  .transform((value) => Math.max(0, Math.min(100, Math.round(value))))
 const RecommendationSchema = z
   .object({
     title: z.string().trim().min(1).max(300),
     company: z.string().trim().min(1).max(200),
     url: PublicHttpUrlSchema,
     platform: z.string().trim().min(1).max(50),
-    location: z.string().trim().max(200).nullable(),
-    experience: z.string().trim().max(200).nullable(),
-    companySize: z.string().trim().max(100).nullable(),
+    location: z.string().trim().max(200).nullable().optional().default(null),
+    experience: z.string().trim().max(200).nullable().optional().default(null),
+    companySize: z.string().trim().max(100).nullable().optional().default(null),
     summary: z.string().trim().min(1).max(2_000),
-    score: z.number().int().min(0).max(100),
+    score: ScoreSchema,
     breakdown: z
       .object({
-        profile: z.number().int().min(0).max(100),
-        criteria: z.number().int().min(0).max(100),
-        freshness: z.number().int().min(0).max(100)
+        profile: ScoreSchema,
+        criteria: ScoreSchema,
+        freshness: ScoreSchema
       })
-      .strict(),
-    matchedSkills: z.array(z.string().trim().min(1).max(80)).max(20),
-    gaps: z.array(z.string().trim().min(1).max(200)).max(20),
+      .strip(),
+    matchedSkills: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
+    gaps: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
     rationale: z.string().trim().min(1).max(2_000)
   })
-  .strict()
+  .strip()
 
-const DiscoveryOutputSchema = z
-  .object({ recommendations: z.array(RecommendationSchema).max(20) })
-  .strict()
+const DiscoveryOutputSchema = z.object({ recommendations: z.array(z.unknown()).max(20) }).strip()
 
 export class JobDiscoveryService {
   constructor(private readonly database: Database) {}
@@ -67,12 +69,23 @@ export class JobDiscoveryService {
     })
     const output = await runLocalWebAgent(prompt(request, documents), signal)
     if (output === null) throw new JobDiscoveryError("agent_unavailable")
-    const parsed = DiscoveryOutputSchema.parse(parseJson(output))
+    const recommendations = parseJobDiscoveryOutput(output)
     return {
       criteria: request,
-      recommendations: [...parsed.recommendations].sort((a, b) => b.score - a.score)
+      recommendations: recommendations.sort((a, b) => b.score - a.score)
     }
   }
+}
+
+export const parseJobDiscoveryOutput = (output: string) => {
+  const parsed = DiscoveryOutputSchema.parse(parseJson(output))
+  const recommendations = parsed.recommendations.flatMap((recommendation) => {
+    const value = RecommendationSchema.safeParse(recommendation)
+    return value.success ? [value.data] : []
+  })
+  if (parsed.recommendations.length > 0 && recommendations.length === 0)
+    throw new JobDiscoveryError("invalid_output")
+  return recommendations
 }
 
 const prompt = (
@@ -87,7 +100,9 @@ const prompt = (
     "Score each role from 0-100 using applicant profile evidence, requested criteria, and posting freshness.",
     "Explain matches and gaps without making hiring decisions. Return at most 12 strong results.",
     "Return only strict JSON matching: {recommendations:[{title,company,url,platform,location,experience,companySize,summary,score,breakdown:{profile,criteria,freshness},matchedSkills,gaps,rationale}]}",
-    JSON.stringify({ criteria, applicantDocuments: documents })
+    "Use null for unknown location, experience, or companySize; use [] for unknown matchedSkills or gaps; use integer 0-100 scores.",
+    JSON.stringify({ criteria, applicantDocuments: documents }),
+    "Your entire response must be one valid JSON object. Do not include markdown, commentary, citations outside JSON, or additional keys."
   ].join("\n")
 
 const parseJson = (text: string): unknown => {
