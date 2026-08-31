@@ -135,6 +135,7 @@ export const ko = {
     interviewLocation: "면접 장소 또는 링크",
     interviewNotes: "면접 준비 메모",
     scheduleInterview: "면접 기록",
+    addToCalendar: "캘린더에 추가",
     history: "전체 이력",
     eventCreated: "지원 시작",
     eventStageChanged: "단계 변경",

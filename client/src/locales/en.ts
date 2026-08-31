@@ -138,6 +138,7 @@ export const en = {
     interviewLocation: "Interview location or link",
     interviewNotes: "Interview preparation notes",
     scheduleInterview: "Record interview",
+    addToCalendar: "Add to calendar",
     history: "Full history",
     eventCreated: "Application started",
     eventStageChanged: "Stage changed",

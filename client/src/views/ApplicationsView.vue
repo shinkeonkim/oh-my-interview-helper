@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   BriefcaseBusiness,
+  CalendarDays,
   CalendarPlus,
   History,
   Plus,
@@ -200,6 +201,35 @@ const interviewReady = computed(() => {
   if (interviewAt.value.length === 0 || interviewKind.value.trim().length === 0) return false
   return !Number.isNaN(new Date(interviewAt.value).getTime())
 })
+const exportInterview = (interview: (typeof interviews.value)[number]) => {
+  const application = applications.value.find((item) => item.id === activeApplication.value)
+  const post = application === undefined ? undefined : postingById.value.get(application.jobPostId)
+  const start = new Date(interview.scheduledAt)
+  const end = new Date(start.getTime() + 60 * 60 * 1_000)
+  const calendarTime = (date: Date) => date.toISOString().replaceAll(/[-:]/g, "").replace(".000", "")
+  const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll(",", "\\,")
+  const content = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Interview Helper//KO",
+    "BEGIN:VEVENT",
+    `UID:${interview.id}@interview-helper.local`,
+    `DTSTAMP:${calendarTime(new Date())}`,
+    `DTSTART:${calendarTime(start)}`,
+    `DTEND:${calendarTime(end)}`,
+    `SUMMARY:${escape(`${post?.companyName ?? ""} ${interview.kind}`.trim())}`,
+    `LOCATION:${escape(interview.location ?? "")}`,
+    `DESCRIPTION:${escape(interview.notes)}`,
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n")
+  const url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }))
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = `interview-${start.toISOString().slice(0, 10)}.ics`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 const newStageReady = computed(() => newStage.value.trim().length > 0)
 const updateHasPublicUrl = computed(() => {
   try {
@@ -1030,6 +1060,9 @@ onBeforeUnmount(() => {
             <p v-if="interview.notes" class="mt-1 whitespace-pre-wrap text-muted-foreground">
               {{ interview.notes }}
             </p>
+            <Button class="mt-3" size="sm" variant="outline" @click="exportInterview(interview)"
+              ><CalendarDays />{{ copy("addToCalendar") }}</Button
+            >
           </li>
         </ol></CardContent
       ></Card
