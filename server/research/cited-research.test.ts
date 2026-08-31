@@ -202,6 +202,8 @@ describe("restricted cited research", () => {
     expect(harness.service.repository.get(first.id)?.parentRecordId).toBeNull()
     const source = refreshed?.sources[0]
     if (refreshed === null || source === undefined) throw new Error("refresh missing")
+    const reused = await harness.service.refresh(refreshed.id, [])
+    expect(reused?.sources.map((item) => item.url)).toEqual(["https://example.com/kim-new"])
     expect(() =>
       harness.service.repository.save({
         id: crypto.randomUUID(),

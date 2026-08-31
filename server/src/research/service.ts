@@ -125,6 +125,12 @@ export class ResearchService {
   refresh(recordId: string, sourceUrls: readonly string[], signal?: AbortSignal) {
     const previous = this.repository.get(recordId)
     if (previous === null) throw new ResearchServiceError("parent_not_found")
+    const refreshUrls =
+      sourceUrls.length > 0
+        ? sourceUrls
+        : previous.sources
+            .filter((source) => source.status === "available")
+            .map((source) => source.url)
     return this.run(
       {
         subjectType: previous.subjectType,
@@ -132,7 +138,7 @@ export class ResearchService {
         organization: previous.analysis.organization ?? null,
         roleHint: previous.analysis.roleHint ?? null,
         jobPostId: previous.jobPostId,
-        sourceUrls,
+        sourceUrls: refreshUrls,
         parentRecordId: previous.id
       },
       signal

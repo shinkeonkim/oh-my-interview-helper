@@ -23,6 +23,7 @@ import {
 } from "./providers"
 import { RunnerPairingService } from "./runner/pairing"
 import { RunnerWebSocketHub, type HubSocket, type HubSocketData } from "./runner/websocket-hub"
+import { LocalAgentResearchAnalyzer } from "./research/local-agent-analyzer"
 
 const main = (): void => {
   try {
@@ -84,6 +85,7 @@ const main = (): void => {
       persistence,
       jobRuntime: jobs,
       providerRegistry: providers,
+      researchAnalyzer: new LocalAgentResearchAnalyzer(),
       runnerPairing: pairing,
       revokeRunnerConnection: (runnerId) => runnerHub.revoke(runnerId)
     })
