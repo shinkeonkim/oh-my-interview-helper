@@ -80,8 +80,8 @@ const monitorBackgroundTask = async (
   for (const event of ((await finalEventsResponse.json()) as { events: JobEvent[] }).events)
     if (event.kind === "progress" && event.payload["phase"] === "result") result = event.payload
   onState(job.state, null)
-  if (job.state !== "succeeded") throw new Error(`task_${job.state}`)
   if (scope !== undefined) localStorage.removeItem(`background-task:${scope}`)
+  if (job.state !== "succeeded") throw new Error(`task_${job.state}`)
   return result
 }
 
