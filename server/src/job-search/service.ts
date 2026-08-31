@@ -67,7 +67,7 @@ export class JobDiscoveryService {
       if (row === null || row.text === null) throw new JobDiscoveryError("document_unavailable")
       return { id, title: row.title, kind: row.kind, text: row.text.slice(0, 12_000) }
     })
-    const output = await runLocalWebAgent(prompt(request, documents), signal, 120_000)
+    const output = await runLocalWebAgent(prompt(request, documents), signal)
     if (output === null) throw new JobDiscoveryError("agent_unavailable")
     const recommendations = parseJobDiscoveryOutput(output)
     return {

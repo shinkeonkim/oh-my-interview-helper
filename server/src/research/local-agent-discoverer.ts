@@ -125,8 +125,8 @@ export const runLocalWebAgent = async (
   timeoutMilliseconds = 180_000
 ): Promise<string | null> => {
   const candidates: LocalResearchCli[] = [
-    ...(Bun.which("claude") === null ? [] : (["claude"] as const)),
-    ...(Bun.which("codex") === null ? [] : (["codex"] as const))
+    ...(Bun.which("codex") === null ? [] : (["codex"] as const)),
+    ...(Bun.which("claude") === null ? [] : (["claude"] as const))
   ]
   for (const cli of candidates) {
     const output = await run(cli, prompt, timeoutMilliseconds, signal)
