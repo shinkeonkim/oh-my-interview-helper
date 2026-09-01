@@ -138,9 +138,26 @@ const comparedPosts = computed(() =>
     .filter((item): item is Posting => item !== undefined)
 )
 const stackTerms = [
-  "TypeScript", "JavaScript", "Python", "Java", "Kotlin", "Go", "Ruby", "React", "Vue",
-  "Node.js", "Spring", "Django", "Rails", "AWS", "GCP", "Docker", "Kubernetes",
-  "PostgreSQL", "Redis", "Elasticsearch"
+  "TypeScript",
+  "JavaScript",
+  "Python",
+  "Java",
+  "Kotlin",
+  "Go",
+  "Ruby",
+  "React",
+  "Vue",
+  "Node.js",
+  "Spring",
+  "Django",
+  "Rails",
+  "AWS",
+  "GCP",
+  "Docker",
+  "Kubernetes",
+  "PostgreSQL",
+  "Redis",
+  "Elasticsearch"
 ]
 const comparisonStack = (postId: string) => {
   const text = comparisonContent.value[postId] ?? ""
@@ -206,8 +223,10 @@ const exportInterview = (interview: (typeof interviews.value)[number]) => {
   const post = application === undefined ? undefined : postingById.value.get(application.jobPostId)
   const start = new Date(interview.scheduledAt)
   const end = new Date(start.getTime() + 60 * 60 * 1_000)
-  const calendarTime = (date: Date) => date.toISOString().replaceAll(/[-:]/g, "").replace(".000", "")
-  const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll(",", "\\,")
+  const calendarTime = (date: Date) =>
+    date.toISOString().replaceAll(/[-:]/g, "").replace(".000", "")
+  const escape = (value: string) =>
+    value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll(",", "\\,")
   const content = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -743,7 +762,9 @@ onBeforeUnmount(() => {
               <p class="text-sm text-muted-foreground">{{ post.companyName }}</p>
             </div>
             <div class="grid gap-1 text-sm">
-              <p><strong>{{ copy("location") }}</strong> · {{ post.metadata?.location ?? "-" }}</p>
+              <p>
+                <strong>{{ copy("location") }}</strong> · {{ post.metadata?.location ?? "-" }}
+              </p>
               <p>
                 <strong>{{ copy("employmentType") }}</strong> ·
                 {{ post.metadata?.employmentType ?? "-" }}
@@ -752,12 +773,9 @@ onBeforeUnmount(() => {
             <div>
               <p class="text-sm font-medium">{{ copy("detectedStack") }}</p>
               <div class="mt-2 flex flex-wrap gap-2">
-                <Badge
-                  v-for="term in comparisonStack(post.id)"
-                  :key="term"
-                  variant="secondary"
-                  >{{ term }}</Badge
-                >
+                <Badge v-for="term in comparisonStack(post.id)" :key="term" variant="secondary">{{
+                  term
+                }}</Badge>
                 <span
                   v-if="comparisonStack(post.id).length === 0"
                   class="text-sm text-muted-foreground"
@@ -816,7 +834,7 @@ onBeforeUnmount(() => {
                 >{{ post.sourceKind }} · {{ copy("version") }} {{ post.versionNumber }}</Badge
               >
             </div></CardHeader
-          ><CardContent class="flex gap-2"
+          ><CardContent class="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
             ><Button as-child variant="secondary"
               ><RouterLink :to="`/jobs/${post.id}/overview`"
                 ><Sparkles />{{ copy("prepare") }}</RouterLink
@@ -912,7 +930,7 @@ onBeforeUnmount(() => {
           <li
             v-for="version in postingVersions"
             :key="version.id"
-            class="flex items-center justify-between gap-3 rounded border p-3"
+            class="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
           >
             <span
               >{{ copy("version") }} {{ version.versionNumber }} ·
@@ -937,7 +955,7 @@ onBeforeUnmount(() => {
           :key="application.id"
           :aria-busy="pendingApplicationIds.has(application.id)"
           ><CardContent class="flex flex-col gap-4 py-5 lg:flex-row lg:items-center"
-            ><div class="min-w-48 flex-1">
+            ><div class="min-w-0 flex-1">
               <p class="font-semibold">{{ postingById.get(application.jobPostId)?.title }}</p>
               <div class="mt-1 flex items-center gap-2">
                 <p class="text-sm text-muted-foreground">{{ application.stageName }}</p>
@@ -962,7 +980,7 @@ onBeforeUnmount(() => {
                 pendingApplicationIds.has(application.id)
               "
               ><SelectTrigger
-                class="w-48"
+                class="w-full lg:w-48"
                 :aria-label="`${copy('stage')}: ${application.stageName}`"
                 ><SelectValue /></SelectTrigger
               ><SelectContent
@@ -1002,7 +1020,7 @@ onBeforeUnmount(() => {
         ><CardTitle>{{ copy("history") }}</CardTitle></CardHeader
       ><CardContent class="grid gap-6 lg:grid-cols-2"
         ><div class="grid gap-3">
-          <div class="flex gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row">
             <Input v-model="note" :aria-label="copy('notes')" :placeholder="copy('notes')" /><Button
               :disabled="!noteReady || addingNote"
               @click="addNote"
@@ -1124,7 +1142,7 @@ onBeforeUnmount(() => {
             /></Button>
           </div>
         </div>
-        <div class="mt-4 flex max-w-md gap-2">
+        <div class="mt-4 flex max-w-md flex-col gap-2 sm:flex-row">
           <Input
             v-model="newStage"
             :disabled="stagesBusy"

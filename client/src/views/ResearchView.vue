@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
     >
     <section v-if="current" class="grid gap-5">
       <Card
-        ><CardHeader class="flex-row items-center justify-between"
+        ><CardHeader class="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center"
           ><CardTitle>{{ current.subjectName }}</CardTitle
           ><Badge>{{ identityLabel(current.identityStatus) }}</Badge></CardHeader
         ><CardContent
@@ -410,7 +410,9 @@ onBeforeUnmount(() => {
         </Card>
       </div>
       <Card v-if="claimDiff">
-        <CardHeader><CardTitle>{{ copy("changes") }}</CardTitle></CardHeader>
+        <CardHeader
+          ><CardTitle>{{ copy("changes") }}</CardTitle></CardHeader
+        >
         <CardContent class="flex flex-wrap gap-3 text-sm">
           <Badge variant="secondary">+ {{ claimDiff.added }} {{ copy("addedClaims") }}</Badge>
           <Badge variant="outline">- {{ claimDiff.removed }} {{ copy("removedClaims") }}</Badge>
@@ -437,8 +439,9 @@ onBeforeUnmount(() => {
                   rel="noreferrer"
                   class="text-left text-xs text-primary underline"
                   @click="focusSource(sourceId, claim.id)"
-                  >{{ current.sources.find((source) => source.id === sourceId)?.title }}<ExternalLink class="inline size-3" /></a
-                >
+                  >{{ current.sources.find((source) => source.id === sourceId)?.title
+                  }}<ExternalLink class="inline size-3"
+                /></a>
               </div></article></CardContent></Card
         ><Card
           ><CardHeader
@@ -469,7 +472,7 @@ onBeforeUnmount(() => {
         >
       </div>
       <Card
-        ><CardHeader class="flex-row items-center justify-between"
+        ><CardHeader class="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center"
           ><CardTitle>{{ copy("sources") }}</CardTitle
           ><Button variant="outline" :disabled="running" @click="submit(current.id)"
             ><RefreshCw />{{ copy("refresh") }}</Button
@@ -480,26 +483,37 @@ onBeforeUnmount(() => {
             :key="source.id"
             :id="'research-source-' + source.id"
             class="rounded-lg border p-4 transition"
-            :class="selectedSourceIds.includes(source.id) ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : ''"
-            ><div class="flex justify-between gap-3">
+            :class="
+              selectedSourceIds.includes(source.id)
+                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                : ''
+            "
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
               <span class="font-medium">{{ source.title }}</span>
               <div class="flex flex-wrap justify-end gap-2">
-                <Badge variant="outline">{{ copy("sourceType." + sourceCategory(source.url)) }}</Badge>
-                <Badge v-if="staleSource(source.retrievedAt)" variant="destructive">{{ copy("staleSource") }}</Badge>
+                <Badge variant="outline">{{
+                  copy("sourceType." + sourceCategory(source.url))
+                }}</Badge>
+                <Badge v-if="staleSource(source.retrievedAt)" variant="destructive">{{
+                  copy("staleSource")
+                }}</Badge>
                 <Badge :variant="source.status === 'available' ? 'secondary' : 'destructive'">{{
                   source.status
                 }}</Badge>
               </div>
             </div>
             <p class="mt-2 text-xs text-muted-foreground">
-              {{ copy("retrieved") }} · {{ new Date(source.retrievedAt).toLocaleString(settings.locale) }}
+              {{ copy("retrieved") }} ·
+              {{ new Date(source.retrievedAt).toLocaleString(settings.locale) }}
             </p>
             <p class="mt-2 line-clamp-3 text-sm text-muted-foreground">{{ source.excerpt }}</p>
             <Button class="mt-3" as-child size="sm" variant="ghost"
               ><a :href="source.url" target="_blank" rel="noreferrer"
-                ><ExternalLink />{{ copy("openSource") }}</a></Button
-            ></article
-          ></CardContent
+                ><ExternalLink />{{ copy("openSource") }}</a
+              ></Button
+            >
+          </article></CardContent
         ></Card
       >
     </section>
@@ -512,7 +526,7 @@ onBeforeUnmount(() => {
           <button
             v-for="record in records"
             :key="record.id"
-            class="flex justify-between rounded-lg border p-3 text-left"
+            class="flex flex-col gap-1 rounded-lg border p-3 text-left sm:flex-row sm:justify-between"
             :disabled="running || openingRecordId === record.id"
             @click="openRecord(record.id)"
           >

@@ -66,6 +66,7 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
   })
 
   await page.goto("/job-search")
+  await page.setViewportSize({ width: 320, height: 720 })
   await page.getByLabel("직무", { exact: true }).fill("플랫폼 엔지니어")
   await page.getByLabel("기술 스택").fill("TypeScript, Kubernetes")
   await page.getByRole("button", { name: "에이전트로 채용공고 탐색" }).click()
@@ -73,6 +74,14 @@ test("discovers matching public jobs from criteria and saves a recommendation", 
   await expect(page.getByText("Platform Engineer")).toBeVisible()
   await expect(page.getByText("91")).toBeVisible()
   await expect(page.getByText("TypeScript")).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true)
+  await expect
+    .poll(
+      async () => (await page.getByRole("button", { name: "공고로 저장" }).boundingBox())?.width
+    )
+    .toBeGreaterThanOrEqual(250)
   expect(discoveryBody).toMatchObject({
     kind: "ui.job_discovery",
     input: {

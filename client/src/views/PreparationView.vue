@@ -522,7 +522,7 @@ onBeforeUnmount(() => {
       </CardContent></Card
     >
     <Card v-if="revision"
-      ><CardHeader class="flex-row items-center justify-between"
+      ><CardHeader class="flex-row flex-wrap items-center justify-between gap-3"
         ><CardTitle>{{ copy("result") }}</CardTitle
         ><Badge>{{ copy("version") }} {{ revision.number }}</Badge></CardHeader
       ><CardContent>
@@ -533,24 +533,39 @@ onBeforeUnmount(() => {
             <p class="mt-3 leading-7 text-background/80">{{ resultSummary }}</p>
           </div>
           <Card v-if="workflow === 'resume_feedback'" class="border-primary/30 bg-primary/5">
-            <CardHeader><CardTitle>{{ copy("evidenceGaps") }}</CardTitle></CardHeader>
+            <CardHeader
+              ><CardTitle>{{ copy("evidenceGaps") }}</CardTitle></CardHeader
+            >
             <CardContent>
               <p v-if="evidenceGaps.length === 0" class="text-sm text-muted-foreground">
                 {{ copy("noExplicitGaps") }}
               </p>
               <ul v-else class="grid gap-3">
-                <li v-for="section in evidenceGaps" :key="section.heading" class="rounded-lg border bg-background p-4">
+                <li
+                  v-for="section in evidenceGaps"
+                  :key="section.heading"
+                  class="rounded-lg border bg-background p-4"
+                >
                   <strong>{{ section.heading }}</strong>
-                  <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{{ section.body }}</p>
+                  <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                    {{ section.body }}
+                  </p>
                 </li>
               </ul>
             </CardContent>
           </Card>
           <section v-if="resultSections.length" class="grid gap-4">
-            <article v-for="section in resultSections" :key="section.heading" class="rounded-xl border p-5">
+            <article
+              v-for="section in resultSections"
+              :key="section.heading"
+              class="rounded-xl border p-5"
+            >
               <h3 class="text-lg font-semibold">{{ section.heading }}</h3>
               <p class="mt-3 whitespace-pre-wrap text-sm leading-7">{{ section.body }}</p>
-              <ul v-if="section.citations.length" class="mt-4 grid gap-1 text-xs text-muted-foreground">
+              <ul
+                v-if="section.citations.length"
+                class="mt-4 grid gap-1 text-xs text-muted-foreground"
+              >
                 <li v-for="citation in section.citations" :key="citation.sourceId">
                   {{ copy("citation") }} · {{ citation.note }}
                 </li>
@@ -558,15 +573,26 @@ onBeforeUnmount(() => {
             </article>
           </section>
           <section v-if="resultQuestions.length" class="grid gap-4">
-            <article v-for="(question, index) in resultQuestions" :key="question.question" class="rounded-xl border p-5">
+            <article
+              v-for="(question, index) in resultQuestions"
+              :key="question.question"
+              class="rounded-xl border p-5"
+            >
               <Badge variant="outline">Q{{ index + 1 }}</Badge>
               <h3 class="mt-3 text-lg font-semibold">{{ question.question }}</h3>
-              <p class="mt-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">{{ copy("suggestedAnswer") }}</p>
-              <p class="mt-2 whitespace-pre-wrap text-sm leading-7">{{ question.suggestedAnswer }}</p>
+              <p class="mt-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {{ copy("suggestedAnswer") }}
+              </p>
+              <p class="mt-2 whitespace-pre-wrap text-sm leading-7">
+                {{ question.suggestedAnswer }}
+              </p>
               <p class="mt-4 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                 <strong>{{ copy("rationale") }}</strong> · {{ question.rationale }}
               </p>
-              <ul v-if="question.citations.length" class="mt-3 grid gap-1 text-xs text-muted-foreground">
+              <ul
+                v-if="question.citations.length"
+                class="mt-3 grid gap-1 text-xs text-muted-foreground"
+              >
                 <li v-for="citation in question.citations" :key="citation.sourceId">
                   {{ copy("citation") }} · {{ citation.note }}
                 </li>
@@ -587,7 +613,7 @@ onBeforeUnmount(() => {
       ></Card
     >
     <Card v-if="provenance">
-      <CardHeader class="flex-row items-center justify-between">
+      <CardHeader class="flex-row flex-wrap items-center justify-between gap-3">
         <CardTitle>{{ copy("provenance") }}</CardTitle>
         <Badge :variant="provenance.staleReasons.length === 0 ? 'secondary' : 'destructive'">
           {{ provenance.staleReasons.length === 0 ? copy("current") : copy("staleStatus") }}

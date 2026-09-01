@@ -321,7 +321,7 @@ onBeforeUnmount(() => controller.abort())
               :href="item.url"
               target="_blank"
               rel="noreferrer"
-              class="mt-3 inline-flex items-center gap-2 text-xl font-semibold hover:text-primary"
+              class="mt-3 inline-flex max-w-full items-start gap-2 break-words text-xl font-semibold [overflow-wrap:anywhere] hover:text-primary"
               >{{ item.title }}<ExternalLink class="size-4"
             /></a>
             <p class="mt-1 text-sm font-medium">{{ item.company }}</p>
@@ -333,13 +333,18 @@ onBeforeUnmount(() => controller.abort())
               }}</Badge
               ><Badge v-for="gap in item.gaps" :key="gap" variant="outline">GAP · {{ gap }}</Badge>
             </div>
-            <div class="mt-4 flex gap-4 font-mono text-xs text-muted-foreground">
+            <div
+              class="mt-4 flex flex-wrap gap-x-4 gap-y-2 font-mono text-xs text-muted-foreground"
+            >
               <span>PROFILE {{ item.breakdown.profile }}</span
               ><span>CRITERIA {{ item.breakdown.criteria }}</span
               ><span>FRESH {{ item.breakdown.freshness }}</span>
             </div>
           </div>
-          <Button :disabled="savingUrl !== null || savedUrls.has(item.url)" @click="save(item)"
+          <Button
+            class="w-full sm:w-fit lg:w-auto"
+            :disabled="savingUrl !== null || savedUrls.has(item.url)"
+            @click="save(item)"
             ><Save />{{ savedUrls.has(item.url) ? copy("savedAlready") : copy("save") }}</Button
           >
         </CardContent></Card
