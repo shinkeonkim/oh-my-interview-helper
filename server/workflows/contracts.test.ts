@@ -12,8 +12,10 @@ describe("preparation workflow contracts", () => {
     expect(artifactKindForWorkflow("cover_letter")).toBe("cover_letter")
     expect(artifactKindForWorkflow("resume_feedback")).toBe("resume")
     expect(artifactKindForWorkflow("technical_prep")).toBe("interview_brief")
+    expect(artifactKindForWorkflow("culture_interview")).toBe("interview_brief")
     expect(artifactKindForWorkflow("topic_answers")).toBe("application_answer")
     expect(promptTemplateForWorkflow("company_questions")).toBe("company-questions")
+    expect(promptTemplateForWorkflow("culture_interview")).toBe("culture-interview")
   })
 
   test("requires structured content and extracts unique citations", () => {
@@ -44,5 +46,28 @@ describe("preparation workflow contracts", () => {
         sections: []
       })
     ).toThrow()
+  })
+
+  test("컬쳐 면접은 문화 분석과 예상 질문을 함께 요구한다", () => {
+    const sourceId = "11111111-1111-4111-8111-111111111111"
+    const citation = [{ sourceId, note: "공개 근거" }]
+    expect(() =>
+      parsePreparationOutput("culture_interview", {
+        workflow: "culture_interview",
+        title: "컬쳐 면접 준비",
+        summary: "공식 정보와 후기성 정보를 구분한 준비 자료",
+        sections: ["기업 문화", "인재상", "최근 면접 후기", "마음가짐"].map((heading) => ({
+          heading,
+          body: `${heading} 근거`,
+          citations: citation
+        })),
+        questions: Array.from({ length: 5 }, (_, index) => ({
+          question: `질문 ${index + 1}`,
+          suggestedAnswer: "지원자 경험을 바탕으로 답변",
+          rationale: "문화 적합성을 확인",
+          citations: citation
+        }))
+      })
+    ).not.toThrow()
   })
 })

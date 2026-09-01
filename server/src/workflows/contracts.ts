@@ -7,6 +7,7 @@ export const PreparationWorkflowKindSchema = z.enum([
   "resume_feedback",
   "interview_prep",
   "technical_prep",
+  "culture_interview",
   "topic_answers",
   "company_questions"
 ])
@@ -41,12 +42,19 @@ const SectionOutputSchema = BaseOutputSchema.extend({
 const QuestionOutputSchema = BaseOutputSchema.extend({
   questions: z.array(QuestionSchema).min(1).max(50)
 })
+const CultureInterviewOutputSchema = BaseOutputSchema.extend({
+  sections: z.array(SectionSchema).min(4).max(12),
+  questions: z.array(QuestionSchema).min(5).max(30)
+})
 
 export const PreparationOutputSchemas = {
   cover_letter: SectionOutputSchema.extend({ workflow: z.literal("cover_letter") }).strict(),
   resume_feedback: SectionOutputSchema.extend({ workflow: z.literal("resume_feedback") }).strict(),
   interview_prep: QuestionOutputSchema.extend({ workflow: z.literal("interview_prep") }).strict(),
   technical_prep: QuestionOutputSchema.extend({ workflow: z.literal("technical_prep") }).strict(),
+  culture_interview: CultureInterviewOutputSchema.extend({
+    workflow: z.literal("culture_interview")
+  }).strict(),
   topic_answers: QuestionOutputSchema.extend({ workflow: z.literal("topic_answers") }).strict(),
   company_questions: QuestionOutputSchema.extend({
     workflow: z.literal("company_questions")
@@ -88,6 +96,7 @@ export const artifactKindForWorkflow = (
       return "resume"
     case "interview_prep":
     case "technical_prep":
+    case "culture_interview":
     case "company_questions":
       return "interview_brief"
     case "topic_answers":
