@@ -36,6 +36,7 @@ type Workflow =
   | "resume_feedback"
   | "interview_prep"
   | "technical_prep"
+  | "culture_interview"
   | "topic_answers"
   | "company_questions"
 type Posting = {
@@ -53,6 +54,7 @@ type Document = {
   versionNumber: number | null
 }
 type Provider = { id: string; model: { id: string; displayName: string }; configured: boolean }
+type ResearchSource = { id: string; title: string; url: string; status: string }
 type Manifest = {
   destination: string
   model: string
@@ -123,6 +125,7 @@ const copy = (key: string) => translate(settings.locale, `preparation.${key}`)
 const controller = new AbortController()
 const postings = ref<Posting[]>([])
 const documents = ref<Document[]>([])
+const cultureResearchSources = ref<ResearchSource[]>([])
 const providers = ref<Provider[]>([])
 const workflow = ref<Workflow>(props.workflowPreset)
 const providerId = ref("")
@@ -166,6 +169,9 @@ const inputs = computed(() => {
     values.push({ kind: "job_post_version", jobPostVersionId: posting.value.currentVersionId })
   for (const documentVersionId of selectedDocumentVersionIds.value)
     values.push({ kind: "document_version", documentVersionId })
+  if (workflow.value === "culture_interview")
+    for (const source of cultureResearchSources.value)
+      values.push({ kind: "research_source", researchSourceId: source.id })
   return values
 })
 const topics: readonly Topic[] = [
@@ -231,6 +237,7 @@ const workflowLabels: Array<[Workflow, string]> = [
   ["resume_feedback", "resumeFeedback"],
   ["interview_prep", "interviewPrep"],
   ["technical_prep", "technicalPrep"],
+  ["culture_interview", "cultureInterview"],
   ["topic_answers", "topicAnswers"],
   ["company_questions", "companyQuestions"]
 ]
@@ -244,6 +251,32 @@ const post = async (path: string, body: unknown) => {
   })
   if (!response.ok) throw new Error("request")
   return response
+}
+const loadCultureResearchSources = async (companyName: string) => {
+  if (workflow.value !== "culture_interview") {
+    cultureResearchSources.value = []
+    return
+  }
+  const response = await fetch(`/api/research?jobPostId=${encodeURIComponent(postId.value)}`, {
+    signal: controller.signal
+  })
+  if (!response.ok) throw new Error("request")
+  const body = (await response.json()) as {
+    records: Array<{ id: string; subjectType: string; subjectName: string }>
+  }
+  const record = body.records.find(
+    (item) => item.subjectType === "company" && item.subjectName === companyName
+  )
+  if (record === undefined) {
+    cultureResearchSources.value = []
+    return
+  }
+  const detailResponse = await fetch(`/api/research/${record.id}`, { signal: controller.signal })
+  if (!detailResponse.ok) throw new Error("request")
+  const detail = (await detailResponse.json()) as { sources: ResearchSource[] }
+  cultureResearchSources.value = detail.sources
+    .filter((source) => source.status === "available")
+    .slice(0, 8)
 }
 const requestBody = (): WorkflowRequest => ({
   workflow: workflow.value,
@@ -276,6 +309,9 @@ const load = async () => {
     )
     providers.value = providerValue.providers.filter((item) => item.configured)
     providerId.value = providers.value[0]?.id ?? ""
+    await loadCultureResearchSources(
+      postingValue.postings.find((item) => item.id === postId.value)?.companyName ?? ""
+    )
   } catch (error) {
     if (requestId === loadRequestId) throw error
   }
@@ -505,6 +541,22 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <p class="text-sm text-muted-foreground">{{ copy("automaticAgent") }}</p>
+        <div
+          v-if="workflow === 'culture_interview'"
+          class="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm"
+        >
+          <p class="font-medium">{{ copy("cultureEvidence") }}</p>
+          <p class="mt-1 text-muted-foreground">
+            {{
+              cultureResearchSources.length > 0
+                ? copy("cultureEvidenceReady").replace(
+                    "{count}",
+                    String(cultureResearchSources.length)
+                  )
+                : copy("cultureEvidenceEmpty")
+            }}
+          </p>
+        </div>
         <div class="grid gap-2">
           <Label for="preparation-practice-answer">{{ copy("practiceAnswer") }}</Label
           ><textarea

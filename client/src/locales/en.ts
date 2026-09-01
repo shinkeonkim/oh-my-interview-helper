@@ -181,10 +181,16 @@ export const en = {
     resumeFeedback: "Resume feedback",
     interviewPrep: "Interview preparation",
     technicalPrep: "Technical preparation",
+    cultureInterview: "Culture interview preparation",
     topicAnswers: "Topic answers",
     companyQuestions: "Questions for the company",
     provider: "Provider",
     automaticAgent: "The app automatically uses an available local Claude Code or Codex agent.",
+    cultureEvidence: "Culture research evidence",
+    cultureEvidenceReady:
+      "Uses {count} sources from the latest company research with the posting and selected documents.",
+    cultureEvidenceEmpty:
+      "No company research sources are connected yet. Run the research step above to include them automatically.",
     document: "Reference document",
     noDocument: "Use posting only",
     postingIncluded:
@@ -243,8 +249,22 @@ export const en = {
     people: "People & team",
     resume: "Resume feedback",
     interview: "Interview prep",
+    culture: "Culture interview",
     technical: "Technical prep",
     topics: "Topic answers",
+    cultureTitle: "Culture interview preparation center",
+    cultureIntro:
+      "Research public company culture, talent principles, and recent interview accounts, then connect them to your experience.",
+    cultureReviewNotice:
+      "Interview reviews are personal accounts and may not reflect the current process. Treat official information and anecdotal patterns separately.",
+    cultureResearch: "Research culture and interview experiences",
+    cultureResearchHelp:
+      "The agent finds official culture and hiring pages plus public interview accounts without requiring links.",
+    cultureResearchHint:
+      "company culture, core values, talent principles, ways of working, recent public interview reviews, and culture interview questions",
+    culturePreparation: "Prepare mindset and likely questions",
+    culturePreparationHelp:
+      "Generate likely questions and answer guidance from research evidence, the posting, and selected documents.",
     application: "Application status",
     noApplication: "No application has been started for this posting.",
     currentStage: "Current stage",

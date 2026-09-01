@@ -29,15 +29,20 @@ const props = withDefaults(
     subjectTypePreset?: SubjectType
     subjectNamePreset?: string
     organizationPreset?: string
+    roleHintPreset?: string
+    taskScopePreset?: string
     embedded?: boolean
   }>(),
   {
     subjectTypePreset: "company",
     subjectNamePreset: "",
     organizationPreset: "",
+    roleHintPreset: "",
+    taskScopePreset: "default",
     embedded: false
   }
 )
+const emit = defineEmits<{ completed: [recordId: string] }>()
 type RecordSummary = {
   id: string
   subjectType: SubjectType
@@ -79,7 +84,7 @@ const copy = (key: string) => translate(settings.locale, `research.${key}`)
 const subjectType = ref<SubjectType>(props.subjectTypePreset)
 const subjectName = ref(props.subjectNamePreset)
 const organization = ref(props.organizationPreset)
-const roleHint = ref("")
+const roleHint = ref(props.roleHintPreset)
 const urls = ref("")
 const records = ref<RecordSummary[]>([])
 const current = ref<ResearchRecord | null>(null)
@@ -126,7 +131,8 @@ const researchReady = computed(
   () => subjectName.value.trim().length > 0 && parsedSourceUrls.value !== null
 )
 const taskScope = computed(
-  () => `research:${jobPostId.value ?? "global"}:${props.subjectTypePreset}`
+  () =>
+    `research:${jobPostId.value ?? "global"}:${props.subjectTypePreset}:${props.taskScopePreset}`
 )
 const load = async () => {
   const requestId = ++loadRequestId
@@ -145,10 +151,11 @@ const load = async () => {
   }
 }
 watch(
-  () => [props.subjectNamePreset, props.organizationPreset] as const,
-  ([name, company]) => {
+  () => [props.subjectNamePreset, props.organizationPreset, props.roleHintPreset] as const,
+  ([name, company, hint]) => {
     if (subjectName.value === "") subjectName.value = name
     if (organization.value === "") organization.value = company
+    if (roleHint.value === "") roleHint.value = hint
   }
 )
 const submit = async (parentRecordId: string | null = null) => {
@@ -188,7 +195,10 @@ const submit = async (parentRecordId: string | null = null) => {
     )
     if (operationContext !== contextId) return
     await load()
-    if (typeof result["recordId"] === "string") await openRecord(result["recordId"])
+    if (typeof result["recordId"] === "string") {
+      await openRecord(result["recordId"])
+      emit("completed", result["recordId"])
+    }
   } catch {
     if (operationContext === contextId) toast.error(copy("failed"))
   } finally {
@@ -215,7 +225,10 @@ const resumeTask = () => {
       .then(async (result) => {
         if (operationContext !== contextId) return
         await load()
-        if (typeof result["recordId"] === "string") await openRecord(result["recordId"])
+        if (typeof result["recordId"] === "string") {
+          await openRecord(result["recordId"])
+          emit("completed", result["recordId"])
+        }
       })
       .catch(() => operationContext === contextId && toast.error(copy("failed")))
       .finally(() => {
@@ -296,7 +309,7 @@ watch(
     if (props.embedded) {
       subjectName.value = props.subjectNamePreset
       organization.value = props.organizationPreset
-      roleHint.value = ""
+      roleHint.value = props.roleHintPreset
       urls.value = ""
     }
     void load()

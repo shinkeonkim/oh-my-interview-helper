@@ -13,7 +13,7 @@ const routes = [
   "/research",
   "/stats",
   "/settings",
-  ...["overview", "company", "people", "resume", "interview", "technical", "topics"].map(
+  ...["overview", "company", "people", "resume", "interview", "culture", "technical", "topics"].map(
     (area) => `/jobs/${postId}/${area}`
   ),
   `/jobs/${postId}/prepare`,

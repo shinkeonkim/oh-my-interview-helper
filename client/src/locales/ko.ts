@@ -178,10 +178,15 @@ export const ko = {
     resumeFeedback: "이력서 피드백",
     interviewPrep: "면접 준비",
     technicalPrep: "기술 면접 준비",
+    cultureInterview: "컬쳐 면접 준비",
     topicAnswers: "토픽별 답안",
     companyQuestions: "회사에 물어볼 질문",
     provider: "Provider",
     automaticAgent: "AI 실행 환경은 로컬에서 사용 가능한 Claude Code 또는 Codex로 자동 선택됩니다.",
+    cultureEvidence: "컬쳐 리서치 근거",
+    cultureEvidenceReady: "최신 기업 리서치 출처 {count}개를 채용공고·선택 문서와 함께 사용합니다.",
+    cultureEvidenceEmpty:
+      "아직 연결할 기업 리서치 출처가 없습니다. 위 조사 단계를 먼저 실행하면 준비 자료에 자동 반영됩니다.",
     document: "참고 문서",
     noDocument: "공고만 사용",
     postingIncluded:
@@ -239,8 +244,22 @@ export const ko = {
     people: "인물 & 팀 분석",
     resume: "이력서 피드백",
     interview: "면접 준비",
+    culture: "컬쳐 면접 준비",
     technical: "기술 면접 준비",
     topics: "토픽별 답안",
+    cultureTitle: "컬쳐 면접 준비 센터",
+    cultureIntro:
+      "기업이 공개한 문화와 인재상, 최근 공개 면접 경험담을 조사하고 내 경험과 연결한 답변을 준비합니다.",
+    cultureReviewNotice:
+      "면접 후기는 개인 경험이며 현재 절차와 다를 수 있습니다. 공식 정보와 후기성 패턴을 구분해 참고하세요.",
+    cultureResearch: "기업 문화와 면접 경험 조사",
+    cultureResearchHelp:
+      "추가 링크 없이도 회사 공식 페이지, 채용·문화 자료와 공개 면접 후기를 에이전트가 찾습니다.",
+    cultureResearchHint:
+      "기업 문화, 핵심 가치, 인재상, 일하는 방식, 최근 공개 면접 후기와 컬쳐 면접 질문",
+    culturePreparation: "마음가짐과 질문 대비 자료 생성",
+    culturePreparationHelp:
+      "조사 근거, 채용공고, 선택한 제출 문서를 함께 사용해 예상 질문과 답변 방향을 만듭니다.",
     application: "지원 현황",
     noApplication: "아직 이 공고에 시작한 지원이 없습니다.",
     currentStage: "현재 단계",

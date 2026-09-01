@@ -19,6 +19,7 @@ export const router = createRouter({
         ["people", "workspace-people"],
         ["resume", "workspace-resume"],
         ["interview", "workspace-interview"],
+        ["culture", "workspace-culture"],
         ["technical", "workspace-technical"],
         ["topics", "workspace-topics"]
       ] as const

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-test("deep-links all seven job workspace areas while preserving job context", async ({ page }) => {
+test("deep-links all eight job workspace areas while preserving job context", async ({ page }) => {
   test.setTimeout(20_000)
   const postId = "11111111-1111-4111-8111-111111111111"
   const versionId = "22222222-2222-4222-8222-222222222222"
@@ -60,6 +60,7 @@ test("deep-links all seven job workspace areas while preserving job context", as
     ["인물 & 팀 분석", "people"],
     ["이력서 피드백", "resume"],
     ["면접 준비", "interview"],
+    ["컬쳐 면접 준비", "culture"],
     ["기술 면접 준비", "technical"],
     ["토픽별 답안", "topics"],
     ["개요", "overview"]
@@ -79,6 +80,7 @@ test("deep-links all seven job workspace areas while preserving job context", as
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()
     if (workflowByArea[area] !== undefined)
       await expect(page.getByRole("combobox").first()).toContainText(workflowByArea[area])
+    if (area === "culture") await expect(page.getByText("컬쳐 면접 준비 센터")).toBeVisible()
     await page.reload()
     await expect(page).toHaveURL(new RegExp(`/jobs/${postId}/${area}$`))
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()

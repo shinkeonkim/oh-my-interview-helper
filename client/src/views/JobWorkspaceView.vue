@@ -8,12 +8,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import PreparationView from "./PreparationView.vue"
+import CultureInterviewView from "./CultureInterviewView.vue"
 import ResearchView from "./ResearchView.vue"
 import WorkspaceChat from "./WorkspaceChat.vue"
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
 
-type Area = "overview" | "company" | "people" | "resume" | "interview" | "technical" | "topics"
+type Area =
+  "overview" | "company" | "people" | "resume" | "interview" | "culture" | "technical" | "topics"
 type Posting = {
   id: string
   title: string
@@ -48,6 +50,7 @@ const areas: readonly Area[] = [
   "people",
   "resume",
   "interview",
+  "culture",
   "technical",
   "topics"
 ]
@@ -249,6 +252,10 @@ onBeforeUnmount(() => {
       embedded
       subject-type-preset="team_lead"
       :organization-preset="posting?.companyName ?? ''"
+    />
+    <CultureInterviewView
+      v-else-if="props.area === 'culture'"
+      :company-name="posting?.companyName ?? ''"
     />
     <PreparationView v-else-if="workflow" embedded :workflow-preset="workflow" />
   </div>
