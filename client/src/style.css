@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Calistoga&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -43,9 +43,9 @@
 :root {
   color-scheme: light;
   --radius: 0.875rem;
-  --font-body: "Inter", "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
-  --display-font: "Calistoga", Georgia, serif;
-  --mono-font: "JetBrains Mono", monospace;
+  --font-body: "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --display-font: var(--font-body);
+  --mono-font: var(--font-body);
   --background: #fafafa;
   --foreground: #0f172a;
   --card: #ffffff;
@@ -103,6 +103,7 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    font-family: var(--font-body);
   }
 
   html {

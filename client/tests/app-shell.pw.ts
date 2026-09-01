@@ -33,6 +33,12 @@ test.describe("application shell contract", () => {
       )
     }
     await expect(page.locator("#main-content")).toBeVisible()
+    for (const locator of [
+      page.locator("body"),
+      page.locator("h1"),
+      page.getByRole("button").first()
+    ])
+      await expect(locator).toHaveCSS("font-family", /Pretendard/)
   })
 
   test("opens Command search, navigates, and restores focus after Escape", async ({ page }) => {
