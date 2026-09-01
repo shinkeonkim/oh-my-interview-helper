@@ -135,3 +135,43 @@ test("summarizes only persisted local activity and job states", async ({ page })
   await expect(page.getByRole("button", { name: "작업 취소" })).toHaveCount(0)
   expect(cancelCsrfToken).toBe("stats-csrf-token")
 })
+
+test("과거 handler_missing 기록을 현재 수정된 이전 버전 오류로 설명한다", async ({ page }) => {
+  await page.route("**/api/postings", (route) => route.fulfill({ json: { postings: [] } }))
+  await page.route("**/api/applications", (route) => route.fulfill({ json: { applications: [] } }))
+  await page.route("**/api/documents", (route) => route.fulfill({ json: { documents: [] } }))
+  await page.route("**/api/jobs", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          kind: "ui.research",
+          state: "failed",
+          errorCode: "handler_missing",
+          errorMessage: "Job handler is unavailable",
+          payload: {},
+          updatedAt: "2026-08-31T15:14:55.639Z"
+        }
+      ]
+    })
+  )
+  await page.route("**/api/stats/overview", (route) =>
+    route.fulfill({
+      json: {
+        uptime: { since: "2026-09-01T00:00:00.000Z", milliseconds: 0 },
+        memory: { rssMb: 0, heapUsedMb: 0, heapTotalMb: 0, externalMb: 0 },
+        counts: {},
+        providerRuns: {
+          total: 0,
+          tokens: { input: 0, output: 0, cache: 0 },
+          byKind: [],
+          states: []
+        }
+      }
+    })
+  )
+
+  await page.goto("/stats")
+  await expect(page.getByText("이전 버전의 작업 등록 오류 · 현재 수정됨")).toBeVisible()
+  await expect(page.getByText("handler_missing")).toHaveCount(0)
+})

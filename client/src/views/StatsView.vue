@@ -109,6 +109,10 @@ const eventLabel = (kind: string) => {
   const known = ["queued", "leased", "running", "progress", "succeeded", "failed", "cancelled"]
   return known.includes(kind) ? copy(`event.${kind}`) : kind
 }
+const failureLabel = (code: string | null, message: string | null = null) =>
+  code === "handler_missing"
+    ? copy("error.handlerMissingResolved")
+    : (code ?? message ?? copy("unknownFailure"))
 const csrf = async () =>
   ((await (await fetch("/api/security/csrf")).json()) as { csrfToken: string }).csrfToken
 const parseJobs = async (response: Response): Promise<Job[]> => {
@@ -476,7 +480,9 @@ onBeforeUnmount(() => {
                     as-child
                     size="sm"
                     variant="outline"
-                    ><RouterLink :to="resultRoute(job)!"><Play />{{ copy("openResult") }}</RouterLink></Button
+                    ><RouterLink :to="resultRoute(job)!"
+                      ><Play />{{ copy("openResult") }}</RouterLink
+                    ></Button
                   ><Button
                     v-if="['queued', 'leased', 'running'].includes(job.state)"
                     size="sm"
@@ -487,8 +493,11 @@ onBeforeUnmount(() => {
                   ></span
                 >
               </div>
-              <p v-if="job.state === 'failed'" class="rounded-lg bg-destructive/10 p-3 text-destructive">
-                {{ copy("failureReason") }} · {{ job.errorCode ?? job.errorMessage ?? copy("unknownFailure") }}
+              <p
+                v-if="job.state === 'failed'"
+                class="rounded-lg bg-destructive/10 p-3 text-destructive"
+              >
+                {{ copy("failureReason") }} · {{ failureLabel(job.errorCode, job.errorMessage) }}
               </p>
               <div
                 v-if="expandedJobId === job.id"
@@ -506,9 +515,10 @@ onBeforeUnmount(() => {
                     class="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span
-                      >#{{ event.sequence }} · {{ eventLabel(event.kind) }}<span
-                        v-if="typeof event.payload['code'] === 'string'"
-                      > · {{ event.payload["code"] }}</span></span
+                      >#{{ event.sequence }} · {{ eventLabel(event.kind)
+                      }}<span v-if="typeof event.payload['code'] === 'string'">
+                        · {{ failureLabel(event.payload["code"]) }}</span
+                      ></span
                     >
                     <time :datetime="event.createdAt">{{
                       new Date(event.createdAt).toLocaleString(settings.locale)

@@ -202,7 +202,8 @@ export const en = {
     regenerate: "Generate new version",
     result: "Generated draft",
     evidenceGaps: "Evidence gaps and improvements",
-    noExplicitGaps: "No explicitly classified evidence gap was found. Review the full feedback below.",
+    noExplicitGaps:
+      "No explicitly classified evidence gap was found. Review the full feedback below.",
     suggestedAnswer: "Suggested answer",
     rationale: "Why this is asked",
     citation: "Evidence",
@@ -277,7 +278,8 @@ export const en = {
       sourcesHelp:
         "The posting is always included. Select any documents and research evidence needed.",
       researchSources: "Company and people research evidence",
-      researchSelectionHelp: "Latest sources are preselected. Choose up to 8 sources for the answer.",
+      researchSelectionHelp:
+        "Latest sources are preselected. Choose up to 8 sources for the answer.",
       addResearch: "Run more research",
       noResearch: "No research evidence is available yet. Run company or people research first.",
       noDocument: "Posting only",
@@ -334,7 +336,8 @@ export const en = {
     changes: "Changes from the previous analysis",
     addedClaims: "claims added",
     removedClaims: "claims removed",
-    changesHelp: "This is a sentence-level comparison. Verify important facts in the linked source.",
+    changesHelp:
+      "This is a sentence-level comparison. Verify important facts in the linked source.",
     retrieved: "Retrieved",
     staleSource: "Older than 30 days",
     openSource: "Open source",
@@ -442,6 +445,9 @@ export const en = {
     openResult: "Open result",
     failureReason: "Failure reason",
     unknownFailure: "Unknown execution error",
+    error: {
+      handlerMissingResolved: "Legacy task registration error · fixed in the current version"
+    },
     noJobs: "No background jobs have run yet.",
     kind: {
       research: "Company and people research",
