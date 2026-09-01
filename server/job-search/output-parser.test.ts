@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { JobDiscoveryError, parseJobDiscoveryOutput } from "../src/job-search/service"
+import {
+  JobDiscoveryError,
+  mergeJobRecommendations,
+  parseJobDiscoveryOutput,
+  splitDiscoveryPlatforms
+} from "../src/job-search/service"
 
 const valid = {
   title: "Backend Engineer",
@@ -35,5 +40,26 @@ describe("공개 채용 탐색 결과 복구", () => {
     expect(() => parseJobDiscoveryOutput('{"recommendations":[{"title":"broken"}]}')).toThrow(
       JobDiscoveryError
     )
+  })
+
+  test("플랫폼을 두 개씩 나누고 중복 공고는 높은 점수 하나만 남긴다", () => {
+    expect(
+      splitDiscoveryPlatforms([
+        "wanted",
+        "saramin",
+        "jobkorea",
+        "remember",
+        "greeting",
+        "inthiswork"
+      ])
+    ).toEqual([
+      ["wanted", "saramin"],
+      ["jobkorea", "remember"],
+      ["greeting", "inthiswork"]
+    ])
+
+    const first = parseJobDiscoveryOutput(JSON.stringify({ recommendations: [valid] }))[0]!
+    const higher = { ...first, url: `${first.url}?tracking=second`, score: 97 }
+    expect(mergeJobRecommendations([[first], [higher]])).toEqual([higher])
   })
 })

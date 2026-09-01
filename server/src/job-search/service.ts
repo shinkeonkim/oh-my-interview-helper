@@ -50,9 +50,15 @@ const RecommendationSchema = z
   .strip()
 
 const DiscoveryOutputSchema = z.object({ recommendations: z.array(z.unknown()).max(20) }).strip()
+type DiscoveryRequest = z.output<typeof JobDiscoveryRequestSchema>
+type Recommendation = z.output<typeof RecommendationSchema>
+type WebAgent = typeof runLocalWebAgent
 
 export class JobDiscoveryService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly webAgent: WebAgent = runLocalWebAgent
+  ) {}
 
   async discover(raw: unknown, signal?: AbortSignal) {
     const request = JobDiscoveryRequestSchema.parse(raw)
@@ -67,14 +73,51 @@ export class JobDiscoveryService {
       if (row === null || row.text === null) throw new JobDiscoveryError("document_unavailable")
       return { id, title: row.title, kind: row.kind, text: row.text.slice(0, 8_000) }
     })
-    const output = await runLocalWebAgent(prompt(request, documents), signal, 135_000)
-    if (output === null) throw new JobDiscoveryError("agent_unavailable")
-    const recommendations = parseJobDiscoveryOutput(output)
+    const batches = splitDiscoveryPlatforms(request.platforms)
+    const outcomes = await Promise.allSettled(
+      batches.map(async (platforms) => {
+        const output = await this.webAgent(
+          prompt({ ...request, platforms }, documents, batches.length),
+          signal,
+          135_000
+        )
+        if (output === null) throw new JobDiscoveryError("agent_unavailable")
+        return parseJobDiscoveryOutput(output)
+      })
+    )
+    const completed = outcomes.flatMap((outcome) =>
+      outcome.status === "fulfilled" ? [outcome.value] : []
+    )
+    if (completed.length === 0) throw new JobDiscoveryError("agent_unavailable")
+    const recommendations = mergeJobRecommendations(completed)
     return {
       criteria: request,
-      recommendations: recommendations.sort((a, b) => b.score - a.score)
+      recommendations
     }
   }
+}
+
+export const splitDiscoveryPlatforms = (
+  platforms: DiscoveryRequest["platforms"]
+): DiscoveryRequest["platforms"][] => {
+  const batches: DiscoveryRequest["platforms"][] = []
+  for (let index = 0; index < platforms.length; index += 2)
+    batches.push(platforms.slice(index, index + 2))
+  return batches
+}
+
+export const mergeJobRecommendations = (
+  batches: readonly (readonly Recommendation[])[]
+): Recommendation[] => {
+  const recommendations = new Map<string, Recommendation>()
+  for (const recommendation of batches.flat()) {
+    const url = new URL(recommendation.url)
+    const key = `${url.hostname.toLowerCase()}${url.pathname.replace(/\/$/, "")}`
+    const current = recommendations.get(key)
+    if (current === undefined || recommendation.score > current.score)
+      recommendations.set(key, recommendation)
+  }
+  return [...recommendations.values()].sort((a, b) => b.score - a.score).slice(0, 18)
 }
 
 export const parseJobDiscoveryOutput = (output: string) => {
@@ -89,8 +132,9 @@ export const parseJobDiscoveryOutput = (output: string) => {
 }
 
 const prompt = (
-  criteria: z.output<typeof JobDiscoveryRequestSchema>,
-  documents: readonly { id: string; title: string; kind: string; text: string }[]
+  criteria: DiscoveryRequest,
+  documents: readonly { id: string; title: string; kind: string; text: string }[],
+  batchCount: number
 ) =>
   [
     "You are a job discovery and applicant-fit research agent.",
@@ -98,8 +142,9 @@ const prompt = (
     "Search the live public web across the requested Korean job platforms and official company career pages.",
     "Find distinct currently open roles, verify each URL, and do not invent postings.",
     "Use at most 8 total web search or fetch operations. Some requested platforms may have no usable result.",
+    `This is one of ${batchCount} parallel platform batches. Focus only on the platforms in criteria.platforms and avoid spending time on other sites.`,
     "Score each role from 0-100 using applicant profile evidence, requested criteria, and posting freshness.",
-    "Explain matches and gaps without making hiring decisions. Return 3-6 strongest results and finish promptly.",
+    "Explain matches and gaps without making hiring decisions. Return 4-7 strongest distinct results and finish promptly.",
     "Return only strict JSON matching: {recommendations:[{title,company,url,platform,location,experience,companySize,summary,score,breakdown:{profile,criteria,freshness},matchedSkills,gaps,rationale}]}",
     "Use null for unknown location, experience, or companySize; use [] for unknown matchedSkills or gaps; use integer 0-100 scores.",
     JSON.stringify({ criteria, applicantDocuments: documents }),
