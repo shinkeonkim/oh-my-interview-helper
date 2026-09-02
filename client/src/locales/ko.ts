@@ -206,6 +206,8 @@ export const ko = {
     evidenceGaps: "공고 대비 근거 부족과 보완점",
     noExplicitGaps: "명시적으로 분류된 근거 부족 항목이 없습니다. 아래 전체 피드백을 확인하세요.",
     suggestedAnswer: "답변 방향",
+    likelyAnswer: "내 문서로 예상한 답변",
+    modelAnswer: "같은 경험으로 만든 모범 답변",
     rationale: "질문 의도",
     followUpQuestions: "예상 꼬리 질문",
     evaluationCriteria: "좋은 답변의 평가 기준",
@@ -262,7 +264,7 @@ export const ko = {
       "기업 문화, 핵심 가치, 인재상, 일하는 방식, 최근 공개 면접 후기와 컬쳐 면접 질문",
     culturePreparation: "마음가짐과 질문 대비 자료 생성",
     culturePreparationHelp:
-      "조사 근거, 채용공고, 선택한 제출 문서를 함께 사용해 예상 질문과 답변 방향을 만듭니다.",
+      "이력서·포트폴리오에서 예상한 내 답변과, 같은 사실을 더 효과적으로 구성한 모범 답변을 질문별로 비교합니다.",
     cultureQuestionPool: "컬쳐 면접 기본 질문 풀",
     cultureQuestionPoolHelp:
       "구조화된 행동·상황 면접 가이드의 공통 평가 축을 6개 영역 12개 질문으로 정리했습니다. AI는 이 풀을 회사와 역할에 맞게 확장합니다.",

@@ -211,6 +211,8 @@ export const en = {
     noExplicitGaps:
       "No explicitly classified evidence gap was found. Review the full feedback below.",
     suggestedAnswer: "Suggested answer",
+    likelyAnswer: "Likely answer from my documents",
+    modelAnswer: "Model answer using the same evidence",
     rationale: "Why this is asked",
     followUpQuestions: "Likely follow-up questions",
     evaluationCriteria: "Strong-answer criteria",
@@ -267,7 +269,7 @@ export const en = {
       "company culture, core values, talent principles, ways of working, recent public interview reviews, and culture interview questions",
     culturePreparation: "Prepare mindset and likely questions",
     culturePreparationHelp:
-      "Generate likely questions and answer guidance from research evidence, the posting, and selected documents.",
+      "Compare the answer inferred from your resume and portfolio with a stronger model answer built from the same facts.",
     cultureQuestionPool: "Core culture interview question pool",
     cultureQuestionPoolHelp:
       "Twelve questions across six themes synthesize common structured behavioral and situational interview dimensions. The AI adapts this pool to the company and role.",

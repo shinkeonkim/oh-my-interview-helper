@@ -63,7 +63,8 @@ describe("preparation workflow contracts", () => {
         })),
         questions: Array.from({ length: 8 }, (_, index) => ({
           question: `질문 ${index + 1}`,
-          suggestedAnswer: "지원자 경험을 바탕으로 답변",
+          likelyAnswer: "제출 문서에서 확인한 지원자 답변",
+          modelAnswer: "같은 사실을 더 구체적으로 구성한 모범 답변",
           rationale: "문화 적합성을 확인",
           followUpQuestions: ["구체적인 본인 행동은?", "결과를 어떻게 확인했나요?"],
           evaluationCriteria: ["구체성", "성찰"],
@@ -86,7 +87,7 @@ describe("preparation workflow contracts", () => {
       })),
       questions: Array.from({ length: 8 }, (_, index) => ({
         question: `질문 ${index + 1}`,
-        suggestedAnswer: "답변",
+        likelyAnswer: "사용자 답변",
         rationale: "의도",
         citations: []
       }))

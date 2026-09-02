@@ -38,7 +38,7 @@ export const defaultPromptTemplateRevisionRegistry = new PromptTemplateRevisionR
   { id: "resume-feedback", revision: "resume-feedback@1" },
   { id: "interview-prep", revision: "interview-prep@1" },
   { id: "technical-prep", revision: "technical-prep@1" },
-  { id: "culture-interview", revision: "culture-interview@2" },
+  { id: "culture-interview", revision: "culture-interview@3" },
   { id: "topic-answers", revision: "topic-answers@1" },
   { id: "company-questions", revision: "company-questions@1" }
 ])

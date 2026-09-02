@@ -88,7 +88,9 @@ type Citation = { sourceId: string; note: string }
 type ResultSection = { heading: string; body: string; citations: Citation[] }
 type ResultQuestion = {
   question: string
-  suggestedAnswer: string
+  suggestedAnswer?: string
+  likelyAnswer?: string
+  modelAnswer?: string
   rationale: string
   followUpQuestions?: string[]
   evaluationCriteria?: string[]
@@ -310,6 +312,8 @@ const load = async () => {
     documents.value = documentValue.documents.filter(
       (item) => item.state === "active" && item.currentVersionId
     )
+    if (workflow.value === "culture_interview")
+      selectedDocumentVersionIds.value = documents.value.map((item) => item.currentVersionId!)
     providers.value = providerValue.providers.filter((item) => item.configured)
     providerId.value = providers.value[0]?.id ?? ""
     await loadCultureResearchSources(
@@ -635,12 +639,34 @@ onBeforeUnmount(() => {
             >
               <Badge variant="outline">Q{{ index + 1 }}</Badge>
               <h3 class="mt-3 text-lg font-semibold">{{ question.question }}</h3>
-              <p class="mt-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {{ copy("suggestedAnswer") }}
-              </p>
-              <p class="mt-2 whitespace-pre-wrap text-sm leading-7">
-                {{ question.suggestedAnswer }}
-              </p>
+              <template v-if="workflow === 'culture_interview'">
+                <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div class="rounded-xl border bg-muted/30 p-4">
+                    <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {{ copy("likelyAnswer") }}
+                    </p>
+                    <p class="mt-3 whitespace-pre-wrap text-sm leading-7">
+                      {{ question.likelyAnswer }}
+                    </p>
+                  </div>
+                  <div class="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <p class="text-xs font-medium uppercase tracking-wider text-primary">
+                      {{ copy("modelAnswer") }}
+                    </p>
+                    <p class="mt-3 whitespace-pre-wrap text-sm leading-7">
+                      {{ question.modelAnswer }}
+                    </p>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <p class="mt-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {{ copy("suggestedAnswer") }}
+                </p>
+                <p class="mt-2 whitespace-pre-wrap text-sm leading-7">
+                  {{ question.suggestedAnswer }}
+                </p>
+              </template>
               <p class="mt-4 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                 <strong>{{ copy("rationale") }}</strong> · {{ question.rationale }}
               </p>

@@ -9,6 +9,8 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
   const researchTaskId = "55555555-5555-4555-8555-555555555555"
   const preparationTaskId = "66666666-6666-4666-8666-666666666666"
   const revisionId = "77777777-7777-4777-8777-777777777777"
+  const resumeVersionId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+  const portfolioVersionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
   let researchCreated = false
   let previewBody: { workflow?: string; inputs?: Array<Record<string, string>> } = {}
 
@@ -32,7 +34,28 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
     })
   )
   await page.route("**/api/applications", (route) => route.fulfill({ json: { applications: [] } }))
-  await page.route("**/api/documents", (route) => route.fulfill({ json: { documents: [] } }))
+  await page.route("**/api/documents", (route) =>
+    route.fulfill({
+      json: {
+        documents: [
+          {
+            id: "resume",
+            title: "플랫폼 이력서",
+            state: "active",
+            currentVersionId: resumeVersionId,
+            versionNumber: 2
+          },
+          {
+            id: "portfolio",
+            title: "프로젝트 포트폴리오",
+            state: "active",
+            currentVersionId: portfolioVersionId,
+            versionNumber: 1
+          }
+        ]
+      }
+    })
+  )
   await page.route("**/api/providers/status", (route) =>
     route.fulfill({
       json: {
@@ -163,7 +186,8 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
           questions: [
             {
               question: "협업 갈등을 해결한 경험은?",
-              suggestedAnswer: "실제 경험을 STAR로 답합니다.",
+              likelyAnswer: "이력서의 플랫폼 전환 경험을 중심으로 답할 가능성이 높습니다.",
+              modelAnswer: "플랫폼 전환 당시 의견 차이를 데이터로 정리하고 합의안을 만들었습니다.",
               rationale: "협업 방식을 확인합니다.",
               followUpQuestions: ["본인이 직접 한 행동은?", "결과를 어떻게 측정했나요?"],
               evaluationCriteria: ["구체적인 행동", "검증 가능한 결과"],
@@ -194,10 +218,22 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
   await expect(page.getByRole("dialog")).toBeVisible()
   expect(previewBody.workflow).toBe("culture_interview")
   expect(previewBody.inputs).toContainEqual({ kind: "research_source", researchSourceId: sourceId })
+  expect(previewBody.inputs).toContainEqual({
+    kind: "document_version",
+    documentVersionId: resumeVersionId
+  })
+  expect(previewBody.inputs).toContainEqual({
+    kind: "document_version",
+    documentVersionId: portfolioVersionId
+  })
   await page.getByRole("dialog").getByRole("button", { name: "확인하고 생성" }).click()
   await expect(page.getByRole("heading", { name: "Acme 컬쳐 면접 준비" })).toBeVisible()
   await expect(page.getByText("개인 경험담으로 참고")).toBeVisible()
   await expect(page.getByText("협업 갈등을 해결한 경험은?")).toBeVisible()
+  await expect(page.getByText("내 문서로 예상한 답변")).toBeVisible()
+  await expect(page.getByText(/이력서의 플랫폼 전환 경험/)).toBeVisible()
+  await expect(page.getByText("같은 경험으로 만든 모범 답변")).toBeVisible()
+  await expect(page.getByText(/의견 차이를 데이터로 정리/)).toBeVisible()
   await expect(page.getByText("본인이 직접 한 행동은?")).toBeVisible()
   await expect(page.getByText("검증 가능한 결과")).toBeVisible()
   await expect(page.getByText("본인의 판단 근거를 보강하세요.")).toBeVisible()

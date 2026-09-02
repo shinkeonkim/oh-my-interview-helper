@@ -23,15 +23,17 @@ const SectionSchema = z
     citations: z.array(CitationSchema).max(20)
   })
   .strict()
-const QuestionSchema = z
-  .object({
-    question: z.string().trim().min(1).max(2_000),
-    suggestedAnswer: z.string().trim().min(1).max(10_000),
-    rationale: z.string().trim().min(1).max(2_000),
-    citations: z.array(CitationSchema).max(20)
-  })
-  .strict()
-const CultureQuestionSchema = QuestionSchema.extend({
+const QuestionCoreSchema = z.object({
+  question: z.string().trim().min(1).max(2_000),
+  rationale: z.string().trim().min(1).max(2_000),
+  citations: z.array(CitationSchema).max(20)
+})
+const QuestionSchema = QuestionCoreSchema.extend({
+  suggestedAnswer: z.string().trim().min(1).max(10_000)
+}).strict()
+const CultureQuestionSchema = QuestionCoreSchema.extend({
+  likelyAnswer: z.string().trim().min(1).max(10_000),
+  modelAnswer: z.string().trim().min(1).max(10_000),
   followUpQuestions: z.array(z.string().trim().min(1).max(2_000)).min(2).max(5),
   evaluationCriteria: z.array(z.string().trim().min(1).max(1_000)).min(2).max(6),
   strengtheningPoints: z.array(z.string().trim().min(1).max(2_000)).min(1).max(6)
@@ -116,10 +118,11 @@ export const parsePreparationOutput = (workflow: PreparationWorkflowKind, output
   PreparationOutputSchemas[workflow].parse(output)
 
 export const citationSourceIds = (output: unknown): readonly string[] => {
+  const CitedItemSchema = z.object({ citations: z.array(CitationSchema) }).passthrough()
   const value = z
     .object({
-      sections: z.array(SectionSchema).optional(),
-      questions: z.array(QuestionSchema).optional()
+      sections: z.array(CitedItemSchema).optional(),
+      questions: z.array(CitedItemSchema).optional()
     })
     .passthrough()
     .parse(output)
