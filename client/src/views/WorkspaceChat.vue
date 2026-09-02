@@ -48,12 +48,16 @@ type Manifest = {
 }
 type DisplayLine = { text: string; kind: "heading" | "bullet" | "paragraph" }
 
-const props = defineProps<{
-  applicationId: string
-  jobPostId: string
-  postingTitle: string
-  postingVersionId: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    applicationId: string
+    jobPostId: string
+    postingTitle: string
+    postingVersionId: string
+    practiceMode?: "general" | "culture"
+  }>(),
+  { practiceMode: "general" }
+)
 const settings = useSettingsStore()
 const copy = (key: string) => translate(settings.locale, `workspace.chat.${key}`)
 const controller = new AbortController()
@@ -88,13 +92,22 @@ const inputs = computed(() => {
     selected.push({ kind: "research_source", researchSourceId })
   return selected
 })
-const taskScope = computed(() => `chat:${props.applicationId}`)
+const taskScope = computed(() => `chat:${props.applicationId}:${props.practiceMode}`)
 const hostname = (url: string) => new URL(url).hostname
 const practiceTime = computed(
-  () => `${String(Math.floor(practiceSeconds.value / 60)).padStart(2, "0")}:${String(practiceSeconds.value % 60).padStart(2, "0")}`
+  () =>
+    `${String(Math.floor(practiceSeconds.value / 60)).padStart(2, "0")}:${String(practiceSeconds.value % 60).padStart(2, "0")}`
 )
 const startPractice = (followUp = false) => {
-  message.value = copy(followUp ? "followUpPrompt" : "practicePrompt")
+  const promptKey =
+    props.practiceMode === "culture"
+      ? followUp
+        ? "cultureFollowUpPrompt"
+        : "culturePracticePrompt"
+      : followUp
+        ? "followUpPrompt"
+        : "practicePrompt"
+  message.value = copy(promptKey)
   if (practiceStartedAt.value !== null) return
   practiceStartedAt.value = Date.now()
   practiceTimer = setInterval(() => {
@@ -352,7 +365,9 @@ onBeforeUnmount(() => {
   <Card class="lg:col-span-3">
     <CardHeader
       ><CardTitle class="flex items-center gap-2"
-        ><MessageCircle />{{ copy("title") }}</CardTitle
+        ><MessageCircle />{{
+          copy(props.practiceMode === "culture" ? "cultureTitle" : "title")
+        }}</CardTitle
       ></CardHeader
     >
     <CardContent class="grid gap-5">
@@ -398,9 +413,13 @@ onBeforeUnmount(() => {
         }}</Button>
         <Badge v-if="practiceStartedAt !== null" variant="outline"
           ><Timer />{{ practiceTime }}</Badge
-        ><Button v-if="practiceStartedAt !== null" size="sm" variant="ghost" @click="resetPractice">{{
-          copy("resetTimer")
-        }}</Button>
+        ><Button
+          v-if="practiceStartedAt !== null"
+          size="sm"
+          variant="ghost"
+          @click="resetPractice"
+          >{{ copy("resetTimer") }}</Button
+        >
       </div>
       <div class="grid gap-3">
         <Label>{{ copy("documents") }}</Label>

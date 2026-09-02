@@ -256,6 +256,10 @@ onBeforeUnmount(() => {
     <CultureInterviewView
       v-else-if="props.area === 'culture'"
       :company-name="posting?.companyName ?? ''"
+      :job-post-id="postId"
+      :posting-title="posting?.title ?? ''"
+      :posting-version-id="posting?.currentVersionId ?? null"
+      :application-id="application?.id ?? null"
     />
     <PreparationView v-else-if="workflow" embedded :workflow-preset="workflow" />
   </div>

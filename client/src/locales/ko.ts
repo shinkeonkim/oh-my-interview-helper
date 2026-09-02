@@ -207,6 +207,9 @@ export const ko = {
     noExplicitGaps: "명시적으로 분류된 근거 부족 항목이 없습니다. 아래 전체 피드백을 확인하세요.",
     suggestedAnswer: "답변 방향",
     rationale: "질문 의도",
+    followUpQuestions: "예상 꼬리 질문",
+    evaluationCriteria: "좋은 답변의 평가 기준",
+    strengtheningPoints: "후속 보강 포인트",
     citation: "근거",
     version: "버전",
     copyResult: "복사",
@@ -260,6 +263,15 @@ export const ko = {
     culturePreparation: "마음가짐과 질문 대비 자료 생성",
     culturePreparationHelp:
       "조사 근거, 채용공고, 선택한 제출 문서를 함께 사용해 예상 질문과 답변 방향을 만듭니다.",
+    cultureQuestionPool: "컬쳐 면접 기본 질문 풀",
+    cultureQuestionPoolHelp:
+      "구조화된 행동·상황 면접 가이드의 공통 평가 축을 6개 영역 12개 질문으로 정리했습니다. AI는 이 풀을 회사와 역할에 맞게 확장합니다.",
+    cultureQuestionPoolSource: "질문 설계 참고:",
+    cultureMockInterview: "AI 컬쳐 모의 면접",
+    cultureMockInterviewHelp:
+      "AI 면접관이 한 번에 하나씩 질문하고, 답변의 구체성·근거·성찰을 평가한 뒤 꼬리 질문과 보강 기준을 제시합니다.",
+    cultureMockInterviewUnavailable:
+      "이 채용공고에 지원을 시작하면 AI 컬쳐 모의 면접과 꼬리 질문 연습을 사용할 수 있습니다.",
     application: "지원 현황",
     noApplication: "아직 이 공고에 시작한 지원이 없습니다.",
     currentStage: "현재 단계",
@@ -276,6 +288,7 @@ export const ko = {
     },
     chat: {
       title: "지원별 AI 대화",
+      cultureTitle: "컬쳐 면접관과 실전 연습",
       empty: "아직 대화가 없습니다. 현재 공고와 선택한 문서를 근거로 질문해 보세요.",
       you: "나",
       assistant: "AI 답변",
@@ -289,6 +302,10 @@ export const ko = {
         "면접관 역할을 맡아 이 채용공고와 선택한 근거를 기반으로 가장 중요한 질문 하나만 먼저 해주세요. 제가 답하면 구체성, 근거, 기술 정확성을 평가하고 다음 질문을 해주세요.",
       followUpPrompt:
         "방금까지의 대화를 면접 답변으로 평가하고, 아직 검증되지 않은 부분을 파고드는 꼬리 질문 하나와 좋은 답변의 평가 기준을 알려주세요.",
+      culturePracticePrompt:
+        "컬쳐 면접관 역할을 맡아 기업 문화 조사 근거와 채용공고를 바탕으로 가치관, 협업, 갈등, 피드백, 주도성, 실패와 성장, 업무 방식 중 가장 중요한 질문 하나만 해주세요. 제가 답하면 구체성, 실제 행동 근거, 성찰, culture-add 관점으로 평가하고 보강 포인트와 다음 질문을 제시해 주세요. 없는 경험을 대신 만들어내지 마세요.",
+      cultureFollowUpPrompt:
+        "방금까지의 컬쳐 면접 답변에서 모호하거나 검증되지 않은 부분을 하나 골라 현실적인 꼬리 질문을 해주세요. 이어서 좋은 답변의 평가 기준과 현재 답변의 보강 포인트를 알려주세요. 지원자의 경험을 지어내지 마세요.",
       document: "참고 문서",
       documents: "함께 보낼 제출 문서",
       sourcesHelp:

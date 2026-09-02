@@ -80,7 +80,13 @@ test("deep-links all eight job workspace areas while preserving job context", as
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()
     if (workflowByArea[area] !== undefined)
       await expect(page.getByRole("combobox").first()).toContainText(workflowByArea[area])
-    if (area === "culture") await expect(page.getByText("컬쳐 면접 준비 센터")).toBeVisible()
+    if (area === "culture") {
+      await expect(page.getByText("컬쳐 면접 준비 센터")).toBeVisible()
+      await expect(page.getByText("컬쳐 면접관과 실전 연습", { exact: true })).toBeVisible()
+      await expect(page.getByRole("button", { name: "모의 면접 시작" })).toBeVisible()
+      await page.getByRole("button", { name: "모의 면접 시작" }).click()
+      await expect(page.getByRole("textbox", { name: "질문" })).toHaveValue(/컬쳐 면접관 역할/)
+    }
     await page.reload()
     await expect(page).toHaveURL(new RegExp(`/jobs/${postId}/${area}$`))
     await expect(page.getByRole("heading", { name: posting.title })).toBeVisible()

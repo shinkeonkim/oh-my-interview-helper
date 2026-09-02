@@ -165,6 +165,9 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
               question: "협업 갈등을 해결한 경험은?",
               suggestedAnswer: "실제 경험을 STAR로 답합니다.",
               rationale: "협업 방식을 확인합니다.",
+              followUpQuestions: ["본인이 직접 한 행동은?", "결과를 어떻게 측정했나요?"],
+              evaluationCriteria: ["구체적인 행동", "검증 가능한 결과"],
+              strengtheningPoints: ["본인의 판단 근거를 보강하세요."],
               citations: []
             }
           ]
@@ -178,6 +181,10 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
 
   await page.goto(`/jobs/${postId}/culture`)
   await expect(page.getByText("컬쳐 면접 준비 센터")).toBeVisible()
+  await expect(page.getByText("컬쳐 면접 기본 질문 풀")).toBeVisible()
+  await expect(
+    page.getByText("왜 이 회사와 이 역할을 선택했으며, 어떤 가치가 본인과 맞습니까?")
+  ).toBeVisible()
   await expect(page.getByLabel("역할 단서")).toHaveValue(/기업 문화.*최근 공개 면접 후기/)
   await page.getByRole("button", { name: "리서치 시작" }).click()
   await expect(page.getByRole("link", { name: "Acme Culture" })).toBeVisible()
@@ -191,4 +198,7 @@ test("기업 문화 조사 결과를 근거로 컬쳐 면접 준비 자료를 �
   await expect(page.getByRole("heading", { name: "Acme 컬쳐 면접 준비" })).toBeVisible()
   await expect(page.getByText("개인 경험담으로 참고")).toBeVisible()
   await expect(page.getByText("협업 갈등을 해결한 경험은?")).toBeVisible()
+  await expect(page.getByText("본인이 직접 한 행동은?")).toBeVisible()
+  await expect(page.getByText("검증 가능한 결과")).toBeVisible()
+  await expect(page.getByText("본인의 판단 근거를 보강하세요.")).toBeVisible()
 })

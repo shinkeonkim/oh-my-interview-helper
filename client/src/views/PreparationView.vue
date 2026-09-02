@@ -90,6 +90,9 @@ type ResultQuestion = {
   question: string
   suggestedAnswer: string
   rationale: string
+  followUpQuestions?: string[]
+  evaluationCriteria?: string[]
+  strengtheningPoints?: string[]
   citations: Citation[]
 }
 type StaleReason =
@@ -641,6 +644,32 @@ onBeforeUnmount(() => {
               <p class="mt-4 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                 <strong>{{ copy("rationale") }}</strong> · {{ question.rationale }}
               </p>
+              <div
+                v-if="question.followUpQuestions?.length"
+                class="mt-4 grid gap-2 rounded-lg border p-4"
+              >
+                <strong class="text-sm">{{ copy("followUpQuestions") }}</strong>
+                <ul class="grid gap-2 text-sm text-muted-foreground">
+                  <li v-for="item in question.followUpQuestions" :key="item">• {{ item }}</li>
+                </ul>
+              </div>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div v-if="question.evaluationCriteria?.length" class="rounded-lg bg-muted/60 p-4">
+                  <strong class="text-sm">{{ copy("evaluationCriteria") }}</strong>
+                  <ul class="mt-2 grid gap-1 text-sm text-muted-foreground">
+                    <li v-for="item in question.evaluationCriteria" :key="item">• {{ item }}</li>
+                  </ul>
+                </div>
+                <div
+                  v-if="question.strengtheningPoints?.length"
+                  class="rounded-lg bg-primary/5 p-4"
+                >
+                  <strong class="text-sm">{{ copy("strengtheningPoints") }}</strong>
+                  <ul class="mt-2 grid gap-1 text-sm text-muted-foreground">
+                    <li v-for="item in question.strengtheningPoints" :key="item">• {{ item }}</li>
+                  </ul>
+                </div>
+              </div>
               <ul
                 v-if="question.citations.length"
                 class="mt-3 grid gap-1 text-xs text-muted-foreground"

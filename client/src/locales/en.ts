@@ -212,6 +212,9 @@ export const en = {
       "No explicitly classified evidence gap was found. Review the full feedback below.",
     suggestedAnswer: "Suggested answer",
     rationale: "Why this is asked",
+    followUpQuestions: "Likely follow-up questions",
+    evaluationCriteria: "Strong-answer criteria",
+    strengtheningPoints: "What to strengthen next",
     citation: "Evidence",
     version: "Version",
     copyResult: "Copy",
@@ -265,6 +268,15 @@ export const en = {
     culturePreparation: "Prepare mindset and likely questions",
     culturePreparationHelp:
       "Generate likely questions and answer guidance from research evidence, the posting, and selected documents.",
+    cultureQuestionPool: "Core culture interview question pool",
+    cultureQuestionPoolHelp:
+      "Twelve questions across six themes synthesize common structured behavioral and situational interview dimensions. The AI adapts this pool to the company and role.",
+    cultureQuestionPoolSource: "Question design references:",
+    cultureMockInterview: "AI culture mock interview",
+    cultureMockInterviewHelp:
+      "The AI interviewer asks one question at a time, assesses specificity, evidence, and reflection, then provides follow-ups and strengthening criteria.",
+    cultureMockInterviewUnavailable:
+      "Start an application for this posting to use the AI culture mock interview and follow-up practice.",
     application: "Application status",
     noApplication: "No application has been started for this posting.",
     currentStage: "Current stage",
@@ -281,6 +293,7 @@ export const en = {
     },
     chat: {
       title: "Application AI chat",
+      cultureTitle: "Practice with a culture interviewer",
       empty: "No messages yet. Ask using the current posting and selected document as evidence.",
       you: "You",
       assistant: "AI answer",
@@ -293,6 +306,10 @@ export const en = {
         "Act as the interviewer. Ask one important question based on this posting and the selected evidence. After my answer, evaluate specificity, evidence, and technical accuracy before asking the next question.",
       followUpPrompt:
         "Evaluate the conversation so far as an interview answer, then ask one follow-up that probes an unverified point and provide the criteria for a strong answer.",
+      culturePracticePrompt:
+        "Act as a culture interviewer. Using company research evidence and the posting, ask only one important question about values, collaboration, conflict, feedback, ownership, failure and growth, or ways of working. After my answer, assess specificity, behavioral evidence, reflection, and culture-add; then provide strengthening points and the next question. Never invent my experience.",
+      cultureFollowUpPrompt:
+        "Choose one vague or unverified part of my culture-interview answer and ask a realistic follow-up. Then explain the criteria for a strong answer and what my current answer should strengthen. Never invent applicant experience.",
       document: "Reference document",
       documents: "Submitted documents to include",
       sourcesHelp:
