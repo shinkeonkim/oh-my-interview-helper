@@ -26,6 +26,7 @@ import {
 import { translate } from "../locales"
 import { useSettingsStore } from "../stores/settings"
 import {
+  backgroundTaskFailureLabel,
   backgroundTaskPhaseLabel,
   resumeBackgroundTask,
   runBackgroundTask
@@ -366,8 +367,9 @@ const generate = async () => {
     revision.value = value
     preview.value = null
     await loadProvenance(value)
-  } catch {
-    if (operationContext === contextId) toast.error(copy("failed"))
+  } catch (error) {
+    if (operationContext === contextId)
+      toast.error(backgroundTaskFailureLabel(error, settings.locale))
   } finally {
     if (operationContext === contextId) {
       running.value = false
@@ -396,7 +398,11 @@ const resumeTask = () => {
         preview.value = null
         return loadProvenance(revision.value)
       })
-      .catch(() => operationContext === contextId && toast.error(copy("failed")))
+      .catch(
+        (error) =>
+          operationContext === contextId &&
+          toast.error(backgroundTaskFailureLabel(error, settings.locale))
+      )
       .finally(() => {
         if (operationContext === contextId) {
           running.value = false

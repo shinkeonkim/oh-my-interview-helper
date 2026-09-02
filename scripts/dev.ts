@@ -21,7 +21,7 @@ const environment = {
 }
 
 const processes = [
-  Bun.spawn(["bun", "server/src/index.ts"], {
+  Bun.spawn(["bun", "--hot", "server/src/index.ts"], {
     env: environment,
     stdout: "inherit",
     stderr: "inherit",
