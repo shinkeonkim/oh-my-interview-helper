@@ -51,7 +51,7 @@ const QuestionOutputSchema = BaseOutputSchema.extend({
 })
 const CultureInterviewOutputSchema = BaseOutputSchema.extend({
   sections: z.array(SectionSchema).min(4).max(12),
-  questions: z.array(CultureQuestionSchema).min(8).max(30)
+  questions: z.array(CultureQuestionSchema).min(6).max(10)
 })
 
 export const PreparationOutputSchemas = {

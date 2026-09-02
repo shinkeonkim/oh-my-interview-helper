@@ -114,7 +114,10 @@ export class StrandsPreparationExecutor implements PreparationExecutor {
   } {
     const provider = this.dependencies.providers.get(input.providerId)
     if (provider === null || !provider.enabled) throw new PreparationExecutorError("unavailable")
-    const sources = this.dependencies.sources.resolveAll(input.inputs)
+    const sources = this.dependencies.sources.resolveAll(
+      input.inputs,
+      input.workflow === "culture_interview" ? 60_000 : undefined
+    )
     return {
       mode: provider.descriptor.mode,
       model: provider.descriptor.model.id,
@@ -210,6 +213,7 @@ const workflowGuidance = (workflow: PreparationWorkflowKind): string => {
     "Create a Korean culture-interview preparation brief grounded only in the supplied posting, documents, and public research sources.",
     "The sections must separately cover: company culture and working principles; stated talent profile; recent public interview-review patterns; and interview mindset plus an action checklist.",
     "The questions must cover motivation, values, collaboration, conflict, feedback, ownership, failure and growth, work style, and thoughtful questions for the interviewer.",
+    "Select 6-10 high-value questions for this applicant and role. Prefer depth and document-specific comparison over repeating every baseline question.",
     `Adapt and expand this researched baseline question pool for the specific company and role: ${JSON.stringify(CULTURE_INTERVIEW_QUESTION_POOL)}. Do not present baseline questions as facts about the company.`,
     "For every question, produce likelyAnswer and modelAnswer as a question-answer-model-answer comparison, plus 2-5 realistic interviewer follow-up questions, 2-6 concrete evaluation criteria, and 1-6 strengthening points.",
     "likelyAnswer must reconstruct the answer this applicant is most likely to give from the supplied resume, portfolio, and other applicant documents. Cite those sources and preserve their facts, tone, scope, and level of detail.",

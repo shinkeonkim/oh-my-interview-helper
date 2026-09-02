@@ -61,7 +61,7 @@ describe("preparation workflow contracts", () => {
           body: `${heading} 근거`,
           citations: citation
         })),
-        questions: Array.from({ length: 8 }, (_, index) => ({
+        questions: Array.from({ length: 6 }, (_, index) => ({
           question: `질문 ${index + 1}`,
           likelyAnswer: "제출 문서에서 확인한 지원자 답변",
           modelAnswer: "같은 사실을 더 구체적으로 구성한 모범 답변",
@@ -85,7 +85,7 @@ describe("preparation workflow contracts", () => {
         body: "내용",
         citations: []
       })),
-      questions: Array.from({ length: 8 }, (_, index) => ({
+      questions: Array.from({ length: 6 }, (_, index) => ({
         question: `질문 ${index + 1}`,
         likelyAnswer: "사용자 답변",
         rationale: "의도",

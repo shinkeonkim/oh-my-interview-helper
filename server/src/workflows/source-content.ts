@@ -22,10 +22,13 @@ export class WorkflowSourceContentResolver {
     this.disclosureSources = new DisclosureSourceResolver(database)
   }
 
-  resolveAll(inputs: readonly DisclosureInputRef[]): readonly WorkflowSourceContent[] {
+  resolveAll(
+    inputs: readonly DisclosureInputRef[],
+    maximumTotalCharacters = MAX_TOTAL_CHARACTERS
+  ): readonly WorkflowSourceContent[] {
     const perSourceCharacters = Math.min(
       MAX_SOURCE_CHARACTERS,
-      Math.floor(MAX_TOTAL_CHARACTERS / Math.max(inputs.length, 1))
+      Math.floor(maximumTotalCharacters / Math.max(inputs.length, 1))
     )
     return inputs.map((input) => {
       const metadata = this.disclosureSources.resolve(input)

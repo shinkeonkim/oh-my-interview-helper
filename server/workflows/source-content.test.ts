@@ -84,8 +84,13 @@ describe("workflow source content resolver", () => {
     })
 
     const sources = new WorkflowSourceContentResolver(persistence.database).resolveAll(inputs)
+    const boundedSources = new WorkflowSourceContentResolver(persistence.database).resolveAll(
+      inputs,
+      60_000
+    )
 
     expect(sources).toHaveLength(4)
     expect(sources.every((source) => source.text.length === 30_000)).toBe(true)
+    expect(boundedSources.every((source) => source.text.length === 15_000)).toBe(true)
   })
 })
