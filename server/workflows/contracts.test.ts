@@ -61,13 +61,36 @@ describe("preparation workflow contracts", () => {
           body: `${heading} 근거`,
           citations: citation
         })),
-        questions: Array.from({ length: 5 }, (_, index) => ({
+        questions: Array.from({ length: 8 }, (_, index) => ({
           question: `질문 ${index + 1}`,
           suggestedAnswer: "지원자 경험을 바탕으로 답변",
           rationale: "문화 적합성을 확인",
+          followUpQuestions: ["구체적인 본인 행동은?", "결과를 어떻게 확인했나요?"],
+          evaluationCriteria: ["구체성", "성찰"],
+          strengtheningPoints: ["지원자 본인의 실제 사례로 교체"],
           citations: citation
         }))
       })
     ).not.toThrow()
+  })
+
+  test("컬쳐 면접 질문마다 꼬리 질문과 평가·보강 기준을 요구한다", () => {
+    const incomplete = {
+      workflow: "culture_interview",
+      title: "컬쳐 면접 준비",
+      summary: "요약",
+      sections: Array.from({ length: 4 }, (_, index) => ({
+        heading: `영역 ${index + 1}`,
+        body: "내용",
+        citations: []
+      })),
+      questions: Array.from({ length: 8 }, (_, index) => ({
+        question: `질문 ${index + 1}`,
+        suggestedAnswer: "답변",
+        rationale: "의도",
+        citations: []
+      }))
+    }
+    expect(() => parsePreparationOutput("culture_interview", incomplete)).toThrow()
   })
 })

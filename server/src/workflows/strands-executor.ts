@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { CULTURE_INTERVIEW_QUESTION_POOL } from "@interview-helper/shared"
 
 import {
   providerInvocationHash,
@@ -209,6 +210,9 @@ const workflowGuidance = (workflow: PreparationWorkflowKind): string => {
     "Create a Korean culture-interview preparation brief grounded only in the supplied posting, documents, and public research sources.",
     "The sections must separately cover: company culture and working principles; stated talent profile; recent public interview-review patterns; and interview mindset plus an action checklist.",
     "The questions must cover motivation, values, collaboration, conflict, feedback, ownership, failure and growth, work style, and thoughtful questions for the interviewer.",
+    `Adapt and expand this researched baseline question pool for the specific company and role: ${JSON.stringify(CULTURE_INTERVIEW_QUESTION_POOL)}. Do not present baseline questions as facts about the company.`,
+    "For every question, write an evidence-aware suggested answer, 2-5 realistic interviewer follow-up questions, 2-6 concrete evaluation criteria, and 1-6 strengthening points for missing specificity, evidence, reflection, or culture-add.",
+    "Suggested answers are coaching drafts, not claims that the applicant had an experience. Clearly mark placeholders or evidence gaps the applicant must replace.",
     "Treat anonymous or third-party interview reviews as anecdotal and potentially outdated. Label patterns as unverified unless corroborated, distinguish official principles from review anecdotes, and never claim the current hiring process is guaranteed.",
     "Suggested answers must use applicant evidence when available and explicitly mark evidence gaps instead of inventing personal experience."
   ].join(" ")

@@ -31,6 +31,11 @@ const QuestionSchema = z
     citations: z.array(CitationSchema).max(20)
   })
   .strict()
+const CultureQuestionSchema = QuestionSchema.extend({
+  followUpQuestions: z.array(z.string().trim().min(1).max(2_000)).min(2).max(5),
+  evaluationCriteria: z.array(z.string().trim().min(1).max(1_000)).min(2).max(6),
+  strengtheningPoints: z.array(z.string().trim().min(1).max(2_000)).min(1).max(6)
+}).strict()
 
 const BaseOutputSchema = z.object({
   title: z.string().trim().min(1).max(300),
@@ -44,7 +49,7 @@ const QuestionOutputSchema = BaseOutputSchema.extend({
 })
 const CultureInterviewOutputSchema = BaseOutputSchema.extend({
   sections: z.array(SectionSchema).min(4).max(12),
-  questions: z.array(QuestionSchema).min(5).max(30)
+  questions: z.array(CultureQuestionSchema).min(8).max(30)
 })
 
 export const PreparationOutputSchemas = {
